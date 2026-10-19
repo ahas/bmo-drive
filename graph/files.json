@@ -1,0 +1,79 @@
+[
+  {
+    "id": "files/garage",
+    "title": "Garage place",
+    "what": "Garage as a place of this machine: its buckets and objects browsed, read and changed over S3 with the configured profile, its data folders guarded, in src/files/garage.rs.",
+    "files": [
+      "src/files/garage.rs"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "service/plumbing"
+    ],
+    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+  },
+  {
+    "id": "files/node-road",
+    "title": "Node road",
+    "what": "The node machines as places: the node list from bmo-node, each reached by an SSH or jake hub road running a POSIX or PowerShell script for drives, listing, reading and changes, in src/files/node/.",
+    "files": [
+      "src/files/node/mod.rs",
+      "src/files/node/posix.rs",
+      "src/files/node/powershell.rs",
+      "src/files/node/road.rs",
+      "src/files/node/shell.rs"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "clients/node",
+      "service/plumbing"
+    ],
+    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+  },
+  {
+    "id": "files/shares",
+    "title": "File share links",
+    "what": "Share links to a file or folder kept in the service's store with their span, the holder's page and download routes, and the bmo-drive file share command, in src/files/shares.rs and src/command.rs.",
+    "files": [
+      "src/files/shares.rs",
+      "src/command.rs",
+      "migrations/0001_file_shares.sql"
+    ],
+    "symbols": [],
+    "aliases": [
+      "셰어링크",
+      "파일공유해줘",
+      "파일기능에 공유는 안달려있나?"
+    ],
+    "needs": [
+      "files/viewer",
+      "service/plumbing"
+    ],
+    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+  },
+  {
+    "id": "files/viewer",
+    "title": "File viewer",
+    "what": "The file routes: places and machines, this machine's drives and volumes, listing in natural order, ranged reading, folder, upload, rename, copy and delete behind the protected-location guard, and folder zips, in src/files/.",
+    "files": [
+      "src/files/mod.rs",
+      "src/files/drives.rs",
+      "src/files/volume.rs",
+      "src/files/guard.rs",
+      "src/files/order.rs",
+      "src/files/change.rs",
+      "src/files/zip.rs",
+      "docs/files.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "files/garage",
+      "files/node-road",
+      "service/plumbing"
+    ],
+    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+  }
+]

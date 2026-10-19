@@ -1,0 +1,22 @@
+[
+  {
+    "id": "service/plumbing",
+    "title": "Service plumbing",
+    "what": "The service's settings in layers, its HTTP routes behind the bearer token with each route registered beside its answer, the SQLite store, health and the binary's commands, in src/http.rs, settings.rs, store.rs, health.rs, lib.rs and main.rs.",
+    "files": [
+      "src/http.rs",
+      "src/settings.rs",
+      "src/store.rs",
+      "src/health.rs",
+      "src/lib.rs",
+      "src/main.rs",
+      "docs/api.md",
+      "settings.toml",
+      "settings.local.toml.example"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [],
+    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+  }
+]
