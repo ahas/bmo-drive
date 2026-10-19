@@ -112,6 +112,21 @@ struct Mount {
   fsroot: Option<String>,
 }
 
+/// The Windows drives WSL mounts, out of what `findmnt --json --list` said: each source, a letter's
+/// root such as `C:\`, with the folder it is mounted at.
+pub fn windows_mounts(mounts: &str) -> Result<Vec<(String, String)>, String> {
+  let mounts: Mounts = serde_json::from_str(mounts).map_err(|why| format!("findmnt: {why}"))?;
+
+  Ok(
+    mounts
+      .filesystems
+      .into_iter()
+      .filter(|mount| matches!(mount.fstype.as_deref(), Some("9p" | "drvfs")))
+      .filter_map(|mount| Some((mount.source?, mount.target)))
+      .collect(),
+  )
+}
+
 fn kind_of(disk: &Block) -> &'static str {
   if disk
     .model

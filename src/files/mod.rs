@@ -5,6 +5,7 @@ mod change;
 mod drives;
 mod garage;
 mod guard;
+mod node;
 mod order;
 mod volume;
 mod zip;
@@ -444,8 +445,11 @@ impl Places for Machine {
 }
 
 /// The reading of the machine a place stands on.
-async fn places_of(_id: &str, standing: &Standing, fresh: bool) -> Result<Arc<dyn Places>, Refused> {
-  Ok(Machine::current(fresh, standing).await?)
+async fn places_of(id: &str, standing: &Standing, fresh: bool) -> Result<Arc<dyn Places>, Refused> {
+  match node::node_of(id) {
+    Some(name) => Ok(node::machine(standing, name, fresh).await?),
+    None => Ok(Machine::current(fresh, standing).await?),
+  }
 }
 
 /// A query parameter read as a count, where it is given.
@@ -469,7 +473,7 @@ fn named_place(call: &Call) -> Result<String, Refused> {
   call.query("place").filter(|place| !place.is_empty()).ok_or_else(missing_place)
 }
 
-/// The machines: this one read with its drives.
+/// The machines: this one read with its drives and Garage, and each node named, its drives unread.
 pub struct FilesPlaces;
 
 impl Route for FilesPlaces {
@@ -478,7 +482,16 @@ impl Route for FilesPlaces {
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
     let machine = Machine::current(true, call.standing()).await?;
-    let machines = vec![machine.view()];
+    // A node service that does not answer leaves this machine alone in the list.
+    let nodes = match node::listed(call.standing()).await {
+      Ok(nodes) => nodes,
+      Err(refused) => {
+        eprintln!("bmo-drive: {}", refused.error);
+        Vec::new()
+      }
+    };
+    let machines: Vec<Value> =
+      std::iter::once(machine.view()).chain(nodes.iter().map(node::Listed::unread)).collect();
 
     Ok(answer(StatusCode::OK, json!({ "machines": machines })))
   }
@@ -498,10 +511,15 @@ impl Route for FilesMachine {
       .query("machine")
       .filter(|key| !key.is_empty())
       .ok_or_else(|| Refused::new(StatusCode::BAD_REQUEST, "missing_machine", "no machine was sent"))?;
-    let view = match key.as_str() {
-      LOCAL => Machine::current(true, call.standing()).await?.view(),
-      _ => return Err(Refused::new(StatusCode::NOT_FOUND, "no_machine", "no such machine")),
+    let view = match node::node_of(&key) {
+      Some(name) => node::machine(call.standing(), name, true).await?.view(),
+      None if key == LOCAL => Machine::current(true, call.standing()).await?.view(),
+      None => return Err(Refused::new(StatusCode::NOT_FOUND, "no_machine", "no such machine")),
     };
+
+    if key != LOCAL {
+      forget_place_prefix(&format!("{key}:"));
+    }
 
     Ok(answer(StatusCode::OK, view))
   }
