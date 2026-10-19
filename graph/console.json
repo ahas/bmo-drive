@@ -2,7 +2,7 @@
   {
     "id": "console/files-bundle",
     "title": "Files screen bundle",
-    "what": "The console plugin bundle a host extends: the Files screen at /files with its tree, list, preview, uploads and share list, and the file share page, calling this service's routes, in client/.",
+    "what": "The console plugin bundle a host extends: the Files screen at /files with its tree, list, preview, uploads, rename and share list, and the file share page, calling this service's routes, in client/.",
     "files": [
       "client/nuxt.config.ts",
       "client/app/components/FilesItem.vue",
@@ -52,6 +52,6 @@
       "files/viewer",
       "files/shares"
     ],
-    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+    "base": "8b68b1fc5c551f392044ad02744a45f36790de97"
   }
 ]
