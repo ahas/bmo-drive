@@ -86,7 +86,9 @@ null), `dataDir` (or null), and `error` and `errorCode` where it cannot be opene
 ### A zip's answer
 
 `content-type: application/zip`, `content-disposition: attachment` under the folder's name with `.zip`
-after it (at a place's top, the place's own last name), `accept-ranges: none`, and no length. A file, a
+after it (at a place's top, the place's own last name), `accept-ranges: none`, and no length; and the
+headers every shown file carries: `x-content-type-options: nosniff`, `cache-control: private, no-store`
+and, a zip being no PDF, the sandbox `content-security-policy` a file read answers with. A file, a
 missing path or a place that cannot be read is refused before the answer starts; an entry that fails
 once the zip has started ends the answer as broken.
 
@@ -177,7 +179,9 @@ once the zip has started ends the answer as broken.
 | 500 | `failed` | anything else; the message says it |
 
 A machine's `errorCode` is one of `node_incomplete`, `node_unreachable`, `node_failed` and
-`node_timeout`. Garage's is one of `garage_config_unreadable` (Garage's configuration file could not be
+`node_timeout`, or the refusal code the node's drives script ended with: `not_found`, `outside_place`,
+`not_folder`, `is_folder`, `no_permission`, `protected`, `name_taken`, `cut_short` or `into_itself`. A
+node whose block devices or mounts cannot be listed shows `no_permission`. Garage's is one of `garage_config_unreadable` (Garage's configuration file could not be
 read), `aws_config_unreadable` (the AWS configuration could not be read), `garage_profile_missing` (the
 profile is not in it) and `garage_profile_incomplete` (the profile lacks its endpoint, region or keys).
 A Garage that could not be reached while answering is refused 502 `garage_failed`.
