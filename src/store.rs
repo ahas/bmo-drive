@@ -19,7 +19,7 @@ pub struct Store {
 }
 
 impl Store {
-  /// The store at `path`, made where it does not stand yet, its folder with it.
+  /// The store at `path`, made where it does not stand yet, its folder with it, and migrated.
   pub async fn open(path: &Path) -> Result<Self, StoreError> {
     if let Some(folder) = path.parent().filter(|folder| !folder.as_os_str().is_empty()) {
       std::fs::create_dir_all(folder)
@@ -32,6 +32,8 @@ impl Store {
       .journal_mode(SqliteJournalMode::Wal)
       .busy_timeout(BUSY);
     let pool = SqlitePoolOptions::new().connect_with(options).await?;
+
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     Ok(Self { pool })
   }
@@ -49,4 +51,6 @@ pub enum StoreError {
   Folder(String, std::io::Error),
   #[error("the store could not be opened: {0}")]
   Open(#[from] sqlx::Error),
+  #[error("the store could not be migrated: {0}")]
+  Migrate(#[from] sqlx::migrate::MigrateError),
 }

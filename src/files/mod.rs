@@ -7,6 +7,7 @@ mod garage;
 mod guard;
 mod node;
 mod order;
+pub mod shares;
 mod volume;
 mod zip;
 

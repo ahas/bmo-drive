@@ -17,6 +17,7 @@ was held to.
 | Folder | Holds |
 |---|---|
 | `src/` | The service and its command, one crate split into its own modules |
+| `migrations/` | The share links' store, its table made by these statements in order |
 | `deploy/` | The service's user unit |
 | `docs/` | The canonical statements of what the service does |
 
