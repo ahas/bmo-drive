@@ -171,15 +171,16 @@ once the zip has started ends the answer as broken.
 | 502 | `node_upload_failed` | the upload could not be put onto the node |
 | 502 | `garage_failed` | Garage did not answer as asked; the message carries what it said |
 | 503 | `store_failed` | the share store could not be read or written |
+| 503 | `garage_config_unreadable`, `aws_config_unreadable`, `garage_profile_missing`, `garage_profile_incomplete` | Garage was asked for while it cannot be opened, for the reason its place states (below) |
 | 504 | `node_timeout` | the node did not answer in time |
 | 504 | `disk_timeout` | the disk did not answer in time |
 | 500 | `failed` | anything else; the message says it |
 
-A machine's or Garage's `errorCode` is one of `node_incomplete`, `node_unreachable`, `node_failed`,
-`node_timeout`, `garage_unreachable` (Garage did not answer), `garage_config_unreadable` (Garage's
-configuration file could not be read), `aws_config_unreadable` (the AWS configuration could not be read),
-`garage_profile_missing` (the profile is not in it) and `garage_profile_incomplete` (the profile lacks
-its endpoint, region or keys).
+A machine's `errorCode` is one of `node_incomplete`, `node_unreachable`, `node_failed` and
+`node_timeout`. Garage's is one of `garage_config_unreadable` (Garage's configuration file could not be
+read), `aws_config_unreadable` (the AWS configuration could not be read), `garage_profile_missing` (the
+profile is not in it) and `garage_profile_incomplete` (the profile lacks its endpoint, region or keys).
+A Garage that could not be reached while answering is refused 502 `garage_failed`.
 
 ## The command
 

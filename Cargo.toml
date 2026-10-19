@@ -18,6 +18,10 @@ test = false
 [dependencies]
 # A folder's zip, written as it streams.
 async_zip = { version = "0.0.19", default-features = false, features = ["tokio"] }
+# Garage, reached as any S3 client reaches it, through a profile of the account's AWS configuration.
+aws-runtime = "1.10.0"
+aws-sdk-s3 = "1.152.0"
+aws-types = "1.6.0"
 axum = "0.8.9"
 # A zip entry's time, as this machine's clock writes it.
 chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
@@ -25,6 +29,9 @@ clap = { version = "4.6.7", features = ["derive"] }
 # The settings: the built-in defaults, the deployment's files and the environment, layered in that order.
 config = { version = "0.15", default-features = false, features = ["toml"] }
 futures-util = { version = "0.3.34", features = ["io"] }
+# An upload's bytes handed to the S3 client as a body.
+http-body-util = "0.1.3"
+hyper = "1.6.0"
 # The one byte range a request's Range header asks for.
 http-range-header = "0.4.2"
 # Each route registers itself beside its own answer.
@@ -44,6 +51,8 @@ sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "run
 thiserror = "2.0.17"
 tokio = { version = "1.53.2", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = { version = "0.7.19", features = ["io"] }
+# Garage's own configuration file.
+toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 
 # Build output kept small: line tables alone for a backtrace, split out, and no incremental cache.
 [profile.dev]

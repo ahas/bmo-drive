@@ -3,6 +3,7 @@
 
 mod change;
 mod drives;
+mod garage;
 mod guard;
 mod order;
 mod volume;
@@ -26,6 +27,7 @@ use serde_json::{Value, json};
 
 use crate::http::{Call, Refused, Route, Standing, answer};
 use drives::Drive;
+use garage::Garage;
 use guard::Guard;
 
 /// What one of a place's answers is still waiting on.
@@ -60,6 +62,58 @@ trait Place: Send + Sync {
   /// This place cut down to the folder at `top`, which becomes its top: the fence stands there, so
   /// nothing above or beside the folder is reached through it, a link leading out of it included.
   fn beneath<'a>(&'a self, top: &'a Within) -> Pending<'a, Box<dyn Place + 'a>>;
+}
+
+/// A place reached through a folder of another by its path alone, for a place where a path can lead
+/// nowhere but where it names — object storage, whose prefixes hold no links.
+struct Prefixed<'a> {
+  place: &'a dyn Place,
+  top: Within,
+}
+
+impl Place for Prefixed<'_> {
+  fn id(&self) -> &str {
+    self.place.id()
+  }
+
+  fn read_folder<'a>(&'a self, within: &'a Within) -> Pending<'a, Vec<Entry>> {
+    Box::pin(async move { self.place.read_folder(&within.under(&self.top)).await })
+  }
+
+  fn open<'a>(&'a self, within: &'a Within, span: Span) -> Pending<'a, Opened> {
+    Box::pin(async move { self.place.open(&within.under(&self.top), span).await })
+  }
+
+  fn make_folder<'a>(&'a self, within: &'a Within) -> Pending<'a, ()> {
+    Box::pin(async move { self.place.make_folder(&within.under(&self.top)).await })
+  }
+
+  fn write<'a>(&'a self, within: &'a Within, upload: Upload) -> Pending<'a, ()> {
+    Box::pin(async move { self.place.write(&within.under(&self.top), upload).await })
+  }
+
+  fn rename<'a>(&'a self, within: &'a Within, name: &'a str) -> Pending<'a, ()> {
+    Box::pin(async move { self.place.rename(&within.under(&self.top), name).await })
+  }
+
+  fn remove<'a>(&'a self, within: &'a Within) -> Pending<'a, ()> {
+    Box::pin(async move { self.place.remove(&within.under(&self.top)).await })
+  }
+
+  fn copy_here<'a>(&'a self, from: &'a Within, to: &'a Within, moving: bool) -> Pending<'a, ()> {
+    Box::pin(
+      async move { self.place.copy_here(&from.under(&self.top), &to.under(&self.top), moving).await },
+    )
+  }
+
+  fn beneath<'a>(&'a self, top: &'a Within) -> Pending<'a, Box<dyn Place + 'a>> {
+    Box::pin(async move {
+      Ok(Box::new(Prefixed {
+        place: self.place,
+        top: top.under(&self.top),
+      }) as Box<dyn Place + 'a>)
+    })
+  }
 }
 
 /// A machine's places as one reading of it lists them.
@@ -117,6 +171,13 @@ impl Within {
 
     names.push(name.to_owned());
     Self { names }
+  }
+
+  /// This path read from inside the folder at `top`.
+  fn under(&self, top: &Self) -> Self {
+    Self {
+      names: top.names.iter().chain(&self.names).cloned().collect(),
+    }
   }
 
   /// The entry `name` beside this one, in the same folder.
@@ -296,6 +357,7 @@ struct Opened {
 /// Everything there is to walk on this machine now.
 struct Machine {
   drives: Vec<Drive>,
+  garage: Option<Garage>,
 }
 
 /// The key this machine is known by among the machines.
@@ -343,13 +405,15 @@ impl Machine {
     let mut drives = drives::this_machine().await.map_err(|why| {
       Refused::new(StatusCode::BAD_GATEWAY, "drives_unread", format!("the drives could not be read: {why}"))
     })?;
-    let guard = Arc::new(Guard::this_machine(&standing.settings.protect, &[]));
+    let garage = garage::this_machine(&drives, &standing.settings).await;
+    let own = garage.as_ref().map(|garage| garage.own.clone()).unwrap_or_default();
+    let guard = Arc::new(Guard::this_machine(&standing.settings.protect, &own));
 
     for volume in drives.iter_mut().flat_map(|drive| drive.volumes.iter_mut()) {
       volume.guard = guard.clone();
     }
 
-    Ok(Self { drives })
+    Ok(Self { drives, garage })
   }
 
   /// The machine as the console is told of it.
@@ -359,7 +423,7 @@ impl Machine {
       "name": host_name(),
       "local": true,
       "disks": self.drives,
-      "garage": null,
+      "garage": self.garage.as_ref().map(Garage::view),
       "error": null,
       "errorCode": null,
     })
@@ -373,6 +437,7 @@ impl Places for Machine {
       .iter()
       .flat_map(|drive| drive.volumes.iter())
       .map(|one| one as &dyn Place)
+      .chain(self.garage.iter().map(|one| one as &dyn Place))
       .find(|place| place.id() == id)
       .ok_or_else(no_place)
   }
