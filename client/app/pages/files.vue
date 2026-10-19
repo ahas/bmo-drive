@@ -189,6 +189,7 @@ import {
   shownPath,
   withMachine
 } from "../domain/files";
+import { OVERLAY_CLOSE_MS } from "bmo-ui/app/domain/closing";
 import { useIsland } from "bmo-ui/app/domain/island";
 import { useNarrow } from "bmo-ui/app/domain/screen";
 import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
@@ -881,6 +882,7 @@ function newFolder(into: FolderAt | null = open.value): void {
     });
 
     await refreshAfter([into]);
+    await menusGone();
 
     // The new folder's name is a field at once, as a file explorer makes it.
     if (made.name !== null && open.value !== null && folderKey(open.value) === folderKey(into)) {
@@ -893,7 +895,24 @@ function newFolder(into: FolderAt | null = open.value): void {
 function startRename(): void {
   const [only] = targets();
 
-  if (only !== undefined && targets().length === 1) renaming.value = only;
+  if (only === undefined || targets().length !== 1) return;
+
+  void menusGone().then(() => {
+    if (selected.value.size === 1 && selected.value.has(only)) renaming.value = only;
+  });
+}
+
+// A name field opened from a menu waits for the menu to be gone. An open menu keeps the keyboard
+// inside itself and, as it leaves, hands it back to what opened it in a task of its own, which would
+// take it from the field the moment the field had taken it.
+async function menusGone(): Promise<void> {
+  const until = Date.now() + OVERLAY_CLOSE_MS;
+
+  while (document.querySelector("[role='menu']") !== null && Date.now() < until) {
+    await new Promise((settle) => requestAnimationFrame(settle));
+  }
+
+  await new Promise((settle) => setTimeout(settle, 0));
 }
 
 function renameEntry(entry: FileEntry, name: string): void {
