@@ -1,0 +1,28 @@
+# The file viewer and its share links as one service: the HTTP server and its command in one binary.
+# The only manifest at the root; the console plugin bundle keeps its own under `client/`.
+[package]
+name = "bmo-drive"
+description = "The file viewer over this machine's drives, Garage and the nodes' volumes, and its share links."
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+test = false
+
+[[bin]]
+name = "bmo-drive"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+
+# Build output kept small: line tables alone for a backtrace, split out, and no incremental cache.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+incremental = false
+
+[profile.release]
+debug = false
+strip = "debuginfo"

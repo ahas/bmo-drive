@@ -1,0 +1,81 @@
+# The drive service's settings (docs/api.md, 「Settings」). A deployment's settings.local.toml overrides any
+# key here, and BMO_DRIVE_<TABLE>__<KEY> in the environment overrides both.
+
+[server]
+# Where the service answers, as host:port.
+listen = "127.0.0.1:3300"
+# The bearer token every caller presents. A deployment names its own.
+token = ""
+
+[store]
+# The SQLite file the share links stand in.
+path = "drive.db"
+
+[console]
+# The console's public address, the base of a share link's page and download.
+address = "http://localhost:3000"
+
+[node]
+# The node service's base address and its token.
+address = "http://127.0.0.1:3310"
+token = ""
+
+[garage]
+# Garage's own configuration file, read for its data directory.
+config = "/etc/garage.toml"
+# The AWS profile Garage is reached through, in the account's own AWS configuration.
+profile = "garage"
+
+[share]
+# Who the file share command records as a link's maker.
+maker = "drive"
+
+# Where the file viewer never changes anything (docs/files.md, 「Protected locations」). Reading them is
+# untouched.
+
+# A machine read by a POSIX shell: this machine and every Linux or WSL node.
+[protect.posix]
+# The operating system's own folders.
+system = [
+  "/bin",
+  "/boot",
+  "/dev",
+  "/etc",
+  "/lib",
+  "/lib32",
+  "/lib64",
+  "/libx32",
+  "/proc",
+  "/root",
+  "/run",
+  "/sbin",
+  "/snap",
+  "/sys",
+  "/usr",
+  "/var",
+]
+# Folders whose own entries are never changed, though what stands deeper in those entries may be.
+top = ["/"]
+# Under the login's home: the deployment's data and deploy trees, a jake agent's folder, the user's service
+# units, the ssh and AWS keys, and Claude Code's own folder.
+home = [".local/share/bmo", ".local/share/jake", ".config/systemd", ".ssh", ".aws", ".claude"]
+# Every entry of a folder under the home whose name begins with a word, such as a repository's checkouts:
+# each { under = "<folder under the home>", starting = "<word>" }.
+home_named = []
+
+# A Windows node, reached in its own PowerShell.
+[protect.windows]
+# The environment variables naming the Windows folder and the program folders.
+system = ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
+# Under the user's own profile: the ssh keys the node's login stands on.
+home = [".ssh"]
+
+# This machine's Garage.
+[protect.garage]
+# Buckets whose name begins with one of these, where backups stand.
+buckets_starting = ["bmo"]
+
+# This machine besides: further folders protected with everything in them, such as the deployment's data
+# root and this service's own store.
+[protect.local]
+extra = []

@@ -1,0 +1,21 @@
+# The drive service's user unit. A deployment runs it from its deploy tree, whose settings.local.toml links
+# to the data root's env/drive.toml (docs/api.md, 「Settings」).
+[Unit]
+Description=bmo-drive: the file viewer and its share links
+After=network-online.target
+# Without its settings the service has no listen address or token, so the unit does not start where the
+# deployment wrote none.
+ConditionPathExists=%h/.local/share/bmo/data/env/drive.toml
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/bmo-drive/deploy
+ExecStart=%h/.local/share/bmo-drive/deploy/bin/bmo-drive serve
+Restart=always
+RestartSec=2
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
+# The repository's one service: stopped, restarted and watched by every deployment, which waits on its health.
+X-BMO-Deploy=bot
