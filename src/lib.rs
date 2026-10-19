@@ -2,6 +2,7 @@
 //! the share links that hand one entry to someone with no login (`docs/files.md`, `docs/api.md`).
 
 pub mod clients;
+pub mod files;
 pub mod health;
 pub mod http;
 pub mod settings;
