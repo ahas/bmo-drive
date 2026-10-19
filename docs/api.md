@@ -239,10 +239,11 @@ camelCase bodies, and a refusal as 200 with `answered` false and a `refusal` car
 
 ## Settings
 
-The settings are read at start from `settings.toml` and then `settings.local.toml`, in the folder
-`BMO_DRIVE_SETTINGS` names, else the folder above the one holding the binary (a deployment's root). A
-key left out of the local file keeps the first file's value; `BMO_DRIVE_<TABLE>__<KEY>` in the
-environment overrides both.
+The settings are read at start in layers, each overriding the one before: the defaults, which are the
+repository's own `settings.toml` built into the binary; then `settings.toml` and `settings.local.toml`
+where they stand in the settings folder, the one `BMO_DRIVE_SETTINGS` names, else the folder above the one
+holding the binary (a deployment's root); then `BMO_DRIVE_<TABLE>__<KEY>` in the environment. An empty
+token lets no caller in.
 
 | Table | Key | What it is |
 |---|---|---|

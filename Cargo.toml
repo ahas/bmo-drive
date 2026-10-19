@@ -16,6 +16,20 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
+axum = "0.8.9"
+clap = { version = "4.6.7", features = ["derive"] }
+# The settings: the built-in defaults, the deployment's files and the environment, layered in that order.
+config = { version = "0.15", default-features = false, features = ["toml"] }
+# Each route registers itself beside its own answer.
+inventory = "0.3.24"
+# The calls to the node service.
+reqwest = { version = "0.13.5", features = ["json"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+# The share links' store, one SQLite file.
+sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "runtime-tokio"] }
+thiserror = "2.0.17"
+tokio = { version = "1.53.2", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
 
 # Build output kept small: line tables alone for a backtrace, split out, and no incremental cache.
 [profile.dev]
