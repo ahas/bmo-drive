@@ -1,0 +1,7 @@
+{
+  // The screen read again with the components the host owes declared, so its templates are held to
+  // what they may ask of the host. The declarations stand outside app/, where a host extending the
+  // layer reads none of them and keeps its own components' types.
+  "extends": "../.nuxt/tsconfig.app.json",
+  "include": ["../.nuxt/nuxt.d.ts", "../app/**/*", "../shared/**/*", "./components.d.ts"]
+}

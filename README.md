@@ -18,12 +18,30 @@ was held to.
 |---|---|
 | `src/` | The service and its command, one crate split into its own modules |
 | `migrations/` | The share links' store, its table made by these statements in order |
+| `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own |
 | `deploy/` | The service's user unit |
 | `docs/` | The canonical statements of what the service does |
 
 At the root stand the Cargo manifest, `VERSION`, `testbed.toml`, `rustfmt.toml`, `CLAUDE.md`,
 `korean-ledger.json`, `settings.toml` and `settings.local.toml.example`, the example of the local
 settings a deployment gives.
+
+## The console plugin bundle
+
+`client/` holds the console's Files screen and its file share page as a Nuxt layer on top of bmo-ui,
+packed as `bmo-drive-client`. A host console extends it as it extends bmo-ui, and owes it:
+
+- bmo-ui itself, at the version the bundle's peer names; for the bundle's own install and typecheck a
+  packed copy stands in `client/vendor/`;
+- its i18n module and a language pack answering the keys the screen reads: the `files`, `common` and
+  `screens` keys, and `files.error.<code>` for each refusal code of `docs/api.md`;
+- the title-bar pieces `DeployMark`, `TodoOpenButton` and `UsageMeters`, declared in `client/host/` by
+  the props the screen hands them;
+- the routes under `/api/files/` and `/api/share/files/` passed on to this service (`docs/api.md`, 「What
+  the console does」).
+
+The screen calls only those routes, and says a refusal by its code in the pack's words. The bundle's
+check is `bun install --frozen-lockfile && bun run typecheck` inside `client/`.
 
 ## Documents
 
