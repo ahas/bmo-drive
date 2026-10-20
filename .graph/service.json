@@ -1,0 +1,78 @@
+[
+  {
+    "id": "service/events",
+    "title": "Event stream",
+    "what": "The service's one event stream, GET /events: entry and share changes kept in the store, the last 10,000, handed out live as server-sent events or as pages, in src/events.rs.",
+    "files": [
+      "src/events.rs",
+      "migrations/0002_events_and_milliseconds.sql"
+    ],
+    "symbols": [
+      "Events",
+      "EventStream",
+      "KINDS",
+      "now_ms"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/plumbing",
+      "service/wire"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065175
+  },
+  {
+    "id": "service/plumbing",
+    "title": "Service plumbing",
+    "what": "The service's settings in layers, its HTTP routes behind the bearer token with each route registered beside its answer and kebab-case refusals, the SQLite store, health and the service itself, in src/http.rs, settings.rs, store.rs, health.rs and lib.rs.",
+    "files": [
+      "src/http.rs",
+      "src/settings.rs",
+      "src/store.rs",
+      "src/health.rs",
+      "src/lib.rs",
+      "deploy/bmo-drive.service",
+      "settings.toml",
+      "settings.local.toml.example",
+      "docs/api.md"
+    ],
+    "symbols": [
+      "Route",
+      "Answers",
+      "router",
+      "Settings",
+      "Store",
+      "serve"
+    ],
+    "aliases": [],
+    "needs": [
+      "calls/node",
+      "service/events",
+      "service/wire"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065171
+  },
+  {
+    "id": "service/wire",
+    "title": "Wire types and client",
+    "what": "The bodies and queries every route takes and answers in the common wire format, and the service's own Rust client with one method per route, in src/wire.rs and src/client.rs.",
+    "files": [
+      "src/wire.rs",
+      "src/client.rs"
+    ],
+    "symbols": [
+      "DriveClient",
+      "ClientFailure",
+      "Place",
+      "Entry",
+      "Share"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/plumbing"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065173
+  }
+]

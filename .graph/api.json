@@ -1,0 +1,104 @@
+[
+  {
+    "id": "api/bundle",
+    "title": "Console bundle API",
+    "what": "The drive console bundle a console extends: its manifest and Nuxt configuration, the Files screen and the share page it attaches, as bmo-ui's plugin contract states it.",
+    "files": [
+      "client/console-bundle.json",
+      "client/nuxt.config.ts",
+      "docs/api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "console/files-bundle"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065191,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/cli",
+    "title": "Command API",
+    "what": "The words of bmo-drive, serve, health, mcp, openapi, nouns and file share, with their exit codes, as docs/api.md states them.",
+    "files": [
+      "docs/api.md",
+      "src/command.rs",
+      "src/main.rs"
+    ],
+    "symbols": [
+      "NOUNS",
+      "file_share",
+      "ShareArgs"
+    ],
+    "aliases": [],
+    "needs": [
+      "files/shares",
+      "harness/plugin",
+      "service/plumbing",
+      "service/wire"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065186,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/http",
+    "title": "HTTP API",
+    "what": "The service's HTTP boundary: the places, entries, shares, events and health routes with their bodies, answers and kebab-case refusals, as docs/api.md and docs/openapi.json state them.",
+    "files": [
+      "docs/api.md",
+      "docs/openapi.json",
+      "src/http.rs",
+      "src/openapi.rs",
+      "src/wire.rs"
+    ],
+    "symbols": [
+      "Route",
+      "Answers",
+      "router",
+      "openapi"
+    ],
+    "aliases": [],
+    "needs": [
+      "files/shares",
+      "files/viewer",
+      "service/events",
+      "service/plumbing"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065183,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/mcp",
+    "title": "Harness plugin tools",
+    "what": "The ahas-drive MCP tools a harness lists and calls, each one call of the service's client, as docs/api.md and skills/ahas-drive/SKILL.md state them.",
+    "files": [
+      "docs/api.md",
+      "skills/ahas-drive/SKILL.md",
+      "src/mcp/mod.rs",
+      "src/mcp/tools.rs"
+    ],
+    "symbols": [
+      "DriveServer",
+      "DriveTool",
+      "tools"
+    ],
+    "aliases": [],
+    "needs": [
+      "harness/plugin"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065189,
+    "boundary": {
+      "side": "exposes"
+    }
+  }
+]

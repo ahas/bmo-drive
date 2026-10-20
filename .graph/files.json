@@ -6,12 +6,18 @@
     "files": [
       "src/files/garage.rs"
     ],
-    "symbols": [],
+    "symbols": [
+      "PLACE",
+      "Garage"
+    ],
     "aliases": [],
     "needs": [
-      "service/plumbing"
+      "files/viewer",
+      "service/plumbing",
+      "service/wire"
     ],
-    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065163
   },
   {
     "id": "files/node-road",
@@ -24,25 +30,37 @@
       "src/files/node/road.rs",
       "src/files/node/shell.rs"
     ],
-    "symbols": [],
+    "symbols": [
+      "listed",
+      "machine",
+      "SshRoad",
+      "JakeRoad"
+    ],
     "aliases": [],
     "needs": [
-      "clients/node",
-      "service/plumbing"
+      "calls/node",
+      "service/plumbing",
+      "service/wire"
     ],
-    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065165
   },
   {
     "id": "files/shares",
     "title": "File share links",
-    "what": "Share links to a file or folder kept in the service's store until a time or with no end, served as /shares with each link's content, and the bmo-drive file share command over the client, in src/files/shares.rs and src/command.rs.",
+    "what": "Share links to a file or folder kept in the service's store until a time or with no end, served as /shares with each link's content, and the bmo-drive file share command, in src/files/shares.rs and src/command.rs.",
     "files": [
       "src/files/shares.rs",
       "src/command.rs",
       "migrations/0001_file_shares.sql",
-      "migrations/0002_events_and_milliseconds.sql"
+      "migrations/0002_events_and_milliseconds.sql",
+      "docs/files.md"
     ],
-    "symbols": [],
+    "symbols": [
+      "SharesList",
+      "SharesCreate",
+      "ShareContent"
+    ],
     "aliases": [
       "셰어링크",
       "파일공유해줘",
@@ -54,7 +72,8 @@
       "service/plumbing",
       "service/wire"
     ],
-    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065168
   },
   {
     "id": "files/viewer",
@@ -70,15 +89,21 @@
       "src/files/zip.rs",
       "docs/files.md"
     ],
-    "symbols": [],
+    "symbols": [
+      "PlacesList",
+      "EntriesList",
+      "ContentRead",
+      "read_drives"
+    ],
     "aliases": [],
     "needs": [
       "files/garage",
       "files/node-road",
+      "service/events",
       "service/plumbing",
-      "service/wire",
-      "service/events"
+      "service/wire"
     ],
-    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065160
   }
 ]

@@ -19,13 +19,10 @@
       "client/app/domain/refusals.ts",
       "client/app/domain/sizes.ts",
       "client/app/domain/urls.ts",
-      "client/app/i18n.d.ts",
       "client/app/pages/files/index.vue",
       "client/app/pages/files/share/[token].vue",
       "client/shared/config.ts",
-      "client/shared/openapi.ts",
-      "client/shared/share-head.ts",
-      "client/shared/types.ts"
+      "client/shared/share-head.ts"
     ],
     "symbols": [
       "refusalText",
@@ -39,10 +36,6 @@
       "readPlaces",
       "droppedItems",
       "FILES_VIEWS",
-      "FileEntry",
-      "FileMachine",
-      "FileShareView",
-      "SharedFileView",
       "SHARE_SPANS"
     ],
     "aliases": [
@@ -51,10 +44,11 @@
       "파일탐색기"
     ],
     "needs": [
-      "files/viewer",
       "files/shares",
+      "files/viewer",
       "service/wire"
     ],
-    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065180
   }
 ]

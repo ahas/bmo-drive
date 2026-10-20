@@ -1,0 +1,28 @@
+[
+  {
+    "id": "harness/plugin",
+    "title": "Harness plugin and OpenAPI document",
+    "what": "The ahas-drive plugin: the MCP server bmo-drive mcp with the nine drive_ tools over the client and its skill, and the OpenAPI document generated from the wire types and the tools, in src/mcp/, src/openapi.rs and skills/.",
+    "files": [
+      "src/mcp/mod.rs",
+      "src/mcp/tools.rs",
+      "src/openapi.rs",
+      "skills/ahas-drive/SKILL.md",
+      "docs/openapi.json"
+    ],
+    "symbols": [
+      "DriveServer",
+      "DriveTool",
+      "tools",
+      "openapi",
+      "openapi_json"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/events",
+      "service/wire"
+    ],
+    "base": "0c9e252ff7723a39e7360b1a899210411b4f9e27",
+    "changed": 1792499065177
+  }
+]
