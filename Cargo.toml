@@ -1,9 +1,10 @@
-# The file viewer and its share links as one service: the HTTP server and its command in one binary.
-# The only manifest at the root; the console plugin bundle keeps its own under `client/`.
+# The file viewer and its share links as one service: the HTTP server, its command, its client and its
+# harness plugin in one binary. The only manifest at the root; the console plugin bundle keeps its own under
+# `client/`.
 [package]
 name = "bmo-drive"
-description = "The file viewer over this machine's drives, Garage and the nodes' volumes, and its share links."
-version = "0.1.0"
+description = "The file viewer over this machine's drives, Garage and the nodes' volumes, its share links, its client and its MCP server."
+version = "0.1.0-rev.1"
 edition = "2024"
 publish = false
 
@@ -23,11 +24,11 @@ aws-runtime = "1.10.0"
 aws-sdk-s3 = "1.152.0"
 aws-types = "1.6.0"
 axum = "0.8.9"
-# A jake hub's output chunks, and a name handed to a Windows node's script.
+# A jake hub's output chunks, a name handed to a Windows node's script, and a file's bytes in a tool answer.
 base64 = "0.22.1"
 # A zip entry's time, as this machine's clock writes it.
 chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
-clap = { version = "4.6.7", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
 # The settings: the built-in defaults, the deployment's files and the environment, layered in that order.
 config = { version = "0.15", default-features = false, features = ["toml"] }
 # A jake hub's token file, written as dotenv lines.
@@ -42,22 +43,28 @@ http-range-header = "0.4.2"
 inventory = "0.3.24"
 # A file's type, guessed from its name.
 mime_guess = "2.0.5"
-# A file's name in a Content-Disposition header.
+# A file's name in a Content-Disposition header, and a place's name or a path in the client's paths.
 percent-encoding = "2.3.2"
 # The scratch name an upload is written under.
 rand = "0.9.2"
-# The calls to the node service.
-reqwest = { version = "0.13.5", features = ["json", "stream"] }
+# The calls to the node service, and the service's own client.
+reqwest = { version = "0.13.5", features = ["json", "query", "stream"] }
+# The harness tools, served over MCP on standard input and output.
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
+# A volume's free space.
+rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"] }
+# The JSON Schemas of the wire types, for the OpenAPI document and the tools.
+schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 # A word of a POSIX node's script, quoted as the shell reads it back whole.
 shlex = "2.0.1"
 # A jake hub's answer, a stream of server-sent events.
 sse-stream = "0.2.6"
-# The share links' store, one SQLite file.
+# The share links' and the events' store, one SQLite file.
 sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "runtime-tokio", "macros", "migrate"] }
 thiserror = "2.0.17"
-tokio = { version = "1.53.2", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1.53.2", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = { version = "0.7.19", features = ["io"] }
 # Garage's own configuration file.
 toml = { version = "0.8.23", default-features = false, features = ["parse"] }

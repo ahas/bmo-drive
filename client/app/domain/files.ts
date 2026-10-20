@@ -3,7 +3,6 @@ import { countText } from "bmo-ui/app/domain/numbers";
 import { formatStamp } from "bmo-ui/app/domain/time";
 import { faultText } from "./refusals";
 import { fileSizeText } from "./sizes";
-import { appUrl } from "./urls";
 
 import type { FileDrive, FileDriveKind, FileEntry, FileGarage, FileMachine, FilePlaces, FileSortKey, FileVolume } from "../../shared/types";
 import type { BarProperty } from "bmo-ui/app/domain/tabs";
@@ -57,21 +56,21 @@ export const VIEW_MARK: Record<FilesView, number> = {
 
 /** The language pack's name for each view, each key whole so it can be found by reading. */
 export const VIEW_LABELS: Record<FilesView, string> = {
-  huge: "files.label.view_huge",
-  large: "files.label.view_large",
-  medium: "files.label.view_medium",
-  small: "files.label.view_small",
-  list: "files.label.view_list",
-  details: "files.label.view_details",
-  tiles: "files.label.view_tiles",
-  content: "files.label.view_content"
+  huge: "drive.label.view_huge",
+  large: "drive.label.view_large",
+  medium: "drive.label.view_medium",
+  small: "drive.label.view_small",
+  list: "drive.label.view_list",
+  details: "drive.label.view_details",
+  tiles: "drive.label.view_tiles",
+  content: "drive.label.view_content"
 };
 
 /** The language pack's name for each column a folder is sorted by. */
 export const SORT_LABELS: Record<FileSortKey, string> = {
-  name: "files.label.name",
-  modified: "files.label.modified",
-  size: "files.label.size"
+  name: "drive.label.name",
+  modified: "drive.label.modified",
+  size: "drive.label.size"
 };
 
 export function readView(value: unknown): FilesView {
@@ -218,33 +217,24 @@ export function listSize(bytes: number): string {
 
 /** The type a file explorer names an entry by: a folder, a file of its ending, or a plain file. */
 export function typeLabel(t: Translate, entry: FileEntry): string {
-  if (entry.kind === "folder") return t("files.label.folder");
+  if (entry.kind === "folder") return t("drive.label.folder");
 
   const dot = entry.name.lastIndexOf(".");
 
-  return dot > 0 ? t("files.label.file_type", { end: entry.name.slice(dot + 1).toUpperCase() }) : t("files.label.plain_file");
+  return dot > 0 ? t("drive.label.file_type", { end: entry.name.slice(dot + 1).toUpperCase() }) : t("drive.label.plain_file");
 }
 
 /** An entry's details as the properties viewer lists them: where it is, what it is, how large, when changed. */
 export function entryProperties(t: Translate, placeName: string, path: string, entry: FileEntry): BarProperty[] {
   return [
-    { label: t("files.label.place"), value: placeName },
-    { label: t("files.label.path"), value: path, mono: true },
-    { label: t("files.label.type"), value: typeLabel(t, entry) },
-    ...(entry.size === null ? [] : [{ label: t("files.label.size"), value: t("files.label.size_exact", { size: fileSizeText(entry.size), bytes: countText(entry.size) }) }]),
-    ...(entry.modified === null ? [] : [{ label: t("files.label.modified"), value: formatStamp(entry.modified / 1000) }])
+    { label: t("drive.label.place"), value: placeName },
+    { label: t("drive.label.path"), value: path, mono: true },
+    { label: t("drive.label.type"), value: typeLabel(t, entry) },
+    ...(entry.size === null ? [] : [{ label: t("drive.label.size"), value: t("drive.label.size_exact", { size: fileSizeText(entry.size), bytes: countText(entry.size) }) }]),
+    ...(entry.modified === null ? [] : [{ label: t("drive.label.modified"), value: formatStamp(entry.modified / 1000) }])
   ];
 }
 
-/** The address a file is read at: shown in the browser, saved, or only its head. */
-export function readUrl(at: FolderAt & { name: string }, how: { download?: boolean; head?: number } = {}): string {
-  const query = new URLSearchParams({ place: at.place, path: joinPath(at.path, at.name) });
-
-  if (how.download === true) query.set("download", "1");
-  if (how.head !== undefined) query.set("head", String(how.head));
-
-  return appUrl(`/api/files/read?${query.toString()}`);
-}
 
 /** Whether an entry stands as its own small picture at a mark of this size. */
 export function showsThumbnail(entry: FileEntry, mark: number): boolean {
@@ -322,11 +312,11 @@ export function placeLabel(t: Translate, places: FilePlaces | null, place: strin
   if (found === null) {
     const cut = place.lastIndexOf(":");
 
-    return place === "garage" ? t("files.label.garage") : cut < 0 ? place : place.slice(cut + 1) || place;
+    return place === "garage" ? t("drive.label.garage") : cut < 0 ? place : place.slice(cut + 1) || place;
   }
 
   const { machine, drive, volume } = found;
-  const own = drive === null || volume === null ? t("files.label.garage") : drive.volumes.length > 1 ? `${drive.name} ${volume.mount}` : drive.name;
+  const own = drive === null || volume === null ? t("drive.label.garage") : drive.volumes.length > 1 ? `${drive.name} ${volume.mount}` : drive.name;
 
   return machine.local ? own : `${machine.name} · ${own}`;
 }
@@ -432,7 +422,7 @@ function driveItems(t: Translate, machine: FileMachine, drives: readonly FileDri
     const [only] = drive.volumes;
 
     if (drive.volumes.length === 0) {
-      return { value: driveRowKey(machine.key, drive.key), label: drive.name, note: t("files.label.not_mounted"), icon, disabled: true };
+      return { value: driveRowKey(machine.key, drive.key), label: drive.name, note: t("drive.label.not_mounted"), icon, disabled: true };
     }
 
     if (drive.volumes.length === 1 && only !== undefined) {
@@ -456,15 +446,15 @@ function driveItems(t: Translate, machine: FileMachine, drives: readonly FileDri
   const where = garageWhere(machine, garage);
 
   if (garage.error !== null) {
-    return [...items, { value: folderKey({ place: garage.place, path: "" }), label: t("files.label.garage"), note: faultText(t, garage.errorCode, garage.error), failed: true, icon: GARAGE_ICON, disabled: true }];
+    return [...items, { value: folderKey({ place: garage.place, path: "" }), label: t("drive.label.garage"), note: faultText(t, garage.errorCode, garage.error), failed: true, icon: GARAGE_ICON, disabled: true }];
   }
 
-  return [...items, folderItem({ place: garage.place, path: "" }, t("files.label.garage"), GARAGE_ICON, context, where === "" ? undefined : where)];
+  return [...items, folderItem({ place: garage.place, path: "" }, t("drive.label.garage"), GARAGE_ICON, context, where === "" ? undefined : where)];
 }
 
 /** The tree: each machine — this one first — opening onto its drives and their volumes, and Garage. */
 export function filesTree(t: Translate, places: FilePlaces, known: ReadonlyMap<string, FolderChildren>): FilesTreeItem[] {
-  const context: TreeContext = { known, more: (count) => t("files.label.more_folders", { n: countText(count) }) };
+  const context: TreeContext = { known, more: (count) => t("drive.label.more_folders", { n: countText(count) }) };
 
   return places.machines.map((machine): FilesTreeItem => {
     const key = machineRowKey(machine.key);
@@ -477,7 +467,7 @@ export function filesTree(t: Translate, places: FilePlaces, known: ReadonlyMap<s
 
     const drives = driveItems(t, machine, machine.disks, context);
 
-    return drives.length === 0 ? { ...item, note: t("files.label.no_drives") } : { ...item, children: drives };
+    return drives.length === 0 ? { ...item, note: t("drive.label.no_drives") } : { ...item, children: drives };
   });
 }
 
@@ -588,4 +578,4 @@ export function carriesFiles(transfer: DataTransfer | null): boolean {
 }
 
 /** The drag type entries of the list travel under, inside the page. */
-export const ENTRIES_DRAG = "application/x-bmo-files";
+export const ENTRIES_DRAG = "application/x-drive-entries";

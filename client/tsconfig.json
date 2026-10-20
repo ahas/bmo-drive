@@ -1,12 +1,10 @@
 {
-  // Nuxt's own project configs carry the layer's code; the screen read with the components the host
-  // owes is a project of its own beside them, so the typecheck reads it too.
+  // Nuxt's own project configs carry the layer's code.
   "files": [],
   "references": [
     { "path": "./.nuxt/tsconfig.app.json" },
     { "path": "./.nuxt/tsconfig.server.json" },
     { "path": "./.nuxt/tsconfig.shared.json" },
-    { "path": "./.nuxt/tsconfig.node.json" },
-    { "path": "./host" }
+    { "path": "./.nuxt/tsconfig.node.json" }
   ]
 }

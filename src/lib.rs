@@ -1,13 +1,19 @@
-//! The drive service: the file viewer over this machine's drives, its Garage and the nodes' volumes, and
-//! the share links that hand one entry to someone with no login (`docs/files.md`, `docs/api.md`).
+//! The drive service: the file viewer over this machine's drives, its Garage and the nodes' volumes, the
+//! share links that hand one entry to someone who holds no token, the service's own client and its harness
+//! plugin (`docs/files.md`, `docs/api.md`).
 
+pub mod client;
 pub mod clients;
 pub mod command;
+pub mod events;
 pub mod files;
 pub mod health;
 pub mod http;
+pub mod mcp;
+pub mod openapi;
 pub mod settings;
 pub mod store;
+pub mod wire;
 
 use std::io;
 

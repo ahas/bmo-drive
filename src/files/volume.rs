@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
 use axum::body::Body;
-use axum::http::StatusCode;
+
 use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_util::io::ReaderStream;
@@ -209,11 +209,7 @@ async fn write(volume: Volume, mount: PathBuf, within: Within, upload: Upload) -
   };
 
   if landing.is_dir() {
-    return Err(Refused::new(
-      StatusCode::BAD_REQUEST,
-      "folder_taken",
-      "a folder of that name stands where the file is to go",
-    ));
+    return Err(Refused::rule("folder-taken", "a folder of that name stands where the file is to go"));
   }
 
   let scratch = landing.with_file_name(scratch_name());
@@ -262,11 +258,7 @@ async fn blocking<T: Send + 'static>(
   match tokio::time::timeout(READING, tokio::task::spawn_blocking(work)).await {
     Ok(Ok(done)) => done,
     Ok(Err(why)) => Err(Refused::failed(why)),
-    Err(_) => Err(Refused::new(
-      StatusCode::GATEWAY_TIMEOUT,
-      "disk_timeout",
-      "the disk did not answer in time",
-    )),
+    Err(_) => Err(Refused::failed("the disk did not answer in time")),
   }
 }
 

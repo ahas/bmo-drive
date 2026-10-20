@@ -19,7 +19,8 @@ These hold every bmo-next repository, and every change here (archive document #3
 
 - `docs/` is the canonical statement of what the service does; the code is one realisation of it.
   Before changing code, read the document covering that area: `docs/files.md` for the file viewer and
-  its share links, `docs/api.md` for the routes, the command, the calls and the settings.
+  its share links, `docs/api.md` for the routes, the command, the harness plugin, the calls and the
+  settings, with `docs/openapi.json` generated from the code beside it.
 - A change that would make a document wrong or incomplete repairs the document first, stating what is
   true now, and the code is written to match.
 - A document states what is true now: no change history, no rationale told through an earlier design,
@@ -45,9 +46,10 @@ These hold every bmo-next repository, and every change here (archive document #3
 - Everything in this repository is English: code, comments, strings, tests, documents, commit messages
   and branch names. No Korean in code or tests, written plainly or as escapes; `korean-ledger.json`
   names none.
-- What the service answers is an English sentence for a log and a snake_case code a screen shows in its
-  own language's words (`docs/api.md`, 「Refusals」). The screen's words stand in bmo-web's language
-  pack.
+- What the service answers is an English sentence for a log and a kebab-case code a screen shows in its
+  own language's words (`docs/api.md`, 「Refusals」). The screen's words stand in the console plugin
+  bundle's own language pack, `client/i18n/`, one file to a locale; its Korean file is data a screen
+  shows, not code.
 - No personal data: no user names, home directories, machine names, internal addresses or names of any
   agent. What the service needs at runtime comes from its settings, never from the code.
 

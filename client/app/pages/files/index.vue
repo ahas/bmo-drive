@@ -5,17 +5,11 @@
        under the toolbar, and the other two rise from the bottom edge. -->
   <UDashboardPanel id="files" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-y-hidden [&>*]:max-w-none' }">
     <template #header>
-      <UDashboardNavbar :title="$t('screens.label.files')" icon="i-material-symbols-folder-open-outline">
-        <template #right>
-          <DeployMark />
-          <TodoOpenButton />
-          <UsageMeters />
-        </template>
-      </UDashboardNavbar>
+      <UDashboardNavbar :title="$t('drive.title')" icon="i-material-symbols-folder-open-outline" />
     </template>
 
     <template #body>
-      <ToolBar :label="$t('files.aria.toolbar')">
+      <ToolBar :label="$t('drive.aria.toolbar')">
         <template v-if="choosing">
           <ChooseAll :keys="entryNames" :selected="selected" @choose="chooseAll" />
           <UTooltip :text="$t('common.action.close')">
@@ -26,39 +20,39 @@
           <UTooltip :text="treeTool.label">
             <UButton color="neutral" variant="ghost" :icon="treeTool.icon" :aria-label="treeTool.label" :aria-pressed="treeTool.pressed" @click="treeTool.onSelect()" />
           </UTooltip>
-          <UTooltip :text="$t('files.action.back')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-arrow-back" :aria-label="$t('files.action.back')" :disabled="visited.length < 2" @click="goBack" />
+          <UTooltip :text="$t('drive.action.back')">
+            <UButton color="neutral" variant="ghost" icon="i-material-symbols-arrow-back" :aria-label="$t('drive.action.back')" :disabled="visited.length < 2" @click="goBack" />
           </UTooltip>
         </template>
 
         <!-- The bar runs right to left and its steps left to right, so a path longer than the bar
              stands at its end, where the open folder is, and one that fits stands at its start. On a
              phone it stands on a line of its own below instead. -->
-        <nav v-if="!narrow" class="min-w-0 flex-1" :aria-label="$t('files.aria.path_bar')">
+        <nav v-if="!narrow" class="min-w-0 flex-1" :aria-label="$t('drive.aria.path_bar')">
           <div class="flex h-full min-w-0 flex-1 items-center overflow-x-auto [direction:rtl] [scrollbar-width:none]">
             <UBreadcrumb :items="pathItems" class="mr-auto shrink-0 [direction:ltr]" :ui="{ list: 'flex-nowrap', link: 'whitespace-nowrap', item: 'shrink-0' }" />
           </div>
         </nav>
         <div v-else class="min-w-0 flex-1" />
 
-        <UTooltip :text="$t('files.action.new_folder')">
-          <UButton color="neutral" variant="ghost" icon="i-material-symbols-create-new-folder-outline" :aria-label="$t('files.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
+        <UTooltip :text="$t('drive.action.new_folder')">
+          <UButton color="neutral" variant="ghost" icon="i-material-symbols-create-new-folder-outline" :aria-label="$t('drive.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
         </UTooltip>
         <UDropdownMenu :items="uploadItems" :content="{ align: 'end' }">
-          <UTooltip :text="$t('files.action.upload')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-upload" :aria-label="$t('files.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
+          <UTooltip :text="$t('drive.action.upload')">
+            <UButton color="neutral" variant="ghost" icon="i-material-symbols-upload" :aria-label="$t('drive.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
           </UTooltip>
         </UDropdownMenu>
         <ActionGroup :actions="editActions" />
 
         <UDropdownMenu :items="viewItems" :content="{ align: 'end' }">
-          <UTooltip :text="$t('files.action.view')" :disabled="!narrow">
-            <UButton color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="narrow ? undefined : $t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('files.action.view')" />
+          <UTooltip :text="$t('drive.action.view')" :disabled="!narrow">
+            <UButton color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="narrow ? undefined : $t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('drive.action.view')" />
           </UTooltip>
         </UDropdownMenu>
 
-        <UTooltip :text="$t('common.action.refresh')">
-          <UButton color="neutral" variant="ghost" icon="i-material-symbols-refresh" :aria-label="$t('common.action.refresh')" :loading="rereading" @click="reread" />
+        <UTooltip :text="$t('drive.action.refresh')">
+          <UButton color="neutral" variant="ghost" icon="i-material-symbols-refresh" :aria-label="$t('drive.action.refresh')" :loading="rereading" @click="reread" />
         </UTooltip>
         <UTooltip v-if="!narrow" :text="previewTool.label">
           <UButton color="neutral" variant="ghost" :icon="previewTool.icon" :aria-label="previewTool.label" :aria-pressed="previewTool.pressed" @click="previewTool.onSelect()" />
@@ -66,31 +60,31 @@
       </ToolBar>
 
       <!-- On a phone the path wraps onto as many lines as it needs, rather than being cut. -->
-      <nav v-if="narrow" class="shrink-0 border-b border-default px-4 py-2" :aria-label="$t('files.aria.path_bar')">
+      <nav v-if="narrow" class="shrink-0 border-b border-default px-4 py-2" :aria-label="$t('drive.aria.path_bar')">
         <UBreadcrumb :items="pathItems" :ui="{ list: 'flex-wrap gap-y-1', link: 'break-all', item: 'min-w-0' }" />
       </nav>
 
       <p v-if="placesFailure !== ''" role="alert" class="flex items-center gap-3 p-4 text-sm text-error">
         {{ placesFailure }}
-        <UButton color="neutral" variant="outline" size="sm" icon="i-material-symbols-refresh" :label="$t('common.action.refresh')" @click="loadPlaces" />
+        <UButton color="neutral" variant="outline" size="sm" icon="i-material-symbols-refresh" :label="$t('drive.action.refresh')" @click="loadPlaces" />
       </p>
 
       <div v-if="narrow" class="flex min-h-0 flex-1 flex-col">
-        <FilesList v-bind="listProps" v-model:selected="selected" v-model:choosing="choosing" class="min-h-0 flex-1" v-on="listEvents">
+        <DriveList v-bind="listProps" v-model:selected="selected" v-model:choosing="choosing" class="min-h-0 flex-1" v-on="listEvents">
           <template #foot><FilesProgress :progress="uploading" /></template>
-        </FilesList>
+        </DriveList>
 
         <!-- The tree, up from the bottom edge on a phone: it only chooses what the list shows. -->
-        <UDrawer v-model:open="treeDrawer" :title="$t('files.action.tree')" :ui="FULL_SHEET">
+        <UDrawer v-model:open="treeDrawer" :title="$t('drive.action.tree')" :ui="FULL_SHEET">
           <template #body>
-            <FilesTree v-model:expanded="expanded" v-bind="treeProps" class="min-h-0 flex-1" @open="openFromTree" @context="onTreeContext" @drop="onTreeDrop" />
+            <DriveTree v-model:expanded="expanded" v-bind="treeProps" class="min-h-0 flex-1" @open="openFromTree" @context="onTreeContext" @drop="onTreeDrop" />
           </template>
         </UDrawer>
 
         <!-- The preview, up from the bottom edge when a file is tapped. -->
-        <UDrawer v-model:open="previewDrawer" :title="$t('files.action.preview')" :ui="FULL_SHEET">
+        <UDrawer v-model:open="previewDrawer" :title="$t('drive.action.preview')" :ui="FULL_SHEET">
           <template #body>
-            <FilesPreview v-bind="previewProps" class="min-h-0 flex-1" @zoom="openPicture" />
+            <DrivePreview v-bind="previewProps" class="min-h-0 flex-1" @zoom="openPicture" />
           </template>
         </UDrawer>
       </div>
@@ -99,7 +93,7 @@
         v-else
         id="files-splitter"
         ref="sides"
-        auto-save-id="bmo-files-splitter"
+        auto-save-id="drive-files-splitter"
         :items="SIDES"
         :ui="{ handle: SPLIT_HANDLE }"
         class="min-h-0 flex-1"
@@ -107,17 +101,17 @@
         @expand="onSideFold($event, true)"
       >
         <template #tree>
-          <FilesTree v-model:expanded="expanded" v-bind="treeProps" class="min-h-0 min-w-0 flex-1" @open="openFolder" @context="onTreeContext" @drop="onTreeDrop" />
+          <DriveTree v-model:expanded="expanded" v-bind="treeProps" class="min-h-0 min-w-0 flex-1" @open="openFolder" @context="onTreeContext" @drop="onTreeDrop" />
         </template>
 
         <template #list>
-          <FilesList v-bind="listProps" v-model:selected="selected" v-model:choosing="choosing" class="min-h-0 min-w-0 flex-1" v-on="listEvents">
+          <DriveList v-bind="listProps" v-model:selected="selected" v-model:choosing="choosing" class="min-h-0 min-w-0 flex-1" v-on="listEvents">
             <template #foot><FilesProgress :progress="uploading" /></template>
-          </FilesList>
+          </DriveList>
         </template>
 
         <template #preview>
-          <FilesPreview v-bind="previewProps" class="min-h-0 min-w-0 flex-1" @zoom="openPicture" />
+          <DrivePreview v-bind="previewProps" class="min-h-0 min-w-0 flex-1" @zoom="openPicture" />
         </template>
       </USplitter>
 
@@ -126,8 +120,8 @@
 
       <FilesConflictDialog v-model:open="conflictOpen" :names="conflictNames" @answer="onConflictAnswer" />
 
-      <ShareLinkDialog v-model:open="shareOpen" :road="shareRoad" span="7d" :subject="shareTarget?.name" />
-      <FilesShareList v-model:open="shareListOpen" :places="places" />
+      <ShareLinkDialog v-model:open="shareOpen" :road="shareRoad" :spans="shareSpans" span="7d" :subject="shareTarget?.name" />
+      <DriveShareList v-model:open="shareListOpen" :places="places" />
 
       <UModal v-model:open="propertiesOpen" :title="propertiesEntry?.name ?? ''">
         <template #body>
@@ -154,9 +148,9 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { refusalText } from "../domain/refusals";
+import { refusalText } from "../../domain/refusals";
 import { countText } from "bmo-ui/app/domain/numbers";
-import { appUrl } from "../domain/urls";
+import { carryEntries, contentUrl, deleteEntries, endShare, makeFolder, makeShare, readListing, readNode, readPlaces, readShares, renameEntry as renameAt, sendFile } from "../../domain/drive";
 import {
   DEFAULT_SORT,
   DEFAULT_VIEW,
@@ -184,21 +178,20 @@ import {
   placeLabel,
   previewKind,
   readSort,
-  readUrl,
   readView,
   shownPath,
   withMachine
-} from "../domain/files";
+} from "../../domain/files";
 import { OVERLAY_CLOSE_MS } from "bmo-ui/app/domain/closing";
 import { useIsland } from "bmo-ui/app/domain/island";
 import { useNarrow } from "bmo-ui/app/domain/screen";
 import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
-import { filesSharePage } from "../../shared/file-shares";
+import { SHARE_SPANS, spanSeconds } from "../../../shared/config";
 
-import type { FileConflict, FileEntry, FileListing, FileMachine, FilePlaces, FileShareView, FileSortKey } from "../../shared/types";
-import type { ShareRoad } from "../domain/share-links";
-import type { Dropped, FilesClip, FilesSort, FilesView, FolderAt, FolderChildren, FilesTreeItem } from "../domain/files";
-import type { FilesPress } from "../components/FilesList.vue";
+import type { FileConflict, FileEntry, FileMachine, FilePlaces, FileShareView, FileSortKey } from "../../../shared/types";
+import type { ShareRoad, ShareSpan } from "bmo-ui/app/domain/share-links";
+import type { Dropped, FilesClip, FilesSort, FilesView, FolderAt, FolderChildren, FilesTreeItem } from "../../domain/files";
+import type { FilesPress } from "../../components/DriveList.vue";
 import type { FilesUploading } from "bmo-ui/app/components/FilesProgress.vue";
 import type { BarAction, BarProperty } from "bmo-ui/app/domain/tabs";
 import type { BreadcrumbItem, ContextMenuItem, DropdownMenuItem, SplitterItem } from "@nuxt/ui";
@@ -334,10 +327,10 @@ const pathItems = computed<BreadcrumbItem[]>(() => {
 
 const treeTool = computed<BarAction>(() =>
   narrow.value
-    ? { id: "tree", label: t("files.action.tree"), icon: "i-material-symbols-account-tree-outline", pressed: treeDrawer.value, onSelect: () => { treeDrawer.value = true; } }
+    ? { id: "tree", label: t("drive.action.tree"), icon: "i-material-symbols-account-tree-outline", pressed: treeDrawer.value, onSelect: () => { treeDrawer.value = true; } }
     : {
         id: "tree",
-        label: treeOpen.value ? t("files.action.tree_collapse") : t("files.action.tree_expand"),
+        label: treeOpen.value ? t("drive.action.tree_collapse") : t("drive.action.tree_expand"),
         icon: treeOpen.value ? "i-material-symbols-left-panel-close-outline" : "i-material-symbols-left-panel-open-outline",
         pressed: treeOpen.value,
         onSelect: () => toggleSide(0)
@@ -346,7 +339,7 @@ const treeTool = computed<BarAction>(() =>
 
 const previewTool = computed<BarAction>(() => ({
   id: "preview",
-  label: previewOpen.value ? t("files.action.preview_collapse") : t("files.action.preview_expand"),
+  label: previewOpen.value ? t("drive.action.preview_collapse") : t("drive.action.preview_expand"),
   icon: previewOpen.value ? "i-material-symbols-right-panel-close-outline" : "i-material-symbols-right-panel-open-outline",
   pressed: previewOpen.value,
   onSelect: () => toggleSide(2)
@@ -497,7 +490,7 @@ function openEntry(entry: FileEntry): void {
     pictureName.value = entry.name;
     pictureOpen.value = true;
   } else if (entry.kind === "file") {
-    window.open(readUrl({ ...at, name: entry.name }), "_blank", "noopener");
+    window.open(contentUrl({ ...at, name: entry.name }), "_blank", "noopener");
   }
 }
 
@@ -517,7 +510,7 @@ const pictureName = ref<string | null>(null);
 const pictures = computed(() => (entries.value ?? []).filter((one) => one.kind === "file" && previewKind(one.name) === "image"));
 const pictureAt = computed(() => pictures.value.findIndex((one) => one.name === pictureName.value));
 const pictureEntry = computed(() => pictures.value[pictureAt.value] ?? null);
-const pictureSrc = computed(() => (open.value === null || pictureName.value === null ? "" : readUrl({ ...open.value, name: pictureName.value })));
+const pictureSrc = computed(() => (open.value === null || pictureName.value === null ? "" : contentUrl({ ...open.value, name: pictureName.value })));
 
 function openPicture(): void {
   if (chosenEntry.value === null) return;
@@ -544,8 +537,8 @@ const pictureActions = computed<BarAction[]>(() => {
   if (at === null || name === null) return [];
 
   return [
-    { id: "download", label: t("files.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(readUrl({ ...at, name }, { download: true }), "_self") },
-    { id: "open", label: t("files.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(readUrl({ ...at, name }), "_blank", "noopener") }
+    { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(contentUrl({ ...at, name }, { download: true }), "_self") },
+    { id: "open", label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(contentUrl({ ...at, name }), "_blank", "noopener") }
   ];
 });
 
@@ -558,7 +551,7 @@ watch(pictureAt, (at) => {
   if (!import.meta.client || open.value === null) return;
 
   for (const near of [pictures.value[at - 1], pictures.value[at + 1]]) {
-    if (near !== undefined) new Image().src = readUrl({ ...open.value, name: near.name });
+    if (near !== undefined) new Image().src = contentUrl({ ...open.value, name: near.name });
   }
 });
 
@@ -578,17 +571,28 @@ const shareOpen = ref(false);
 const shareListOpen = ref(false);
 const shareTarget = ref<{ place: string; path: string; name: string } | null>(null);
 
+const shareSpans = computed<ShareSpan[]>(() => SHARE_SPANS.map((span) => ({ value: span.key, label: t(span.label) })));
+
+// The road the share dialog goes by: each link's page is the address the service answers with it.
 const shareRoad = computed<ShareRoad>(() => {
   const target = shareTarget.value;
   const entry = { place: target?.place ?? "", path: target?.path ?? "" };
+  const pages = new Map<string, string>();
+  const known = (share: FileShareView): FileShareView => {
+    pages.set(share.token, share.url);
+
+    return share;
+  };
 
   return {
-    page: filesSharePage,
-    read: async () => (await $fetch<{ shares: FileShareView[] }>("/api/files/shares")).shares.find((one) => one.place === entry.place && one.path === entry.path) ?? null,
-    make: async (span) => (await $fetch<{ share: FileShareView }>("/api/files/shares", { method: "POST", body: { ...entry, span } })).share,
-    remove: async (link) => {
-      await $fetch(`/api/files/shares/${encodeURIComponent(link.token)}`, { method: "DELETE" });
-    }
+    page: (link) => pages.get(link.token) ?? "",
+    read: async () => {
+      const found = (await readShares()).find((one) => one.place === entry.place && one.path === entry.path);
+
+      return found === undefined ? null : known(found);
+    },
+    make: async (span) => known(await makeShare(entry.place, entry.path, spanSeconds(span))),
+    remove: async (link) => endShare(link.token)
   };
 });
 
@@ -623,7 +627,7 @@ async function loadPlaces(): Promise<void> {
   placesLoading.value = true;
 
   try {
-    places.value = merged(await $fetch<FilePlaces>("/api/files/places"));
+    places.value = merged(await readPlaces());
 
     if (open.value === null) {
       const first = firstPlace(places.value);
@@ -631,7 +635,7 @@ async function loadPlaces(): Promise<void> {
       if (first !== null) await router.replace({ query: addressOf({ place: first, path: "" }) });
     }
   } catch (error) {
-    placesFailure.value = refusalText(t, error, t("files.error.places_failed"));
+    placesFailure.value = refusalText(t, error, t("drive.error.places_failed"));
   } finally {
     placesLoading.value = false;
   }
@@ -646,11 +650,13 @@ async function readMachine(key: string): Promise<void> {
   let read: FileMachine;
 
   try {
-    read = await $fetch<FileMachine>("/api/files/machine", { query: { machine: key } });
+    const standing = places.value.machines.find((one) => one.key === key);
+
+    read = key === "local" || standing === undefined ? (await readPlaces()).machines[0]! : await readNode(standing);
   } catch (error) {
     const standing = places.value.machines.find((one) => one.key === key);
 
-    read = { ...(standing ?? { key, name: key, local: false, garage: null }), disks: null, error: refusalText(t, error, t("files.error.machine_failed")), errorCode: null };
+    read = { ...(standing ?? { key, name: key, local: false, garage: null }), disks: null, error: refusalText(t, error, t("drive.error.machine_failed")), errorCode: null };
   } finally {
     const next = new Set(readingMachines.value);
 
@@ -676,9 +682,7 @@ async function loadListing(fresh = false): Promise<void> {
   loading.value = true;
 
   try {
-    const page = await $fetch<FileListing>("/api/files/list", {
-      query: { place: at.place, path: at.path, sort: sort.value.by, order: sort.value.order, offset: "0", limit: String(PAGE), ...(fresh ? { fresh: "1" } : {}) }
-    });
+    const page = await readListing(at, { sort: sort.value.by, order: sort.value.order, after: 0, limit: PAGE, fresh });
 
     if (mine !== listAsked) return;
 
@@ -695,7 +699,7 @@ async function loadListing(fresh = false): Promise<void> {
     if (mine !== listAsked) return;
 
     entries.value = null;
-    listFailure.value = refusalText(t, error, t("files.error.list_failed"));
+    listFailure.value = refusalText(t, error, t("drive.error.list_failed"));
   } finally {
     if (mine === listAsked) loading.value = false;
   }
@@ -711,16 +715,14 @@ async function loadMore(): Promise<void> {
   loadingMore.value = true;
 
   try {
-    const page = await $fetch<FileListing>("/api/files/list", {
-      query: { place: at.place, path: at.path, sort: sort.value.by, order: sort.value.order, offset: String(shown.length), limit: String(PAGE) }
-    });
+    const page = await readListing(at, { sort: sort.value.by, order: sort.value.order, after: shown.length, limit: PAGE });
 
     if (mine === listAsked && entries.value === shown) {
       entries.value = [...shown, ...page.entries];
       total.value = page.total;
     }
   } catch (error) {
-    if (mine === listAsked) listFailure.value = refusalText(t, error, t("files.error.list_failed"));
+    if (mine === listAsked) listFailure.value = refusalText(t, error, t("drive.error.list_failed"));
   } finally {
     if (mine === listAsked) loadingMore.value = false;
   }
@@ -737,13 +739,11 @@ async function loadFolders(at: FolderAt, fresh = false): Promise<void> {
   let children: FolderChildren;
 
   try {
-    const page = await $fetch<FileListing>("/api/files/list", {
-      query: { place: at.place, path: at.path, folders: "1", limit: String(TREE_PAGE), ...(fresh ? { fresh: "1" } : {}) }
-    });
+    const page = await readListing(at, { folders: true, limit: TREE_PAGE, fresh });
 
     children = { state: "read", names: page.entries.map((one) => one.name), more: page.total - page.entries.length };
   } catch (error) {
-    children = { state: "failed", reason: refusalText(t, error, t("files.error.list_failed")) };
+    children = { state: "failed", reason: refusalText(t, error, t("drive.error.list_failed")) };
   }
 
   known.value = new Map(known.value).set(key, children);
@@ -861,7 +861,7 @@ async function change(work: () => Promise<void>): Promise<void> {
   try {
     await work();
   } catch (error) {
-    island.say({ tone: "error", title: refusalText(t, error, t("files.error.change_failed")) });
+    island.say({ tone: "error", title: refusalText(t, error, t("drive.error.change_failed")) });
   } finally {
     changing.value = false;
   }
@@ -876,18 +876,15 @@ function newFolder(into: FolderAt | null = open.value): void {
   if (into === null) return;
 
   void change(async () => {
-    const made = await $fetch<{ name: string | null }>("/api/files/folder", {
-      method: "POST",
-      body: { place: into.place, path: joinPath(into.path, t("files.action.new_folder")), conflict: "rename" }
-    });
+    const made = await makeFolder(into.place, joinPath(into.path, t("drive.action.new_folder")), "rename");
 
     await refreshAfter([into]);
     await menusGone();
 
     // The new folder's name is a field at once, as a file explorer makes it.
-    if (made.name !== null && open.value !== null && folderKey(open.value) === folderKey(into)) {
-      selected.value = new Set([made.name]);
-      renaming.value = made.name;
+    if (made !== null && open.value !== null && folderKey(open.value) === folderKey(into)) {
+      selected.value = new Set([made]);
+      renaming.value = made;
     }
   });
 }
@@ -923,7 +920,7 @@ function renameEntry(entry: FileEntry, name: string): void {
   if (at === null || name === "" || name === entry.name) return;
 
   void change(async () => {
-    await $fetch("/api/files/rename", { method: "POST", body: { place: at.place, path: joinPath(at.path, entry.name), name } });
+    await renameAt(at.place, joinPath(at.path, entry.name), name);
     await refreshAfter([at]);
     selected.value = new Set([name]);
     showInPreview(name);
@@ -938,17 +935,17 @@ function deleteChosen(): void {
 
   void change(async () => {
     const sure = await island.ask({
-      title: names.length === 1 ? t("files.message.delete_confirm", { name: names[0] }) : t("files.message.delete_confirm_many", { n: countText(names.length) }),
-      description: t("files.message.delete_warning"),
-      confirm: t("files.action.delete"),
+      title: names.length === 1 ? t("drive.message.delete_confirm", { name: names[0] }) : t("drive.message.delete_confirm_many", { n: countText(names.length) }),
+      description: t("drive.message.delete_warning"),
+      confirm: t("drive.action.delete"),
       tone: "error"
     });
 
     if (!sure) return;
 
-    await $fetch("/api/files/delete", { method: "POST", body: { place: at.place, paths: names.map((name) => joinPath(at.path, name)) } });
+    await deleteEntries(at.place, names.map((name) => joinPath(at.path, name)));
     await refreshAfter([at]);
-    island.say({ tone: "success", title: t("files.message.deleted", { n: countText(names.length) }) });
+    island.say({ tone: "success", title: t("drive.message.deleted", { n: countText(names.length) }) });
   });
 }
 
@@ -961,17 +958,14 @@ function toClip(mode: FilesClip["mode"]): void {
 
 /** Entries of one place carried into a folder, copied or moved, with any collision asked about. */
 async function carry(from: { place: string; paths: string[] }, into: FolderAt, move: boolean, first: FileConflict = "refuse"): Promise<void> {
-  const done = await settled(
-    (conflict) => $fetch<{ names: string[] }>("/api/files/copy", { method: "POST", body: { from, to: { place: into.place, path: into.path }, move, conflict } }),
-    first
-  );
+  const done = await settled((conflict) => carryEntries(from, into, move, conflict), first);
 
   if (done === null) return;
 
   const sources = from.paths.map((path) => ({ place: from.place, path: parentPath(path) ?? "" }));
 
   await refreshAfter([into, ...sources]);
-  island.say({ tone: "success", title: t(move ? "files.message.moved" : "files.message.copied", { n: countText(done.names.length) }) });
+  island.say({ tone: "success", title: t(move ? "drive.message.moved" : "drive.message.copied", { n: countText(done.length) }) });
 }
 
 function paste(into: FolderAt | null = open.value): void {
@@ -992,45 +986,14 @@ function paste(into: FolderAt | null = open.value): void {
 async function copyPaths(paths: string[]): Promise<void> {
   try {
     await navigator.clipboard.writeText(paths.join("\n"));
-    island.say({ tone: "success", title: t("files.message.path_copied") });
+    island.say({ tone: "success", title: t("drive.message.path_copied") });
   } catch (error) {
-    island.say({ tone: "error", title: refusalText(t, error, t("files.error.change_failed")) });
+    island.say({ tone: "error", title: refusalText(t, error, t("drive.error.change_failed")) });
   }
 }
 
 // ---- Uploading --------------------------------------------------------------------------------------------
 
-/** One file's bytes sent as the request's body, its progress told as it goes. */
-function sendFile(into: FolderAt, path: string, file: File, conflict: FileConflict, progress: (sent: number) => void): Promise<void> {
-  const query = new URLSearchParams({ place: into.place, path: joinPath(into.path, path), conflict });
-
-  return new Promise((done, failed) => {
-    const request = new XMLHttpRequest();
-
-    request.open("POST", appUrl(`/api/files/upload?${query.toString()}`));
-    request.setRequestHeader("content-type", "application/octet-stream");
-    request.upload.onprogress = (event) => progress(event.loaded);
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300) {
-        done();
-
-        return;
-      }
-
-      const body = (() => {
-        try {
-          return JSON.parse(request.responseText) as { code?: unknown; names?: unknown };
-        } catch {
-          return null;
-        }
-      })();
-
-      failed({ statusCode: request.status, data: { code: body?.code, names: body?.names } });
-    };
-    request.onerror = () => failed(new Error(t("files.error.upload_failed")));
-    request.send(file);
-  });
-}
 
 /** What was dropped or picked, uploaded into a folder: each folder made — merged where it stands — and each file sent. */
 function upload(into: FolderAt, items: Dropped[]): void {
@@ -1050,14 +1013,21 @@ function upload(into: FolderAt, items: Dropped[]): void {
     try {
       for (const item of items) {
         if (item.kind === "folder") {
-          await $fetch("/api/files/folder", { method: "POST", body: { place: into.place, path: joinPath(into.path, item.path), conflict: "skip" } });
+          await makeFolder(into.place, joinPath(into.path, item.path), "skip");
           continue;
         }
 
         const sent: FileConflict | null = await settled(async (conflict) => {
-          await sendFile(into, item.path, item.file, conflict, (bytes) => {
-            uploading.value = { done, all: files.length, sent: sentBefore + bytes, bytes: all };
-          });
+          await sendFile(
+            into,
+            item.path,
+            item.file,
+            conflict,
+            (bytes) => {
+              uploading.value = { done, all: files.length, sent: sentBefore + bytes, bytes: all };
+            },
+            t("drive.error.upload_failed")
+          );
 
           return conflict;
         }, decided);
@@ -1070,7 +1040,7 @@ function upload(into: FolderAt, items: Dropped[]): void {
         uploading.value = { done, all: files.length, sent: sentBefore, bytes: all };
       }
 
-      if (done > 0) island.say({ tone: "success", title: t("files.message.uploaded", { n: countText(done) }) });
+      if (done > 0) island.say({ tone: "success", title: t("drive.message.uploaded", { n: countText(done) }) });
     } finally {
       uploading.value = null;
       await refreshAfter([into]);
@@ -1079,8 +1049,8 @@ function upload(into: FolderAt, items: Dropped[]): void {
 }
 
 const uploadItems = computed<DropdownMenuItem[]>(() => [
-  { label: t("files.action.upload_files"), icon: "i-material-symbols-upload-file-outline", onSelect: () => filesInput.value?.click() },
-  { label: t("files.action.upload_folder"), icon: "i-material-symbols-drive-folder-upload-outline", onSelect: () => folderInput.value?.click() }
+  { label: t("drive.action.upload_files"), icon: "i-material-symbols-upload-file-outline", onSelect: () => filesInput.value?.click() },
+  { label: t("drive.action.upload_folder"), icon: "i-material-symbols-drive-folder-upload-outline", onSelect: () => folderInput.value?.click() }
 ]);
 
 // Files picked from the browser's own chooser: a folder's arrive with their paths inside it.
@@ -1157,13 +1127,13 @@ const editActions = computed<BarAction[]>(() => {
   const some = selected.value.size > 0 && !changing.value;
 
   return [
-    { id: "cut", label: t("files.action.cut"), icon: "i-material-symbols-content-cut", disabled: !some, onSelect: () => toClip("cut") },
-    { id: "copy", label: t("files.action.copy"), icon: "i-material-symbols-content-copy", disabled: !some, onSelect: () => toClip("copy") },
-    { id: "paste", label: t("files.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || !canChange.value, onSelect: () => paste() },
-    { id: "rename", label: t("files.action.rename"), icon: "i-material-symbols-drive-file-rename-outline", disabled: selected.value.size !== 1 || changing.value, onSelect: startRename },
-    { id: "delete", label: t("files.action.delete"), icon: "i-material-symbols-delete-outline", disabled: !some, onSelect: deleteChosen },
-    { id: "share", label: t("common.action.share"), icon: "i-material-symbols-share-outline", disabled: shareable() === null, onSelect: () => shareEntry() },
-    { id: "share-links", label: t("files.action.share_links"), icon: "i-material-symbols-link", onSelect: () => (shareListOpen.value = true) }
+    { id: "cut", label: t("drive.action.cut"), icon: "i-material-symbols-content-cut", disabled: !some, onSelect: () => toClip("cut") },
+    { id: "copy", label: t("drive.action.copy"), icon: "i-material-symbols-content-copy", disabled: !some, onSelect: () => toClip("copy") },
+    { id: "paste", label: t("drive.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || !canChange.value, onSelect: () => paste() },
+    { id: "rename", label: t("drive.action.rename"), icon: "i-material-symbols-drive-file-rename-outline", disabled: selected.value.size !== 1 || changing.value, onSelect: startRename },
+    { id: "delete", label: t("drive.action.delete"), icon: "i-material-symbols-delete-outline", disabled: !some, onSelect: deleteChosen },
+    { id: "share", label: t("drive.action.share"), icon: "i-material-symbols-share-outline", disabled: shareable() === null, onSelect: () => shareEntry() },
+    { id: "share-links", label: t("drive.action.share_links"), icon: "i-material-symbols-link", onSelect: () => (shareListOpen.value = true) }
   ];
 });
 
@@ -1203,18 +1173,18 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
   if (entry === null) {
     return [
       [
-        { label: t("files.action.new_folder"), icon: "i-material-symbols-create-new-folder-outline", disabled: !canChange.value, onSelect: () => newFolder() },
-        { label: t("files.action.upload"), icon: "i-material-symbols-upload", disabled: !canChange.value, children: uploadItems.value },
-        { label: t("files.action.paste"), icon: "i-material-symbols-content-paste", kbds: SHORTCUT.paste, disabled: clip.value === null || !canChange.value, onSelect: () => paste() }
+        { label: t("drive.action.new_folder"), icon: "i-material-symbols-create-new-folder-outline", disabled: !canChange.value, onSelect: () => newFolder() },
+        { label: t("drive.action.upload"), icon: "i-material-symbols-upload", disabled: !canChange.value, children: uploadItems.value },
+        { label: t("drive.action.paste"), icon: "i-material-symbols-content-paste", kbds: SHORTCUT.paste, disabled: clip.value === null || !canChange.value, onSelect: () => paste() }
       ],
       [
-        { label: t("files.action.view"), icon: VIEW_ICONS[view.value], children: viewItems.value },
-        { label: t("files.action.sort"), icon: "i-material-symbols-sort", children: sortItems },
-        { label: t("common.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void reread() }
+        { label: t("drive.action.view"), icon: VIEW_ICONS[view.value], children: viewItems.value },
+        { label: t("drive.action.sort"), icon: "i-material-symbols-sort", children: sortItems },
+        { label: t("drive.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void reread() }
       ],
       [
         { label: t("common.action.choose_all"), icon: "i-material-symbols-select-all", kbds: SHORTCUT.all, onSelect: () => chooseAll(true) },
-        { label: t("files.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }
+        { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }
       ]
     ];
   }
@@ -1226,27 +1196,27 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
 
   return [
     [
-      ...(many ? [] : [{ label: t("files.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openEntry(entry) }]),
+      ...(many ? [] : [{ label: t("drive.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openEntry(entry) }]),
       ...(file && !many
         ? [
-            { label: t("files.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(readUrl({ ...at, name: entry.name }), "_blank", "noopener") },
-            { label: t("files.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(readUrl({ ...at, name: entry.name }, { download: true }), "_self") }
+            { label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(contentUrl({ ...at, name: entry.name }), "_blank", "noopener") },
+            { label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(contentUrl({ ...at, name: entry.name }, { download: true }), "_self") }
           ]
         : []),
-      ...((file || folder) && !many ? [{ label: t("common.action.share"), icon: "i-material-symbols-share-outline", onSelect: () => shareEntry(entry) }] : [])
+      ...((file || folder) && !many ? [{ label: t("drive.action.share"), icon: "i-material-symbols-share-outline", onSelect: () => shareEntry(entry) }] : [])
     ],
     [
-      { label: t("files.action.cut"), icon: "i-material-symbols-content-cut", kbds: SHORTCUT.cut, onSelect: () => toClip("cut") },
-      { label: t("files.action.copy"), icon: "i-material-symbols-content-copy", kbds: SHORTCUT.copy, onSelect: () => toClip("copy") },
-      ...(folder && !many ? [{ label: t("files.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || !canChange.value, onSelect: () => paste(inside) }] : [])
+      { label: t("drive.action.cut"), icon: "i-material-symbols-content-cut", kbds: SHORTCUT.cut, onSelect: () => toClip("cut") },
+      { label: t("drive.action.copy"), icon: "i-material-symbols-content-copy", kbds: SHORTCUT.copy, onSelect: () => toClip("copy") },
+      ...(folder && !many ? [{ label: t("drive.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || !canChange.value, onSelect: () => paste(inside) }] : [])
     ],
     [
-      ...(many ? [] : [{ label: t("files.action.rename"), icon: "i-material-symbols-drive-file-rename-outline", kbds: SHORTCUT.rename, disabled: changing.value, onSelect: startRename }]),
-      { label: t("files.action.delete"), icon: "i-material-symbols-delete-outline", color: "error" as const, kbds: SHORTCUT.delete, disabled: changing.value, onSelect: deleteChosen }
+      ...(many ? [] : [{ label: t("drive.action.rename"), icon: "i-material-symbols-drive-file-rename-outline", kbds: SHORTCUT.rename, disabled: changing.value, onSelect: startRename }]),
+      { label: t("drive.action.delete"), icon: "i-material-symbols-delete-outline", color: "error" as const, kbds: SHORTCUT.delete, disabled: changing.value, onSelect: deleteChosen }
     ],
     [
-      { label: t("files.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths(targets().map((name) => pathOf(at, name))) },
-      ...(narrow.value && !choosing.value ? [{ label: t("files.action.choose"), icon: "i-material-symbols-check-box-outline", onSelect: () => (choosing.value = true) }] : []),
+      { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths(targets().map((name) => pathOf(at, name))) },
+      ...(narrow.value && !choosing.value ? [{ label: t("drive.action.choose"), icon: "i-material-symbols-check-box-outline", onSelect: () => (choosing.value = true) }] : []),
       ...(many ? [] : [{ label: t("common.label.properties"), icon: "i-material-symbols-info-outline-rounded", onSelect: () => showProperties(entry) }])
     ]
   ].filter((group) => group.length > 0);
@@ -1270,7 +1240,7 @@ const treeMenu = computed<ContextMenuItem[][]>(() => {
   if (item?.machine !== undefined) {
     const key = item.machine;
 
-    return [[{ label: t("common.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void readMachine(key) }]];
+    return [[{ label: t("drive.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void readMachine(key) }]];
   }
 
   const at = item?.folder;
@@ -1278,12 +1248,12 @@ const treeMenu = computed<ContextMenuItem[][]>(() => {
   if (at === undefined) return [];
 
   return [
-    [{ label: t("files.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openFromTree(at) }],
+    [{ label: t("drive.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openFromTree(at) }],
     [
-      { label: t("files.action.new_folder"), icon: "i-material-symbols-create-new-folder-outline", disabled: changing.value, onSelect: () => newFolder(at) },
-      { label: t("files.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || changing.value, onSelect: () => paste(at) }
+      { label: t("drive.action.new_folder"), icon: "i-material-symbols-create-new-folder-outline", disabled: changing.value, onSelect: () => newFolder(at) },
+      { label: t("drive.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || changing.value, onSelect: () => paste(at) }
     ],
-    [{ label: t("files.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }]
+    [{ label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }]
   ];
 });
 

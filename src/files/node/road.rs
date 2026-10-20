@@ -8,7 +8,6 @@ use std::process::Stdio;
 use std::sync::{Arc, LazyLock};
 
 use axum::body::Bytes;
-use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt;
@@ -63,11 +62,7 @@ fn last_line(text: &str) -> String {
 }
 
 fn upload_failed(why: String) -> Refused {
-  Refused::new(
-    StatusCode::BAD_GATEWAY,
-    "node_upload_failed",
-    format!("the upload could not be put onto the node: {why}"),
-  )
+  Refused::upstream(format!("the upload could not be put onto the node: {why}"))
 }
 
 /// An ssh node's road: a batch login with the arguments the node service hands out for it.

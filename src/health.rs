@@ -4,55 +4,50 @@ use std::time::Duration;
 
 use axum::http::{Method, StatusCode};
 use axum::response::Response;
-use serde::Deserialize;
-use serde_json::json;
 
+use crate::client::DriveClient;
 use crate::http::{Call, Refused, Route, answer};
 use crate::settings::Settings;
+use crate::wire::Health;
 
-/// The process, the version and whether the store is open and migrated. A service that answers has its
-/// store: it opens it before it answers anything.
-pub struct Health;
+/// Whether the store is open and migrated, and the version. A service that answers has its store: it opens
+/// it before it answers anything.
+pub struct HealthRead;
 
-impl Route for Health {
+impl Route for HealthRead {
   const METHOD: Method = Method::GET;
   const PATH: &'static str = "/health";
 
   async fn answer(&self, _call: Call) -> Result<Response, Refused> {
     Ok(answer(
       StatusCode::OK,
-      json!({ "pid": std::process::id(), "version": env!("CARGO_PKG_VERSION"), "ready": true }),
+      Health {
+        ready: true,
+        reason: None,
+        version: env!("CARGO_PKG_VERSION").to_owned(),
+      },
     ))
   }
 }
 
-crate::route!(Health);
+crate::route!(HealthRead);
 
 // How long the command waits on the service.
 const WAIT: Duration = Duration::from_secs(5);
 
-#[derive(Deserialize)]
-struct Answer {
-  ready: bool,
-}
-
 /// Whether the service the settings name answers ready, asked once and waited on at most five seconds.
 pub async fn ask(settings: &Settings) -> Result<(), String> {
-  let address = format!("http://{}/health", settings.server.listen);
-  let answer = reqwest::Client::new()
-    .get(&address)
-    .bearer_auth(&settings.server.token)
-    .timeout(WAIT)
-    .send()
+  let health = DriveClient::of_settings(settings)
+    .with_timeout(WAIT)
+    .health()
     .await
-    .map_err(|why| format!("the service at {} did not answer: {why}", settings.server.listen))?;
-  let status = answer.status();
+    .map_err(|why| format!("the service at {} did not answer ready: {why}", settings.server.listen))?;
 
-  if !status.is_success() {
-    return Err(format!("the service answered {}", status.as_u16()));
+  match health {
+    Health { ready: true, .. } => Ok(()),
+    Health { reason, .. } => Err(format!(
+      "the service is not ready: {}",
+      reason.unwrap_or_else(|| "for no stated reason".to_owned())
+    )),
   }
-
-  let read: Answer = answer.json().await.map_err(|why| format!("the answer could not be read: {why}"))?;
-
-  if read.ready { Ok(()) } else { Err("the service is not ready".to_owned()) }
 }

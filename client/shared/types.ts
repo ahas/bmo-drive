@@ -1,4 +1,6 @@
-// The file viewer's places and folders as the service answers them (docs/api.md, "The file viewer").
+// The Files screen's own view of what the service answers (docs/api.md): the machines with their drives
+// and places, a folder's entries and the share links, as the screen draws them. The service's own shapes
+// are the generated `openapi.ts`; the screen's calls turn each answer into these (app/domain/drive.ts).
 export type FileDriveKind = "nvme" | "ssd" | "hdd" | "usb" | "network" | "virtual";
 
 export interface FileVolume {
@@ -63,7 +65,7 @@ export interface FileEntry {
   name: string;
   kind: FileEntryKind;
   size: number | null;
-  // Unix milliseconds.
+  // Epoch milliseconds.
   modified: number | null;
 }
 
@@ -81,8 +83,8 @@ export type FileSortKey = "name" | "size" | "modified";
 // What a share link hands out: one file, or one folder as its zip (docs/files.md, "Share links").
 export type FileShareKind = "file" | "folder";
 
-// One live share link of an entry, as the administrator's own screen reads it. The token is the link
-// itself, so this shape goes to a logged-in screen and nowhere else.
+// One live share link of an entry. The token is the link itself, so this shape goes to a screen that
+// holds the service's token and nowhere else.
 export interface FileShareView {
   token: string;
   place: string;
@@ -90,18 +92,18 @@ export interface FileShareView {
   // The name the entry is handed out under: its own, and at a place's top the place's last name.
   name: string;
   kind: FileShareKind;
+  // The address its page stands at.
+  url: string;
   createdBy: string;
-  // Unix seconds.
+  // Unix seconds, as the share link dialog reads a time.
   createdAt: number;
-  // When the link stops opening, and null where it never does.
+  // When the link stops opening, in Unix seconds, and null where it never does.
   expiresAt: number | null;
 }
 
-// What the holder of a link is shown: the entry's name and kind, a file's size, and when the link
-// ends. The place and the path stay on the service.
+// What the holder of a link is shown: the entry's name and kind, and when the link ends.
 export interface SharedFileView {
   name: string;
   kind: FileShareKind;
-  size: number | null;
   expiresAt: number | null;
 }

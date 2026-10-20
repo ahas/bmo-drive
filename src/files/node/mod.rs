@@ -13,15 +13,13 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 use axum::body::{Body, Bytes};
-use axum::http::StatusCode;
-use serde::Serialize;
-use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use super::drives::Drive;
 use super::{Entry, Opened, Pending, Place, Places, Refused, Span, Upload, Within, no_place, outside};
 use crate::clients::node::{NodeError, Target};
 use crate::http::Standing;
+use crate::wire;
 use posix::Posix;
 use powershell::PowerShell;
 use road::{Ended, JakeRoad, Road, Running, SshRoad};
@@ -37,31 +35,11 @@ const READING: Duration = Duration::from_secs(20);
 /// The prefix of a node's machine key and of every place on it.
 const NODE: &str = "node:";
 
-const NODE_INCOMPLETE: &str = "node_incomplete";
-const NODE_FAILED: &str = "node_failed";
-
-/// Why a node could not be read: a code and an English sentence (`docs/api.md`, 「Refusals」).
-#[derive(Clone, Debug)]
-struct Fault {
-  code: &'static str,
-  message: String,
-}
-
-impl From<Refused> for Fault {
-  fn from(refused: Refused) -> Self {
-    Self {
-      code: refused.code,
-      message: refused.error,
-    }
-  }
-}
+/// Why a node could not be read, kept with its reading and answered at every asking.
+type Fault = Refused;
 
 fn nodes_unread(why: &NodeError) -> Refused {
-  Refused::new(
-    StatusCode::BAD_GATEWAY,
-    "nodes_unread",
-    format!("the node list could not be read: {why}"),
-  )
+  Refused::upstream(format!("the node list could not be read: {why}"))
 }
 
 /// A node as the list names it.
@@ -70,26 +48,7 @@ pub struct Listed {
   pub label: String,
 }
 
-impl Listed {
-  /// The machine as the console is told of it before it is read.
-  pub fn unread(&self) -> Value {
-    json!({
-      "key": machine_key(&self.name),
-      "name": self.label,
-      "local": false,
-      "disks": null,
-      "garage": null,
-      "error": null,
-      "errorCode": null,
-    })
-  }
-}
-
-fn machine_key(name: &str) -> String {
-  format!("{NODE}{name}")
-}
-
-/// The node a place or a machine key names, where it names one.
+/// The node a place names, where it names one.
 pub fn node_of(id: &str) -> Option<&str> {
   id.strip_prefix(NODE).map(|rest| rest.split(':').next().unwrap_or(rest))
 }
@@ -112,43 +71,65 @@ pub async fn listed(standing: &Standing) -> Result<Vec<Listed>, Refused> {
 }
 
 /// A volume of a node, walked over the node's road.
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct NodeVolume {
   place: String,
   mount: String,
   fs_type: String,
-  #[serde(skip)]
   root: String,
-  #[serde(skip)]
   node: Arc<str>,
-  #[serde(skip)]
   road: Arc<dyn Road>,
 }
 
 /// A node read: its drives, or why they could not be read.
 pub struct NodeMachine {
-  key: String,
+  node: String,
   name: String,
   drives: Result<Vec<Drive<NodeVolume>>, Fault>,
 }
 
 impl NodeMachine {
-  pub fn view(&self) -> Value {
-    let (disks, error, code) = match &self.drives {
-      Ok(drives) => (json!(drives), Value::Null, Value::Null),
-      Err(fault) => (Value::Null, json!(fault.message), json!(fault.code)),
-    };
+  /// The node and its drives, refused where they could not be read.
+  pub fn machine(&self) -> Result<wire::Machine, Refused> {
+    let drives = self.drives.as_ref().map_err(Clone::clone)?;
 
-    json!({
-      "key": self.key,
-      "name": self.name,
-      "local": false,
-      "disks": disks,
-      "garage": null,
-      "error": error,
-      "errorCode": code,
+    Ok(wire::Machine {
+      name: self.name.clone(),
+      node_name: Some(self.node.clone()),
+      drives: drives
+        .iter()
+        .map(|drive| {
+          drive.wire(|volume| wire::DriveVolume {
+            place_name: volume.place.clone(),
+            mount: volume.mount.clone(),
+            fs_type: volume.fs_type.clone(),
+          })
+        })
+        .collect(),
     })
+  }
+
+  /// The node's volumes as places, refused where its drives could not be read.
+  pub fn places(&self) -> Result<Vec<wire::Place>, Refused> {
+    let drives = self.drives.as_ref().map_err(Clone::clone)?;
+
+    Ok(
+      drives
+        .iter()
+        .flat_map(|drive| drive.volumes.iter().map(move |volume| (drive, volume)))
+        .map(|(drive, volume)| wire::Place {
+          name: volume.place.clone(),
+          kind: wire::PlaceKind::Node,
+          label: volume.mount.clone(),
+          free_bytes: None,
+          node_name: Some(self.node.clone()),
+          drive_key: Some(drive.key.clone()),
+          mount: Some(volume.mount.clone()),
+          reason: None,
+          reason_code: None,
+        })
+        .collect(),
+    )
   }
 }
 
@@ -157,7 +138,7 @@ impl Places for NodeMachine {
     self
       .drives
       .as_ref()
-      .map_err(|fault| Refused::new(StatusCode::BAD_GATEWAY, fault.code, fault.message.clone()))?
+      .map_err(Clone::clone)?
       .iter()
       .flat_map(|drive| drive.volumes.iter())
       .find(|volume| volume.place == id)
@@ -187,13 +168,13 @@ pub async fn machine(standing: &Standing, name: &str, fresh: bool) -> Result<Arc
     .await?
     .into_iter()
     .find(|one| one.name == name)
-    .ok_or_else(|| Refused::new(StatusCode::NOT_FOUND, "no_node", format!("no node {name} is listed")))?;
+    .ok_or_else(|| Refused::not_found(format!("no node {name} is listed")))?;
   let drives = match road(standing, &node.name).await? {
     Ok(road) => read_drives(&node.name, road).await,
     Err(fault) => Err(fault),
   };
   let read = Arc::new(NodeMachine {
-    key: machine_key(&node.name),
+    node: node.name.clone(),
     name: node.label,
     drives,
   });
@@ -209,9 +190,8 @@ pub async fn machine(standing: &Standing, name: &str, fresh: bool) -> Result<Arc
 /// The node's own road, out of the connection and the login the node service gives for it: a fault where
 /// it gives none that serves, a refusal where it did not answer.
 async fn road(standing: &Standing, name: &str) -> Result<Result<Arc<dyn Road>, Fault>, Refused> {
-  let incomplete = |why: String| Fault {
-    code: NODE_INCOMPLETE,
-    message: format!("the node service holds no usable connection for {name}: {why}"),
+  let incomplete = |why: String| {
+    Refused::upstream(format!("the node service holds no usable connection for {name}: {why}"))
   };
   let protect = &standing.settings.protect;
   let posix = || -> Arc<dyn Shell> {
@@ -260,10 +240,9 @@ async fn read_drives(name: &str, road: Arc<dyn Road>) -> Result<Vec<Drive<NodeVo
   let shell = road.shell();
   let printed = whole(name, road.run(shell.drives_script(), None), Some(READING)).await?;
   let node: Arc<str> = Arc::from(name);
-  let drives = shell.read_drives(&printed).map_err(|why| Fault {
-    code: NODE_FAILED,
-    message: format!("{name}'s drives could not be read: {why}"),
-  })?;
+  let drives = shell
+    .read_drives(&printed)
+    .map_err(|why| Refused::upstream(format!("{name}'s drives could not be read: {why}")))?;
 
   Ok(
     drives
@@ -297,15 +276,11 @@ async fn read_drives(name: &str, road: Arc<dyn Road>) -> Result<Vec<Drive<NodeVo
 }
 
 fn timed_out(node: &str) -> Refused {
-  Refused::new(StatusCode::GATEWAY_TIMEOUT, "node_timeout", format!("{node} did not answer in time"))
+  Refused::upstream(format!("{node} did not answer in time"))
 }
 
 fn no_length(node: &str) -> Refused {
-  Refused::new(
-    StatusCode::BAD_GATEWAY,
-    "node_no_length",
-    format!("{node} did not say the file's length"),
-  )
+  Refused::upstream(format!("{node} did not say the file's length"))
 }
 
 /// What a script's ending says: nothing where it ended well, a refusal otherwise.
@@ -313,17 +288,12 @@ fn settled(node: &str, ended: Ended) -> Result<(), Refused> {
   match ended {
     Ended::Code(0, _) => Ok(()),
     Ended::Code(code, said) => Err(refusal_of(code).unwrap_or_else(|| {
-      Refused::new(
-        StatusCode::BAD_GATEWAY,
-        NODE_FAILED,
-        format!("{node} failed: {}", if said.is_empty() { format!("exit code {code}") } else { said }),
-      )
+      Refused::upstream(format!(
+        "{node} failed: {}",
+        if said.is_empty() { format!("exit code {code}") } else { said }
+      ))
     })),
-    Ended::Failed(why) => Err(Refused::new(
-      StatusCode::BAD_GATEWAY,
-      "node_unreachable",
-      format!("{node} could not be reached: {why}"),
-    )),
+    Ended::Failed(why) => Err(Refused::upstream(format!("{node} could not be reached: {why}"))),
   }
 }
 

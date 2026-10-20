@@ -2,7 +2,7 @@
   {
     "id": "service/plumbing",
     "title": "Service plumbing",
-    "what": "The service's settings in layers, its HTTP routes behind the bearer token with each route registered beside its answer, the SQLite store, health and the binary's commands, in src/http.rs, settings.rs, store.rs, health.rs, lib.rs and main.rs.",
+    "what": "The service's settings in layers, its HTTP routes behind the bearer token with each route registered beside its answer and kebab-case refusals, the SQLite store, health and the binary's commands, in src/http.rs, settings.rs, store.rs, health.rs, lib.rs and main.rs.",
     "files": [
       "src/http.rs",
       "src/settings.rs",
@@ -17,6 +17,71 @@
     "symbols": [],
     "aliases": [],
     "needs": [],
-    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+  },
+  {
+    "id": "service/wire",
+    "title": "Wire types and client",
+    "what": "The bodies and queries every route takes and answers in the common wire format, and the service's own Rust client with one method per route, in src/wire.rs and src/client.rs.",
+    "files": [
+      "src/wire.rs",
+      "src/client.rs"
+    ],
+    "symbols": [
+      "DriveClient",
+      "ClientFailure",
+      "Place",
+      "Entry",
+      "Share"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/plumbing"
+    ],
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+  },
+  {
+    "id": "service/events",
+    "title": "Event stream",
+    "what": "The service's one event stream, GET /events: entry and share changes kept in the store, the last 10,000, handed out live as server-sent events or as pages, in src/events.rs.",
+    "files": [
+      "src/events.rs",
+      "migrations/0002_events_and_milliseconds.sql"
+    ],
+    "symbols": [
+      "Events",
+      "EventStream",
+      "KINDS"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/plumbing",
+      "service/wire"
+    ],
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
+  },
+  {
+    "id": "harness/plugin",
+    "title": "Harness plugin and OpenAPI document",
+    "what": "The ahas-drive plugin: the MCP server bmo-drive mcp with the nine drive_ tools over the client and its skill, and the OpenAPI document generated from the wire types, in src/mcp/, src/openapi.rs and skills/.",
+    "files": [
+      "src/mcp/mod.rs",
+      "src/mcp/tools.rs",
+      "src/openapi.rs",
+      "skills/ahas-drive/SKILL.md",
+      "docs/openapi.json"
+    ],
+    "symbols": [
+      "DriveServer",
+      "DriveTool",
+      "tools",
+      "openapi"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/wire",
+      "service/events"
+    ],
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
   }
 ]

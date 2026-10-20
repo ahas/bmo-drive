@@ -18,13 +18,13 @@ use aws_sdk_s3::error::{ProvideErrorMetadata, SdkError};
 use aws_sdk_s3::primitives::ByteStream;
 use aws_types::os_shim_internal::{Env, Fs};
 use axum::body::{Body, Bytes};
-use axum::http::StatusCode;
+
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use http_body_util::StreamBody;
 use hyper::body::Frame;
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::Deserialize;
-use serde_json::{Value, json};
+
 use tokio::sync::mpsc;
 use tokio_util::io::ReaderStream;
 
@@ -34,6 +34,7 @@ use super::{
   protected,
 };
 use crate::settings::Settings;
+use crate::wire;
 
 /// The place Garage is known by.
 pub const PLACE: &str = "garage";
@@ -56,10 +57,8 @@ impl Fault {
 
 /// Where Garage stands on this machine, and how it is reached.
 pub struct Garage {
-  /// The drive and mount point its data directory stands on.
+  /// The drive its data directory stands on.
   disk: Option<String>,
-  mount: Option<String>,
-  data_dir: Option<String>,
   /// Its data and metadata folders, which only Garage itself may write.
   pub own: Vec<PathBuf>,
   reach: Result<Reach, Fault>,
@@ -112,8 +111,8 @@ struct DataPath {
   path: String,
 }
 
-const CONFIG_UNREADABLE: &str = "garage_config_unreadable";
-const AWS_CONFIG_UNREADABLE: &str = "aws_config_unreadable";
+const CONFIG_UNREADABLE: &str = "garage-config-unreadable";
+const AWS_CONFIG_UNREADABLE: &str = "aws-config-unreadable";
 
 /// The data directory Garage's configuration names, or why it could not be read.
 fn data_dir(config: &str) -> Result<Option<String>, Fault> {
@@ -128,25 +127,25 @@ fn data_dir(config: &str) -> Result<Option<String>, Fault> {
   })
 }
 
-/// The drive and mount point a path stands on: the volume whose mount point is the longest that holds
+/// The drive a path stands on: the one holding the volume whose mount point is the longest that holds
 /// it.
-fn standing_on(path: &Path, drives: &[Drive]) -> Option<(String, String)> {
+fn standing_on(path: &Path, drives: &[Drive]) -> Option<String> {
   drives
     .iter()
     .flat_map(|drive| drive.volumes.iter().map(move |volume| (drive, volume)))
     .filter(|(_, volume)| path.starts_with(&volume.mount))
     .max_by_key(|(_, volume)| volume.mount.len())
-    .map(|(drive, volume)| (drive.key.clone(), volume.mount.clone()))
+    .map(|(drive, _)| drive.key.clone())
 }
 
 /// How Garage is reached, out of the profile the AWS configuration files hold.
 fn reach(sections: &EnvConfigSections, profile_name: &str) -> Result<Reach, Fault> {
   let profile = sections.get_profile(profile_name).ok_or_else(|| {
-    Fault::new("garage_profile_missing", format!("the AWS profile {profile_name} is not configured"))
+    Fault::new("garage-profile-missing", format!("the AWS profile {profile_name} is not configured"))
   })?;
   let field = |name: &str| {
     profile.get(name).map(str::to_owned).filter(|value| !value.is_empty()).ok_or_else(|| {
-      Fault::new("garage_profile_incomplete", format!("the AWS profile {profile_name} has no {name}"))
+      Fault::new("garage-profile-incomplete", format!("the AWS profile {profile_name} has no {name}"))
     })
   };
 
@@ -199,12 +198,10 @@ impl Garage {
     let real = data_dir
       .as_deref()
       .map(|dir| std::fs::canonicalize(dir).unwrap_or_else(|_| PathBuf::from(dir)));
-    let (disk, mount) = real.and_then(|dir| standing_on(&dir, drives)).unzip();
+    let disk = real.and_then(|dir| standing_on(&dir, drives));
 
     Self {
       disk,
-      mount,
-      data_dir,
       own: Vec::new(),
       reach,
       protected_buckets: Vec::new(),
@@ -212,19 +209,22 @@ impl Garage {
     }
   }
 
-  /// The place as the console is told of it: where it stands, and why it cannot be opened where it
-  /// cannot.
-  pub fn view(&self) -> Value {
+  /// The place as a caller is told of it: the drive its data stands on, and why it cannot be opened where
+  /// it cannot.
+  pub fn place(&self) -> wire::Place {
     let fault = self.reach.as_ref().err();
 
-    json!({
-      "place": PLACE,
-      "disk": self.disk,
-      "mount": self.mount,
-      "dataDir": self.data_dir,
-      "error": fault.map(|fault| fault.message.clone()),
-      "errorCode": fault.map(|fault| fault.code),
-    })
+    wire::Place {
+      name: PLACE.to_owned(),
+      kind: wire::PlaceKind::Store,
+      label: "Garage".to_owned(),
+      free_bytes: None,
+      node_name: None,
+      drive_key: self.disk.clone(),
+      mount: None,
+      reason: fault.map(|fault| fault.message.clone()),
+      reason_code: fault.map(|fault| fault.code.to_owned()),
+    }
   }
 
   fn client(&self) -> Result<&Client, Refused> {
@@ -232,10 +232,9 @@ impl Garage {
       return Ok(made);
     }
 
-    let reach = self
-      .reach
-      .as_ref()
-      .map_err(|fault| Refused::new(StatusCode::SERVICE_UNAVAILABLE, fault.code, fault.message.clone()))?;
+    let reach = self.reach.as_ref().map_err(|fault| {
+      Refused::rule("garage-closed", format!("Garage cannot be opened: {}", fault.message))
+    })?;
     let timeouts = TimeoutConfig::builder()
       .connect_timeout(Duration::from_secs(3))
       .operation_attempt_timeout(Duration::from_secs(20))
@@ -324,8 +323,7 @@ impl Garage {
   }
 
   async fn object(&self, within: &Within, span: Span) -> Result<Opened, Refused> {
-    let bucket_not_file =
-      || Refused::new(StatusCode::BAD_REQUEST, "bucket_not_file", "a bucket cannot be read as a file");
+    let bucket_not_file = || Refused::rule("bucket-not-file", "a bucket cannot be read as a file");
     let [bucket, key @ ..] = within.names.as_slice() else {
       return Err(bucket_not_file());
     };
@@ -386,24 +384,20 @@ fn refused<E: ProvideErrorMetadata, R>(error: SdkError<E, R>) -> Refused {
     Some("NoSuchBucket" | "NoSuchKey" | "NotFound") => return not_found(),
     // A refusal of the key says nothing of Garage's own words, which name the key.
     Some("AccessDenied" | "Forbidden" | "InvalidAccessKeyId" | "SignatureDoesNotMatch") => {
-      return Refused::new(StatusCode::FORBIDDEN, "garage_forbidden", "Garage refused the profile's key");
+      return Refused::upstream("Garage refused the profile's key");
     }
     Some("BucketNotEmpty") => {
-      return Refused::new(StatusCode::CONFLICT, "bucket_not_empty", "the bucket is not empty");
+      return Refused::conflict("the bucket is not empty");
     }
     _ => {}
   }
 
   let said = [code, message].into_iter().flatten().collect::<Vec<_>>().join(": ");
 
-  Refused::new(
-    StatusCode::BAD_GATEWAY,
-    "garage_failed",
-    format!(
-      "Garage did not answer: {}",
-      if said.is_empty() { "for no stated reason" } else { &said }
-    ),
-  )
+  Refused::upstream(format!(
+    "Garage did not answer: {}",
+    if said.is_empty() { "for no stated reason" } else { &said }
+  ))
 }
 
 impl Place for Garage {
@@ -475,7 +469,7 @@ impl Place for Garage {
   fn rename<'a>(&'a self, within: &'a Within, name: &'a str) -> Pending<'a, ()> {
     Box::pin(async move {
       if matches!(self.spot(within)?, Spot::Bucket(_)) {
-        return Err(Refused::new(StatusCode::BAD_REQUEST, "bucket_rename", "a bucket cannot be renamed"));
+        return Err(Refused::rule("bucket-rename", "a bucket cannot be renamed"));
       }
 
       self.carry(within, &within.sibling(name), true).await
@@ -504,7 +498,7 @@ impl Place for Garage {
   fn copy_here<'a>(&'a self, from: &'a Within, to: &'a Within, moving: bool) -> Pending<'a, ()> {
     Box::pin(async move {
       if moving && matches!(self.spot(from)?, Spot::Bucket(_)) {
-        return Err(Refused::new(StatusCode::BAD_REQUEST, "bucket_move", "a bucket cannot be moved"));
+        return Err(Refused::rule("bucket-move", "a bucket cannot be moved"));
       }
 
       self.carry(from, to, moving).await
@@ -523,7 +517,7 @@ impl Place for Garage {
 }
 
 fn outside_bucket() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "outside_bucket", "a file cannot stand outside every bucket")
+  Refused::rule("outside-bucket", "a file cannot stand outside every bucket")
 }
 
 /// An upload's bytes handed over through a channel: the SDK takes only a body it may share between
@@ -564,7 +558,7 @@ impl<'a> Spot<'a> {
   /// Where a path lands, to be read: a protected bucket is read like any other.
   fn read(within: &'a Within) -> Result<Self, Refused> {
     let [bucket, key @ ..] = within.names.as_slice() else {
-      return Err(Refused::new(StatusCode::BAD_REQUEST, "no_bucket", "no bucket was named"));
+      return Err(Refused::rule("no-bucket", "no bucket was named"));
     };
 
     Ok(if key.is_empty() { Self::Bucket(bucket) } else { Self::Key(bucket, key.join("/")) })

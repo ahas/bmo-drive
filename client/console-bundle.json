@@ -1,0 +1,11 @@
+{
+  "name": "drive",
+  "title": "drive.title",
+  "icon": "i-material-symbols-folder-open-outline",
+  "screenPath": "/files",
+  "serviceName": "drive",
+  "languagePack": "i18n",
+  "events": false,
+  "websocket": false,
+  "pushKinds": []
+}

@@ -24,7 +24,6 @@ pub const ENVIRONMENT_PREFIX: &str = "BMO_DRIVE";
 pub struct Settings {
   pub server: Server,
   pub store: Store,
-  pub console: Console,
   pub node: Node,
   pub garage: Garage,
   pub share: Share,
@@ -40,18 +39,11 @@ pub struct Server {
   pub token: String,
 }
 
-/// The share links' store.
+/// The store the share links and the kept events stand in.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Store {
   /// The SQLite file; a relative one is read from where the process starts.
   pub path: PathBuf,
-}
-
-/// The console the share links are opened through.
-#[derive(Clone, Debug, Deserialize)]
-pub struct Console {
-  /// Its public address, the base of a link's page and download.
-  pub address: String,
 }
 
 /// The node service.
@@ -70,11 +62,13 @@ pub struct Garage {
   pub profile: String,
 }
 
-/// The share links the command makes.
+/// The share links.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Share {
-  /// Who the command records as a link's maker.
-  pub maker: String,
+  /// The address a link's page stands under: a link's `url` is it, a `/` and the token.
+  pub address: String,
+  /// Who the command records as a link's maker; none where empty.
+  pub actor: String,
 }
 
 /// Where the file viewer never changes anything (`docs/files.md`, 「Protected locations」).

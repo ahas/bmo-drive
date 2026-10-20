@@ -1,7 +1,7 @@
 <template>
   <!-- The chosen entry (docs/files.md): its name, its actions and its properties at
        the head, and below it the file as the browser can show it. -->
-  <section class="flex min-h-0 flex-col" :aria-label="$t('files.action.preview')">
+  <section class="flex min-h-0 flex-col" :aria-label="$t('drive.action.preview')">
     <div v-if="props.chosen !== null" class="flex h-9 shrink-0 items-center gap-2 border-b border-default ps-4 pe-1 pointer-coarse:h-10">
       <UIcon :name="entryIcon(props.chosen.entry)" class="size-4 shrink-0" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium text-highlighted">{{ props.chosen.entry.name }}</span>
@@ -9,7 +9,7 @@
     </div>
 
     <p v-if="props.chosen === null" class="flex flex-1 items-center justify-center p-4 text-sm text-muted" role="status">
-      {{ $t("files.status.choose_file") }}
+      {{ $t("drive.status.choose_file") }}
     </p>
 
     <div v-else-if="props.chosen.entry.kind !== 'file'" class="flex flex-1 flex-col items-center justify-center gap-3 p-4">
@@ -23,7 +23,7 @@
       v-else-if="kind === 'image'"
       type="button"
       class="flex min-h-0 flex-1 cursor-zoom-in items-center justify-center overflow-hidden p-4 hover:bg-elevated/50 active:bg-accented/50"
-      :aria-label="$t('files.action.zoom')"
+      :aria-label="$t('drive.action.zoom')"
       @click="emit('zoom')"
     >
       <LoadingImage :src="shownUrl" :alt="props.chosen.entry.name" eager image-class="max-h-full max-w-full object-contain" class="max-h-full" />
@@ -54,13 +54,13 @@
     </div>
 
     <template v-else-if="kind === 'text' && text.state !== 'none'">
-      <SkeletonStatus v-if="text.state === 'loading'" as="div" class="p-4" :label="$t('files.status.preview_loading')">
+      <SkeletonStatus v-if="text.state === 'loading'" as="div" class="p-4" :label="$t('drive.status.preview_loading')">
         <SkeletonText :lines="8" size="sm" last-width="w-1/3" />
       </SkeletonStatus>
       <p v-else-if="text.state === 'failed'" class="flex flex-1 items-center justify-center p-4 text-center text-sm text-error" role="alert">{{ text.reason }}</p>
       <template v-else-if="text.state === 'read'">
         <p v-if="text.cut" class="shrink-0 border-b border-default bg-elevated px-4 py-2 text-sm tabular-nums text-muted" role="status">
-          {{ $t("files.label.text_cut", { shown: listSize(TEXT_HEAD_BYTES), whole: listSize(props.chosen.entry.size ?? 0) }) }}
+          {{ $t("drive.label.text_cut", { shown: listSize(TEXT_HEAD_BYTES), whole: listSize(props.chosen.entry.size ?? 0) }) }}
         </p>
         <FilesText :text="text.text" :name="props.chosen.entry.name" />
       </template>
@@ -68,8 +68,8 @@
 
     <div v-else class="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
       <UIcon :name="entryIcon(props.chosen.entry)" class="size-16" />
-      <p class="text-sm text-muted">{{ kind === "video" ? $t("files.status.unplayable") : $t("files.status.no_preview") }}</p>
-      <UButton color="neutral" variant="outline" size="sm" icon="i-material-symbols-download" :label="$t('files.action.download')" :to="downloadUrl" external />
+      <p class="text-sm text-muted">{{ kind === "video" ? $t("drive.status.unplayable") : $t("drive.status.no_preview") }}</p>
+      <UButton color="neutral" variant="outline" size="sm" icon="i-material-symbols-download" :label="$t('drive.action.download')" :to="downloadUrl" external />
     </div>
   </section>
 </template>
@@ -77,7 +77,8 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { refusalText } from "../domain/refusals";
-import { TEXT_HEAD_BYTES, entryIcon, entryProperties, isJson, laidOutJson, listSize, previewKind, readUrl, textOf, typeLabel as typeOf } from "../domain/files";
+import { contentUrl } from "../domain/drive";
+import { TEXT_HEAD_BYTES, entryIcon, entryProperties, isJson, laidOutJson, listSize, previewKind, textOf, typeLabel as typeOf } from "../domain/files";
 
 import type { FileEntry } from "../../shared/types";
 import type { FolderAt } from "../domain/files";
@@ -104,15 +105,15 @@ const video = ref<VideoState>({ state: "loading" });
 
 const at = computed(() => (props.chosen === null ? null : { place: props.chosen.place, path: props.chosen.path, name: props.chosen.entry.name }));
 const kind = computed(() => (props.chosen === null ? "none" : previewKind(props.chosen.entry.name)));
-const shownUrl = computed(() => (at.value === null ? "" : readUrl(at.value)));
-const downloadUrl = computed(() => (at.value === null ? "" : readUrl(at.value, { download: true })));
+const shownUrl = computed(() => (at.value === null ? "" : contentUrl(at.value)));
+const downloadUrl = computed(() => (at.value === null ? "" : contentUrl(at.value, { download: true })));
 
 const actions = computed<BarAction[]>(() =>
   props.chosen?.entry.kind !== "file"
     ? []
     : [
-        { id: "download", label: t("files.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(downloadUrl.value, "_self") },
-        { id: "open", label: t("files.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(shownUrl.value, "_blank", "noopener") }
+        { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(downloadUrl.value, "_self") },
+        { id: "open", label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(shownUrl.value, "_blank", "noopener") }
       ]
 );
 
@@ -135,7 +136,7 @@ async function readText(): Promise<void> {
   text.value = { state: "loading" };
 
   try {
-    const response = await fetch(readUrl(at.value, { head: TEXT_HEAD_BYTES }));
+    const response = await fetch(contentUrl(at.value, { head: TEXT_HEAD_BYTES }));
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { code?: unknown } | null;
@@ -151,7 +152,7 @@ async function readText(): Promise<void> {
 
     text.value = read === null ? { state: "none" } : { state: "read", text: isJson(chosen.entry.name) && !cut ? laidOutJson(read) : read, cut };
   } catch (error) {
-    if (mine === asked) text.value = { state: "failed", reason: refusalText(t, error, t("files.error.preview_failed")) };
+    if (mine === asked) text.value = { state: "failed", reason: refusalText(t, error, t("drive.error.preview_failed")) };
   }
 }
 
@@ -170,7 +171,7 @@ async function videoFailed(event: Event): Promise<void> {
   if (failure === null || failure.code === MediaError.MEDIA_ERR_ABORTED || at.value === null) return;
 
   if (failure.code === MediaError.MEDIA_ERR_NETWORK) {
-    video.value = { state: "failed", reason: t("files.error.preview_failed") };
+    video.value = { state: "failed", reason: t("drive.error.preview_failed") };
 
     return;
   }
@@ -181,7 +182,7 @@ async function videoFailed(event: Event): Promise<void> {
     return;
   }
 
-  const response = await fetch(readUrl(at.value, { head: 1 })).catch(() => null);
+  const response = await fetch(contentUrl(at.value, { head: 1 })).catch(() => null);
   const body = response === null || response.ok ? null : ((await response.json().catch(() => null)) as { code?: unknown } | null);
 
   if (mine !== asked) return;
@@ -189,7 +190,7 @@ async function videoFailed(event: Event): Promise<void> {
   video.value =
     response !== null && response.ok
       ? { state: "unplayable" }
-      : { state: "failed", reason: refusalText(t, { data: { code: body?.code } }, t("files.error.preview_failed")) };
+      : { state: "failed", reason: refusalText(t, { data: { code: body?.code } }, t("drive.error.preview_failed")) };
 }
 
 watch(

@@ -8,12 +8,8 @@ listen = "127.0.0.1:3300"
 token = ""
 
 [store]
-# The SQLite file the share links stand in.
+# The SQLite file the share links and the kept events stand in.
 path = "drive.db"
-
-[console]
-# The console's public address, the base of a share link's page and download.
-address = "http://localhost:3000"
 
 [node]
 # The node service's base address and its token.
@@ -27,8 +23,10 @@ config = "/etc/garage.toml"
 profile = "garage"
 
 [share]
-# Who the file share command records as a link's maker.
-maker = "drive"
+# The address a share link's page stands under: a link's url is it, a slash and the token.
+address = "http://localhost:3000/files/share"
+# Who the file share command records as a link's maker; none where empty.
+actor = ""
 
 # Where the file viewer never changes anything (docs/files.md, 「Protected locations」). Reading them is
 # untouched.
@@ -57,7 +55,7 @@ system = [
 # Folders whose own entries are never changed, though what stands deeper in those entries may be.
 top = ["/"]
 # Under the login's home: the deployment's data and deploy trees, a jake agent's folder, the user's service
-# units, the ssh and AWS keys, and Claude Code's own folder.
+# units, the ssh and AWS keys, and a coding harness's own folder.
 home = [".local/share/bmo", ".local/share/jake", ".config/systemd", ".ssh", ".aws", ".claude"]
 # Every entry of a folder under the home whose name begins with a word, such as a repository's checkouts:
 # each { under = "<folder under the home>", starting = "<word>" }.

@@ -1,7 +1,7 @@
-//! The file viewer's changes (`docs/files.md`, 「Changing files」): making a folder, uploading, renaming,
-//! copying, moving and deleting, on any place. A name already taken is settled here, for every place
-//! alike, before the place is asked to change anything; copying between two places streams each file
-//! from the one into the other.
+//! The file viewer's changes (`docs/files.md`, 「Changing files」): making a folder, writing a file,
+//! renaming, moving, copying and deleting, on any place. A name already taken is settled here, for every
+//! place alike, before the place is asked to change anything; copying between two places streams each file
+//! from the one into the other. Every change made is an event of the service's stream.
 
 use std::collections::HashMap;
 use std::io;
@@ -9,42 +9,14 @@ use std::io;
 use axum::http::{Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use futures_util::{StreamExt, TryStreamExt};
-use serde_json::{Value, json};
 
 use super::{
-  Kind, Pending, Place, Span, Upload, Within, fair_name, forget_place_prefix, into_itself, missing_place,
-  not_found, places_of,
+  Kind, Pending, Place, Span, Upload, Within, entry_at, fair_name, forget_place_prefix, into_itself,
+  not_found, path_entry, path_place, place_top, places_of,
 };
+use crate::events::Events;
 use crate::http::{Call, Refused, Route, answer};
-
-/// How a name already taken in the folder is settled.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Conflict {
-  /// Nothing is changed, and the colliding names are said.
-  Refuse,
-  /// The entry standing there gives way.
-  Replace,
-  /// The arriving entry takes the first free name with a number added.
-  Rename,
-  /// The colliding entries are left out.
-  Skip,
-}
-
-impl Conflict {
-  fn read(value: Option<&str>) -> Result<Self, Refused> {
-    match value {
-      None | Some("" | "refuse") => Ok(Self::Refuse),
-      Some("replace") => Ok(Self::Replace),
-      Some("rename") => Ok(Self::Rename),
-      Some("skip") => Ok(Self::Skip),
-      Some(other) => Err(Refused::new(
-        StatusCode::BAD_REQUEST,
-        "bad_conflict",
-        format!("{other} is not a way to settle a taken name"),
-      )),
-    }
-  }
-}
+use crate::wire::{self, Conflict, CopyRequest, EntryKey, EntryMove, EntryPage, FolderRequest, WriteQuery};
 
 /// What becomes of one arriving name.
 #[derive(Debug, PartialEq, Eq)]
@@ -122,31 +94,22 @@ fn conflict_answer(names: Vec<String>) -> Response {
   super::taken().with("names", names).into_response()
 }
 
-fn text<'a>(body: &'a Value, field: &str) -> Result<&'a str, Refused> {
-  body
-    .get(field)
-    .and_then(Value::as_str)
-    .ok_or_else(|| Refused::new(StatusCode::BAD_REQUEST, "missing_field", format!("{field} was not sent")))
-}
-
-fn outside_top() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "place_top", "the top of a place cannot be changed")
-}
-
 /// A path that names an entry, never a place's top.
 fn entry_path(path: &str) -> Result<Within, Refused> {
   let within = Within::read(path)?;
 
   if within.names.is_empty() {
-    return Err(outside_top());
+    return Err(place_top());
   }
 
   Ok(within)
 }
 
-/// The kind of the entry at `within`, read from its folder.
+/// The kind of the entry at `within`, read from its folder; a place's top is a folder.
 pub(super) async fn kind_of(place: &dyn Place, within: &Within) -> Result<Kind, Refused> {
-  let (folder, name) = within.split().ok_or_else(outside_top)?;
+  let Some((folder, name)) = within.split() else {
+    return Ok(Kind::Folder);
+  };
 
   standing_in(place, &folder).await?.get(name).copied().ok_or_else(not_found)
 }
@@ -185,172 +148,248 @@ fn carry<'a>(
   })
 }
 
-/// A new folder.
-pub struct FilesFolder;
+/// The event of an entry gone from its path.
+async fn deleted(events: &Events, place_name: &str, within: &Within) {
+  let key = EntryKey {
+    place_name: place_name.to_owned(),
+    path: within.joined(),
+  };
 
-impl Route for FilesFolder {
-  const METHOD: Method = Method::POST;
-  const PATH: &'static str = "/api/files/folder";
+  events.publish("entry.deleted", key).await;
+}
+
+/// The entry now standing at `within`, told as an event of `kind`.
+async fn arrived(
+  events: &Events,
+  place: &dyn Place,
+  within: &Within,
+  kind: &str,
+) -> Result<wire::Entry, Refused> {
+  let entry = entry_at(place, within).await?;
+
+  events.publish(kind, &entry).await;
+
+  Ok(entry)
+}
+
+/// An entry given a new path in its own place: a new name in its folder, or a folder of its own.
+pub struct EntryMoveRoute;
+
+impl Route for EntryMoveRoute {
+  const METHOD: Method = Method::PATCH;
+  const PATH: &'static str = "/places/{placeName}/entries/{entryPath}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
-    let body = call.body().await?;
-    let id = text(&body, "place")?;
-    let within = entry_path(text(&body, "path")?)?;
-    let conflict = Conflict::read(body.get("conflict").and_then(Value::as_str))?;
-    let (folder, name) = within.split().ok_or_else(outside_top)?;
-    let places = places_of(id, call.standing(), false).await?;
-    let place = places.place(id)?;
-    let landings = match settle(standing_in(place, &folder).await?, &[(name.to_owned(), true)], conflict) {
-      Ok(landings) => landings,
-      Err(names) => return Ok(conflict_answer(names)),
-    };
-    let landed = match landings.into_iter().next() {
-      Some(Landing::New(name)) => {
-        place.make_folder(&folder.child(&name)).await?;
-        Some(name)
-      }
+    let (id, within) = path_entry(&mut call).await?;
+    let moved: EntryMove = call.body().await?;
+    let conflict = moved.conflict.unwrap_or(Conflict::Refuse);
+
+    if conflict == Conflict::Skip {
+      return Err(Refused::bad_request("a move is refused, replaced or renamed, never skipped"));
+    }
+
+    let source = entry_path(&within.joined())?;
+    let target = entry_path(&moved.path)?;
+    let places = places_of(&id, call.standing(), false).await?;
+    let place = places.place(&id)?;
+
+    // Moved onto itself, an entry stays as it is.
+    if target == source {
+      return Ok(answer(StatusCode::OK, entry_at(place, &source).await?));
+    }
+
+    if target.names.starts_with(&source.names) {
+      return Err(into_itself());
+    }
+
+    let (to_folder, name) = target.split().ok_or_else(place_top)?;
+    let (from_folder, _) = source.split().ok_or_else(place_top)?;
+
+    if !fair_name(name) {
+      return Err(Refused::rule("bad-name", "the name cannot stand in a path"));
+    }
+
+    let folder = kind_of(place, &source).await? == Kind::Folder;
+    let landing =
+      match settle(standing_in(place, &to_folder).await?, &[(name.to_owned(), folder)], conflict) {
+        Ok(landings) => landings.into_iter().next(),
+        Err(names) => return Ok(conflict_answer(names)),
+      };
+    let events = &call.standing().events;
+    let landed = match landing {
+      Some(Landing::New(name)) => name,
       Some(Landing::Replacing(name, _)) => {
-        place.remove(&folder.child(&name)).await?;
-        place.make_folder(&folder.child(&name)).await?;
-        Some(name)
+        place.remove(&to_folder.child(&name)).await?;
+        deleted(events, &id, &to_folder.child(&name)).await;
+        name
       }
-      Some(Landing::Skipped) | None => None,
+      Some(Landing::Skipped) | None => return Err(Refused::failed("the move landed nowhere")),
     };
+    let at = to_folder.child(&landed);
 
-    forget_place_prefix(id);
+    if from_folder == to_folder {
+      place.rename(&source, &landed).await?;
+    } else {
+      place.copy_here(&source, &at, true).await?;
+    }
 
-    Ok(answer(StatusCode::OK, json!({ "name": landed })))
+    forget_place_prefix(&id);
+    deleted(events, &id, &source).await;
+
+    Ok(answer(StatusCode::OK, arrived(events, place, &at, "entry.created").await?))
   }
 }
 
-crate::route!(FilesFolder);
+crate::route!(EntryMoveRoute);
 
-/// One file, its bytes the request's body, written as they stream in.
-pub struct FilesUpload;
+/// An entry deleted, a folder with everything in it.
+pub struct EntryDelete;
 
-impl Route for FilesUpload {
-  const METHOD: Method = Method::POST;
-  const PATH: &'static str = "/api/files/upload";
+impl Route for EntryDelete {
+  const METHOD: Method = Method::DELETE;
+  const PATH: &'static str = "/places/{placeName}/entries/{entryPath}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
-    let id = call.query("place").filter(|place| !place.is_empty()).ok_or_else(missing_place)?;
-    let within = entry_path(&call.query("path").unwrap_or_default())?;
-    let conflict = Conflict::read(call.query("conflict").as_deref())?;
+    let (id, within) = path_entry(&mut call).await?;
+    let within = entry_path(&within.joined())?;
+    let places = places_of(&id, call.standing(), false).await?;
+
+    places.place(&id)?.remove(&within).await?;
+    forget_place_prefix(&id);
+    deleted(&call.standing().events, &id, &within).await;
+
+    Ok(StatusCode::NO_CONTENT.into_response())
+  }
+}
+
+crate::route!(EntryDelete);
+
+/// One file, its bytes the request's body, written as they stream in.
+pub struct ContentWrite;
+
+impl Route for ContentWrite {
+  const METHOD: Method = Method::PUT;
+  const PATH: &'static str = "/places/{placeName}/entries/{entryPath}/content";
+
+  async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let (id, within) = path_entry(&mut call).await?;
+    let within = entry_path(&within.joined())?;
+    let query: WriteQuery = call.query()?;
+    let conflict = query.conflict.unwrap_or(Conflict::Replace);
     let length = call
       .header(header::CONTENT_LENGTH)
       .and_then(|value| value.parse::<u64>().ok())
-      .ok_or_else(|| {
-        Refused::new(StatusCode::LENGTH_REQUIRED, "length_required", "the upload carries no Content-Length")
-      })?;
-    let (folder, name) = within.split().ok_or_else(outside_top)?;
+      .ok_or_else(|| Refused::bad_request("the file's bytes carry no Content-Length"))?;
+    let (folder, name) = within.split().ok_or_else(place_top)?;
     let places = places_of(&id, call.standing(), false).await?;
     let place = places.place(&id)?;
-    let landings = match settle(standing_in(place, &folder).await?, &[(name.to_owned(), false)], conflict) {
-      Ok(landings) => landings,
+    let landing = match settle(standing_in(place, &folder).await?, &[(name.to_owned(), false)], conflict) {
+      Ok(landings) => landings.into_iter().next(),
       Err(names) => return Ok(conflict_answer(names)),
     };
-    let landed = match landings.into_iter().next() {
-      Some(Landing::New(name)) => name,
+    let (landed, made) = match landing {
+      Some(Landing::New(name)) => (name, true),
       Some(Landing::Replacing(name, kind)) => {
         // A file gives way as the new one is put in its place; a folder must go first.
         if kind != Kind::File {
           place.remove(&folder.child(&name)).await?;
         }
 
-        name
+        (name, false)
       }
-      Some(Landing::Skipped) | None => return Ok(answer(StatusCode::OK, json!({ "name": null }))),
+      Some(Landing::Skipped) | None => return Ok(answer(StatusCode::OK, entry_at(place, &within).await?)),
     };
     let body = std::mem::take(call.request.body_mut());
     let upload = Upload {
       length,
       body: body.into_data_stream().map_err(io::Error::other).boxed(),
     };
+    let at = folder.child(&landed);
 
-    place.write(&folder.child(&landed), upload).await?;
+    place.write(&at, upload).await?;
     forget_place_prefix(&id);
 
-    Ok(answer(StatusCode::OK, json!({ "name": landed })))
+    let (status, kind) = if made {
+      (StatusCode::CREATED, "entry.created")
+    } else {
+      (StatusCode::OK, "entry.changed")
+    };
+
+    Ok(answer(status, arrived(&call.standing().events, place, &at, kind).await?))
   }
 }
 
-crate::route!(FilesUpload);
+crate::route!(ContentWrite);
 
-/// One entry given a new name in its own folder.
-pub struct FilesRename;
+/// A new folder.
+pub struct FoldersCreate;
 
-impl Route for FilesRename {
+impl Route for FoldersCreate {
   const METHOD: Method = Method::POST;
-  const PATH: &'static str = "/api/files/rename";
+  const PATH: &'static str = "/places/{placeName}/folders";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
-    let body = call.body().await?;
-    let id = text(&body, "place")?;
-    let within = entry_path(text(&body, "path")?)?;
-    let name = text(&body, "name")?;
+    let id = path_place(&mut call).await?;
+    let asked: FolderRequest = call.body().await?;
+    let within = entry_path(&asked.path)?;
+    let conflict = asked.conflict.unwrap_or(Conflict::Refuse);
+    let (folder, name) = within.split().ok_or_else(place_top)?;
+    let places = places_of(&id, call.standing(), false).await?;
+    let place = places.place(&id)?;
+    let landing = match settle(standing_in(place, &folder).await?, &[(name.to_owned(), true)], conflict) {
+      Ok(landings) => landings.into_iter().next(),
+      Err(names) => return Ok(conflict_answer(names)),
+    };
+    let events = &call.standing().events;
+    let landed = match landing {
+      Some(Landing::New(name)) => name,
+      Some(Landing::Replacing(name, _)) => {
+        place.remove(&folder.child(&name)).await?;
+        deleted(events, &id, &folder.child(&name)).await;
+        name
+      }
+      Some(Landing::Skipped) | None => return Ok(answer(StatusCode::OK, entry_at(place, &within).await?)),
+    };
+    let at = folder.child(&landed);
 
-    if !fair_name(name) {
-      return Err(Refused::new(StatusCode::BAD_REQUEST, "bad_name", "the name cannot stand in a path"));
-    }
+    place.make_folder(&at).await?;
+    forget_place_prefix(&id);
 
-    if within.last() == Some(name) {
-      return Ok(answer(StatusCode::OK, json!({ "name": name })));
-    }
-
-    let (folder, _) = within.split().ok_or_else(outside_top)?;
-    let places = places_of(id, call.standing(), false).await?;
-    let place = places.place(id)?;
-
-    if let Err(names) =
-      settle(standing_in(place, &folder).await?, &[(name.to_owned(), false)], Conflict::Refuse)
-    {
-      return Ok(conflict_answer(names));
-    }
-
-    place.rename(&within, name).await?;
-    forget_place_prefix(id);
-
-    Ok(answer(StatusCode::OK, json!({ "name": name })))
+    Ok(answer(StatusCode::CREATED, arrived(events, place, &at, "entry.created").await?))
   }
 }
 
-crate::route!(FilesRename);
+crate::route!(FoldersCreate);
 
-/// Entries of one place copied or moved into a folder of the same place or of another.
-pub struct FilesCopy;
+/// Entries of one place copied into a folder of the same place or of another.
+pub struct CopiesCreate;
 
-impl Route for FilesCopy {
+impl Route for CopiesCreate {
   const METHOD: Method = Method::POST;
-  const PATH: &'static str = "/api/files/copy";
+  const PATH: &'static str = "/places/{placeName}/copies";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
-    let body = call.body().await?;
-    let empty = Value::Null;
-    let from = body.get("from").unwrap_or(&empty);
-    let to = body.get("to").unwrap_or(&empty);
-    let (from_id, to_id) = (text(from, "place")?, text(to, "place")?);
-    let target = Within::read(text(to, "path")?)?;
-    let moving = body.get("move").and_then(Value::as_bool).unwrap_or(false);
-    let conflict = Conflict::read(body.get("conflict").and_then(Value::as_str))?;
+    let from_id = path_place(&mut call).await?;
+    let asked: CopyRequest = call.body().await?;
+    let to_id = asked.to_place_name.filter(|name| !name.is_empty()).unwrap_or_else(|| from_id.clone());
+    let target = Within::read(&asked.to)?;
+    let conflict = asked.conflict.unwrap_or(Conflict::Refuse);
     let same = from_id == to_id;
     let mut sources = Vec::new();
 
-    for path in from.get("paths").and_then(Value::as_array).into_iter().flatten() {
-      let source = entry_path(path.as_str().unwrap_or_default())?;
+    for path in &asked.paths {
+      let source = entry_path(path)?;
 
       if same && target.names.starts_with(&source.names) {
         return Err(into_itself());
       }
 
-      // Moved onto the folder it stands in, an entry stays as it is.
-      if !(same && moving && source.split().is_some_and(|(folder, _)| folder == target)) {
-        sources.push(source);
-      }
+      sources.push(source);
     }
 
-    let from_places = places_of(from_id, call.standing(), false).await?;
-    let to_places = places_of(to_id, call.standing(), false).await?;
-    let (from_place, to_place) = (from_places.place(from_id)?, to_places.place(to_id)?);
+    let from_places = places_of(&from_id, call.standing(), false).await?;
+    let to_places = places_of(&to_id, call.standing(), false).await?;
+    let (from_place, to_place) = (from_places.place(&from_id)?, to_places.place(&to_id)?);
     let mut kinds = Vec::new();
 
     for source in &sources {
@@ -366,6 +405,7 @@ impl Route for FilesCopy {
       Ok(landings) => landings,
       Err(names) => return Ok(conflict_answer(names)),
     };
+    let events = &call.standing().events;
     let mut landed = Vec::new();
 
     for ((source, kind), landing) in sources.into_iter().zip(kinds).zip(landings) {
@@ -374,60 +414,40 @@ impl Route for FilesCopy {
         Landing::New(name) => name,
         Landing::Replacing(name, _) => {
           to_place.remove(&target.child(&name)).await?;
+          deleted(events, &to_id, &target.child(&name)).await;
           name
         }
       };
-      let arrived = target.child(&name);
+      let at = target.child(&name);
 
       if same {
-        from_place.copy_here(&source, &arrived, moving).await?;
+        from_place.copy_here(&source, &at, false).await?;
       } else {
-        carry(from_place, source.clone(), kind, to_place, arrived).await?;
-
-        if moving {
-          from_place.remove(&source).await?;
-        }
+        carry(from_place, source, kind, to_place, at.clone()).await?;
       }
 
-      landed.push(name);
+      landed.push(at);
     }
 
-    forget_place_prefix(from_id);
-    forget_place_prefix(to_id);
+    forget_place_prefix(&to_id);
 
-    Ok(answer(StatusCode::OK, json!({ "names": landed })))
+    let mut items = Vec::new();
+
+    for at in &landed {
+      items.push(arrived(events, to_place, at, "entry.created").await?);
+    }
+
+    let total_count = items.len() as u64;
+
+    Ok(answer(
+      StatusCode::CREATED,
+      EntryPage {
+        items,
+        more: false,
+        total_count,
+      },
+    ))
   }
 }
 
-crate::route!(FilesCopy);
-
-/// Entries of one place deleted, a folder with everything in it.
-pub struct FilesDelete;
-
-impl Route for FilesDelete {
-  const METHOD: Method = Method::POST;
-  const PATH: &'static str = "/api/files/delete";
-
-  async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
-    let body = call.body().await?;
-    let id = text(&body, "place")?;
-    let mut entries = Vec::new();
-
-    for path in body.get("paths").and_then(Value::as_array).into_iter().flatten() {
-      entries.push(entry_path(path.as_str().unwrap_or_default())?);
-    }
-
-    let places = places_of(id, call.standing(), false).await?;
-    let place = places.place(id)?;
-
-    for within in &entries {
-      place.remove(within).await?;
-    }
-
-    forget_place_prefix(id);
-
-    Ok(answer(StatusCode::OK, json!({})))
-  }
-}
-
-crate::route!(FilesDelete);
+crate::route!(CopiesCreate);

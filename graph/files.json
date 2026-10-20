@@ -11,7 +11,7 @@
     "needs": [
       "service/plumbing"
     ],
-    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
   },
   {
     "id": "files/node-road",
@@ -30,16 +30,17 @@
       "clients/node",
       "service/plumbing"
     ],
-    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
   },
   {
     "id": "files/shares",
     "title": "File share links",
-    "what": "Share links to a file or folder kept in the service's store with their span, the holder's page and download routes, and the bmo-drive file share command, in src/files/shares.rs and src/command.rs.",
+    "what": "Share links to a file or folder kept in the service's store until a time or with no end, served as /shares with each link's content, and the bmo-drive file share command over the client, in src/files/shares.rs and src/command.rs.",
     "files": [
       "src/files/shares.rs",
       "src/command.rs",
-      "migrations/0001_file_shares.sql"
+      "migrations/0001_file_shares.sql",
+      "migrations/0002_events_and_milliseconds.sql"
     ],
     "symbols": [],
     "aliases": [
@@ -49,14 +50,16 @@
     ],
     "needs": [
       "files/viewer",
-      "service/plumbing"
+      "service/events",
+      "service/plumbing",
+      "service/wire"
     ],
-    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
   },
   {
     "id": "files/viewer",
     "title": "File viewer",
-    "what": "The file routes: places and machines, this machine's drives and volumes, listing in natural order, ranged reading, folder, upload, rename, copy and delete behind the protected-location guard, and folder zips, in src/files/.",
+    "what": "The places and entries routes: this machine's drives and volumes with their free space, listing in natural order, ranged reading and writing, folders, moves, copies and deletion behind the protected-location guard, and zips of named entries, in src/files/.",
     "files": [
       "src/files/mod.rs",
       "src/files/drives.rs",
@@ -72,8 +75,10 @@
     "needs": [
       "files/garage",
       "files/node-road",
-      "service/plumbing"
+      "service/plumbing",
+      "service/wire",
+      "service/events"
     ],
-    "base": "bf0d9289ab6f9d41fc56d87c79979e8bd6241979"
+    "base": "93b33dee42b1aca2107bfd153aa6dd88327eddda"
   }
 ]

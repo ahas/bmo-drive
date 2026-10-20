@@ -15,7 +15,7 @@ work knows what the old behaviour was held to.
 
 | Old file | Lines | Here | Treatment |
 |---|---|---|---|
-| `mod.rs` | 923 | the places, listing and reading module | carried; its routes answer at the console's paths |
+| `mod.rs` | 923 | the places, listing and reading module | carried; its routes answer as the places and entries resources |
 | `change.rs` | 500 | the changes module | carried |
 | `drives.rs` | 387 | the drives module | carried |
 | `volume.rs` | 468 | the volume place | carried |
@@ -32,26 +32,26 @@ work knows what the old behaviour was held to.
 
 ### The routes: 15
 
-`git grep -n 'const PATH' 3e4c032 -- bot/bmo-server/src/control/files`. Each answers here at the
-console's own path (`docs/api.md`).
+`git grep -n 'const PATH' 3e4c032 -- bot/bmo-server/src/control/files`. Each answers here as a route of
+the service's own resources (`docs/api.md`).
 
 | Old route | Here |
 |---|---|
-| `GET /files/places` | `GET /api/files/places` |
-| `GET /files/machine` | `GET /api/files/machine` |
-| `GET /files/list` | `GET /api/files/list` |
-| `GET /files/read` | `GET /api/files/read` |
-| `GET /files/zip` | `GET /api/files/zip` |
-| `POST /files/folder` | `POST /api/files/folder` |
-| `POST /files/upload` | `POST /api/files/upload` |
-| `POST /files/rename` | `POST /api/files/rename` |
-| `POST /files/copy` | `POST /api/files/copy` |
-| `POST /files/delete` | `POST /api/files/delete` |
-| `GET /files/shares` | `GET /api/files/shares` |
-| `POST /files/shares` | `POST /api/files/shares`, taking a span and a maker rather than seconds and `createdBy` |
-| `DELETE /files/shares` (token in the query) | `DELETE /api/files/shares/{token}` |
-| `GET /files/shared` (token in the query) | `GET /api/share/files/{token}` |
-| `GET /files/shared/download` (token in the query) | `GET /api/share/files/{token}/download` |
+| `GET /files/places` | `GET /places` and `GET /machine`; the node list is the node service's own |
+| `GET /files/machine` | `GET /machine` with `nodeName` |
+| `GET /files/list` | `GET /places/{placeName}/entries` |
+| `GET /files/read` | `GET /places/{placeName}/entries/{entryPath}/content` |
+| `GET /files/zip` | `POST /places/{placeName}/archives` |
+| `POST /files/folder` | `POST /places/{placeName}/folders` |
+| `POST /files/upload` | `PUT /places/{placeName}/entries/{entryPath}/content` |
+| `POST /files/rename` | `PATCH /places/{placeName}/entries/{entryPath}` |
+| `POST /files/copy` | `POST /places/{placeName}/copies`, and a move inside a place `PATCH` of each entry |
+| `POST /files/delete` | `DELETE /places/{placeName}/entries/{entryPath}`, one to an entry |
+| `GET /files/shares` | `GET /shares` |
+| `POST /files/shares` | `POST /shares`, taking the link's end as a time and its maker as `actorName` |
+| `DELETE /files/shares` (token in the query) | `DELETE /shares/{token}` |
+| `GET /files/shared` (token in the query) | `GET /shares/{token}` |
+| `GET /files/shared/download` (token in the query) | `GET /shares/{token}/content` |
 
 ### The command: one part of one file
 
@@ -62,7 +62,7 @@ console's own path (`docs/api.md`).
 |---|---|
 | the `FileShare` variant of the file verbs, its usage text and its dispatch | the `file share` command of `bmo-drive` |
 | `ShareAsked` | carried |
-| `Control` (`new`, `of_process`, `ask`, `lines_of`, `volume_of`) | not carried as a client: the command works through this repository's own share and place modules in its own process; `lines_of` and `volume_of` are carried as what they print and how a path finds its volume |
+| `Control` (`new`, `of_process`, `ask`, `lines_of`, `volume_of`) | not carried: the command asks the service through the service's own client; `lines_of` and `volume_of` are carried as what they print and how a path finds its volume |
 | `file_share` | carried |
 
 Every other item of that file (the room file, the room upload, the mp3 conversion and what they share)
@@ -80,7 +80,7 @@ is the receiver's, which carries it in its own repository.
 | Old crate | Items used | Here |
 |---|---|---|
 | `node-check` | `rows` (`NodeRow`, `Target`, `Hub`, `SshTarget`), `ssh` (`SshRun`, `login_args`, `read_run`), `hub` (`hub_token`), `Machine`, `NodeState` | not carried: the node's connection and its SSH login are read from bmo-node's routes; a hub's token is read from the token file the node's connection names; the OpenSSH failure is told by the last line it wrote |
-| `bmo-policy` | `file_writes`, `ssh`, `web.public_address` | `file_writes` becomes this repository's settings (below); `ssh` is bmo-node's, read through its login route; `web.public_address` becomes the console address of this repository's settings |
+| `bmo-policy` | `file_writes`, `ssh`, `web.public_address` | `file_writes` becomes this repository's settings (below); `ssh` is bmo-node's, read through its login route; `web.public_address` becomes the share address of this repository's settings |
 
 ### Policy files: 3
 
@@ -91,7 +91,7 @@ crate alone, so the file-write rules are this unit's own.
 |---|---|---|
 | `policy/bmo-policy/policy/file-writes.toml` with `src/file_writes.rs` | this unit alone | the protected locations of this repository's settings |
 | `policy/bmo-policy/policy/ssh.toml` | bmo-node, which owns it | not carried; read through bmo-node's login route |
-| `policy/bmo-policy/policy/web.toml` (`public_address`) | many | not carried; the console address is a setting here |
+| `policy/bmo-policy/policy/web.toml` (`public_address`) | many | not carried; the share address is a setting here |
 
 ### The share table: 2 files
 
@@ -111,7 +111,9 @@ The 27 files bmo-web's own inventory lists under bmo-drive, each read with
 
 `app/components/FilesItem.vue`, `app/components/FilesList.vue`, `app/components/FilesPreview.vue`,
 `app/components/FilesShareList.vue`, `app/components/FilesTree.vue`, `app/domain/files.ts`,
-`app/pages/files.vue`, `app/pages/share/files/[token].vue`, `shared/file-shares.ts`.
+`app/pages/files.vue`, `app/pages/share/files/[token].vue`, `shared/file-shares.ts`. The components
+stand under the bundle's own prefix as `Drive*`, the pages under its screen path `/files`, and a link's
+page address is the one the service answers with it.
 
 ### Realised by this repository's routes: 16
 
@@ -129,39 +131,39 @@ and the maker named.
 
 `app/domain/files.test.ts` (17 tests) and `server/utils/files.test.ts` (6 tests).
 
-### Copied beside them into the bundle: 8 sources
+### What they took from beside them: 8 sources
 
-What the carried files import that bmo-ui does not export, each carried with only what the screen uses:
+What the carried files imported that bmo-ui did not export, each carried with only what the screen uses,
+or left where bmo-ui now serves it:
 
 | Old source | What is taken |
 |---|---|
 | `app/domain/urls.ts` | `appUrl` |
 | `app/domain/copy.ts` | `copyText` |
 | `app/domain/attachments.ts` | `fileSizeText` |
-| `app/domain/share-links.ts` | the whole file |
-| `app/components/ShareLinkDialog.vue` | the whole file |
-| `shared/config.ts` | `SHARE_SPANS` and `ShareSpanKey` |
+| `app/domain/share-links.ts` | not kept: bmo-ui's own share link module stands in for it |
+| `app/components/ShareLinkDialog.vue` | not kept: bmo-ui's own share link dialog stands in for it |
+| `shared/config.ts` | `SHARE_SPANS` and `ShareSpanKey`, each span with the seconds it lives |
 | `shared/types.ts` | the file viewer's types: `FileDriveKind`, `FileVolume`, `FileDrive`, `FileGarage`, `FileMachine`, `FilePlaces`, `FileConflict`, `FileConflictRefusal`, `FileEntryKind`, `FileEntry`, `FileListing`, `FileSortKey`, `FileShareKind`, `FileShareView`, `SharedFileView` |
 | `shared/share-head.ts` | `SHARE_ROBOTS` |
 
-The share dialog and its road are also carried by the bmo-artifact bundle; a base home for them is
-bmo-ui's to give.
+### Already in bmo-ui: 5 components
 
-### Already in bmo-ui: 4 components
+`FilesNameField`, `FilesConflictDialog`, `FilesProgress`, `FilesText` and `ShareLinkDialog` stand in
+bmo-ui, which the bundle takes as a peer. So do the modules the screen reads time, numbers, share links,
+the relay, drag selection, the hold menu, the bars, failures, file icons, the island, side parts and the
+screen width from.
 
-`FilesNameField`, `FilesConflictDialog`, `FilesProgress` and `FilesText` stand in bmo-ui, which the
-bundle takes as a peer. So do the modules the screen reads time, numbers, drag selection, the hold
-menu, the bars, failures, file icons, the island, side parts and the screen width from.
+### Not kept: 3 components
 
-### Owed by the host: 3 components
-
-`DeployMark`, `TodoOpenButton` and `UsageMeters`, the console's own title-bar pieces.
+`DeployMark`, `TodoOpenButton` and `UsageMeters`, a console's own title-bar pieces: the frame around a
+bundle's pages is the console's.
 
 ### The screen's words
 
-The screen reads its words from bmo-web's language pack under `files`, beside the `common` and
-`screens` keys the console already holds. The old pack's whole `files` part, and a key for each refusal
-code (`files.error.<code>`, `docs/api.md`), are bmo-web's to hold.
+The screen reads its words from the bundle's own pack, `client/i18n/`, under `drive`, beside the layer's
+own `common` and `files` keys the console answers. The old pack's whole `files` part is carried there, with
+a key for each refusal code (`drive.error.<code>`, `docs/api.md`).
 
 ## Tests: deferred
 

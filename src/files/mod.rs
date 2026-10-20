@@ -1,5 +1,6 @@
-//! The file viewer (`docs/files.md`): this machine's drives, each a place the console walks and changes as
-//! a file explorer does, and the routes that read them (`docs/api.md`, 「The file viewer」).
+//! The file viewer (`docs/files.md`): this machine's drives, its Garage and the nodes' volumes, each a place
+//! a caller walks and changes as a file explorer does, and the routes that read them (`docs/api.md`,
+//! 「Places」 and 「Entries」).
 
 mod change;
 mod drives;
@@ -24,10 +25,12 @@ use axum::response::Response;
 use futures_util::stream::BoxStream;
 use http_range_header::{EndPosition, StartPosition};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
-use serde::Serialize;
-use serde_json::{Value, json};
 
 use crate::http::{Call, Refused, Route, Standing, answer};
+pub(crate) use crate::wire::EntryKind as Kind;
+use crate::wire::{
+  self, ContentQuery, EntriesQuery, EntryPage, EntrySort, MachineQuery, PlacePage, PlacesQuery, SortOrder,
+};
 use drives::Drive;
 use garage::Garage;
 use guard::Guard;
@@ -198,42 +201,46 @@ fn fair_name(name: &str) -> bool {
 }
 
 /// The code of a path that would leave its place.
-const OUTSIDE_PLACE: &str = "outside_place";
+const OUTSIDE_PLACE: &str = "outside-place";
 
 fn outside() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, OUTSIDE_PLACE, "the path would leave its place")
+  Refused::rule(OUTSIDE_PLACE, "the path would leave its place")
 }
 
 fn taken() -> Refused {
-  Refused::new(StatusCode::CONFLICT, "name_taken", "the name is already taken")
+  Refused::conflict("the name is already taken")
 }
 
 fn protected() -> Refused {
-  Refused::new(StatusCode::FORBIDDEN, "protected", "a protected location cannot be changed")
+  Refused::rule("protected", "a protected location cannot be changed")
 }
 
 fn into_itself() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "into_itself", "a folder cannot be copied or moved into itself")
+  Refused::rule("into-itself", "a folder cannot be copied or moved into itself")
 }
 
 fn cut_short() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "cut_short", "the file did not arrive whole")
+  Refused::bad_request("the file did not arrive whole")
 }
 
 fn not_found() -> Refused {
-  Refused::new(StatusCode::NOT_FOUND, "not_found", "nothing stands at that path")
+  Refused::not_found("nothing stands at that path")
 }
 
 fn no_place() -> Refused {
-  Refused::new(StatusCode::NOT_FOUND, "no_place", "no such place")
+  Refused::not_found("no such place")
 }
 
 fn is_folder() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "is_folder", "a folder cannot be read as a file")
+  Refused::rule("is-folder", "a folder cannot be read as a file")
 }
 
 fn not_folder() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "not_folder", "it is not a folder")
+  Refused::rule("not-folder", "it is not a folder")
+}
+
+fn place_top() -> Refused {
+  Refused::rule("place-top", "the top of a place cannot be changed")
 }
 
 /// The name a file is written under beside its final one until all of it has arrived.
@@ -246,10 +253,10 @@ fn io_kind_refusal(kind: io::ErrorKind) -> Refused {
   match kind {
     io::ErrorKind::NotFound => not_found(),
     io::ErrorKind::PermissionDenied => {
-      Refused::new(StatusCode::FORBIDDEN, "no_permission", "the account may not read or change it")
+      Refused::rule("no-permission", "the account may not read or change it")
     }
     io::ErrorKind::AlreadyExists => taken(),
-    other => Refused::new(StatusCode::BAD_REQUEST, "failed_io", format!("it could not be done: {other}")),
+    other => Refused::rule("failed-io", format!("it could not be done: {other}")),
   }
 }
 
@@ -259,28 +266,62 @@ fn io_refusal(error: &io::Error) -> Refused {
     io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied | io::ErrorKind::AlreadyExists => {
       io_kind_refusal(error.kind())
     }
-    _ => Refused::new(StatusCode::BAD_REQUEST, "failed_io", format!("it could not be done: {error}")),
+    _ => Refused::rule("failed-io", format!("it could not be done: {error}")),
   }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum Kind {
-  Folder,
-  File,
-  /// A device, a socket, a pipe, or a link that leads nowhere.
-  Other,
-}
-
-/// One entry of a folder.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+/// One entry of a folder, as a place reads it.
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Entry {
   name: String,
   kind: Kind,
   /// A file's length in bytes; a folder has none.
   size: Option<u64>,
-  /// When it last changed, in Unix milliseconds.
+  /// When it last changed, in epoch milliseconds.
   modified: Option<i64>,
+}
+
+impl Entry {
+  /// The entry as a caller is told of it, standing in the folder at `folder` of the place `place_name`.
+  fn wire(&self, place_name: &str, folder: &Within) -> wire::Entry {
+    wire::Entry {
+      place_name: place_name.to_owned(),
+      path: folder.child(&self.name).joined(),
+      name: self.name.clone(),
+      kind: self.kind,
+      byte_count: self.size,
+      changed_at: self.modified,
+    }
+  }
+}
+
+/// The top of a place, as an entry: a folder with no name, size or time.
+fn top_entry(place_name: &str) -> wire::Entry {
+  wire::Entry {
+    place_name: place_name.to_owned(),
+    path: String::new(),
+    name: String::new(),
+    kind: Kind::Folder,
+    byte_count: None,
+    changed_at: None,
+  }
+}
+
+/// The entry at `within` as it stands now, read from its folder.
+async fn entry_at(place: &dyn Place, within: &Within) -> Result<wire::Entry, Refused> {
+  let Some((folder, name)) = within.split() else {
+    place.read_folder(within).await?;
+
+    return Ok(top_entry(place.id()));
+  };
+
+  place
+    .read_folder(&folder)
+    .await?
+    .into_iter()
+    .find(|entry| entry.name == name)
+    .map(|entry| entry.wire(place.id(), &folder))
+    .ok_or_else(not_found)
 }
 
 /// Which of a file's bytes a reading asks for, said before the file's length is known.
@@ -418,18 +459,64 @@ impl Machine {
     Ok(Self { drives, garage })
   }
 
-  /// The machine as the console is told of it.
-  fn view(&self) -> Value {
-    json!({
-      "key": LOCAL,
-      "name": host_name(),
-      "local": true,
-      "disks": self.drives,
-      "garage": self.garage.as_ref().map(Garage::view),
-      "error": null,
-      "errorCode": null,
-    })
+  /// The machine as a caller is told of it.
+  fn machine(&self) -> wire::Machine {
+    wire::Machine {
+      name: host_name(),
+      node_name: None,
+      drives: self
+        .drives
+        .iter()
+        .map(|drive| {
+          drive.wire(|volume| wire::DriveVolume {
+            place_name: volume.place.clone(),
+            mount: volume.mount.clone(),
+            fs_type: volume.fs_type.clone(),
+          })
+        })
+        .collect(),
+    }
   }
+
+  /// The machine's places as a caller is told of them: its volumes, each with its free space, then its
+  /// Garage where it has one.
+  async fn places(&self) -> Vec<wire::Place> {
+    let mut places = Vec::new();
+
+    for drive in &self.drives {
+      for volume in &drive.volumes {
+        places.push(wire::Place {
+          name: volume.place.clone(),
+          kind: wire::PlaceKind::Volume,
+          label: volume.mount.clone(),
+          free_bytes: free_bytes(&volume.mount).await,
+          node_name: None,
+          drive_key: Some(drive.key.clone()),
+          mount: Some(volume.mount.clone()),
+          reason: None,
+          reason_code: None,
+        });
+      }
+    }
+
+    places.extend(self.garage.as_ref().map(Garage::place));
+    places
+  }
+}
+
+// How long a volume may take to say its free space: a share that stopped answering says none.
+const FREE_FOR: Duration = Duration::from_secs(2);
+
+/// The bytes free on the volume mounted at `mount`, where it says in time.
+async fn free_bytes(mount: &str) -> Option<u64> {
+  let mount = mount.to_owned();
+  let asked = tokio::task::spawn_blocking(move || {
+    rustix::fs::statvfs(mount.as_str())
+      .ok()
+      .map(|stat| stat.f_bavail.saturating_mul(stat.f_frsize))
+  });
+
+  tokio::time::timeout(FREE_FOR, asked).await.ok()?.ok()?
 }
 
 impl Places for Machine {
@@ -453,80 +540,68 @@ async fn places_of(id: &str, standing: &Standing, fresh: bool) -> Result<Arc<dyn
   }
 }
 
-/// A query parameter read as a count, where it is given.
-fn count(call: &Call, name: &str) -> Result<Option<u64>, Refused> {
-  call
-    .query(name)
-    .filter(|value| !value.is_empty())
-    .map(|value| {
-      value.parse::<u64>().map_err(|_| {
-        Refused::new(StatusCode::BAD_REQUEST, "bad_count", format!("{name} must be a whole number from 0"))
-      })
-    })
-    .transpose()
+/// The node a query names, where it names one.
+fn named_node(node_name: Option<String>) -> Option<String> {
+  node_name.filter(|name| !name.is_empty())
 }
 
-fn missing_place() -> Refused {
-  Refused::new(StatusCode::BAD_REQUEST, "missing_place", "no place was sent")
+/// A page cut from a whole list: the members past the `after` already read, at most `limit`.
+fn page_of<T>(all: Vec<T>, after: Option<u64>, limit: u64) -> (Vec<T>, bool) {
+  let after = usize::try_from(after.unwrap_or(0)).unwrap_or(usize::MAX);
+  let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+  let more = all.len() > after.saturating_add(limit);
+
+  (all.into_iter().skip(after).take(limit).collect(), more)
 }
 
-fn named_place(call: &Call) -> Result<String, Refused> {
-  call.query("place").filter(|place| !place.is_empty()).ok_or_else(missing_place)
-}
+// The most places a page carries, and the number it carries where none is asked.
+const PLACES_MOST: u64 = 1000;
 
-/// The machines: this one read with its drives and Garage, and each node named, its drives unread.
-pub struct FilesPlaces;
+/// The places files live in: this machine's, read now, or a node's volumes.
+pub struct PlacesList;
 
-impl Route for FilesPlaces {
+impl Route for PlacesList {
   const METHOD: Method = Method::GET;
-  const PATH: &'static str = "/api/files/places";
+  const PATH: &'static str = "/places";
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
-    let machine = Machine::current(true, call.standing()).await?;
-    // A node service that does not answer leaves this machine alone in the list.
-    let nodes = match node::listed(call.standing()).await {
-      Ok(nodes) => nodes,
-      Err(refused) => {
-        eprintln!("bmo-drive: {}", refused.error);
-        Vec::new()
+    let query: PlacesQuery = call.query()?;
+    let all = match named_node(query.node_name) {
+      Some(name) => node::machine(call.standing(), &name, false).await?.places()?,
+      None => Machine::current(true, call.standing()).await?.places().await,
+    };
+    let (items, more) = page_of(all, query.after, query.limit.unwrap_or(PLACES_MOST).clamp(1, PLACES_MOST));
+
+    Ok(answer(StatusCode::OK, PlacePage { items, more }))
+  }
+}
+
+crate::route!(PlacesList);
+
+/// This machine and its drives, or a node and its drives, read now.
+pub struct MachineRead;
+
+impl Route for MachineRead {
+  const METHOD: Method = Method::GET;
+  const PATH: &'static str = "/machine";
+
+  async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    let query: MachineQuery = call.query()?;
+    let machine = match named_node(query.node_name) {
+      Some(name) => {
+        let machine = node::machine(call.standing(), &name, true).await?.machine()?;
+
+        forget_place_prefix(&format!("node:{name}:"));
+        machine
       }
+      None => Machine::current(true, call.standing()).await?.machine(),
     };
-    let machines: Vec<Value> =
-      std::iter::once(machine.view()).chain(nodes.iter().map(node::Listed::unread)).collect();
 
-    Ok(answer(StatusCode::OK, json!({ "machines": machines })))
+    Ok(answer(StatusCode::OK, machine))
   }
 }
 
-crate::route!(FilesPlaces);
-
-/// One machine's drives, read now.
-pub struct FilesMachine;
-
-impl Route for FilesMachine {
-  const METHOD: Method = Method::GET;
-  const PATH: &'static str = "/api/files/machine";
-
-  async fn answer(&self, call: Call) -> Result<Response, Refused> {
-    let key = call
-      .query("machine")
-      .filter(|key| !key.is_empty())
-      .ok_or_else(|| Refused::new(StatusCode::BAD_REQUEST, "missing_machine", "no machine was sent"))?;
-    let view = match node::node_of(&key) {
-      Some(name) => node::machine(call.standing(), name, true).await?.view(),
-      None if key == LOCAL => Machine::current(true, call.standing()).await?.view(),
-      None => return Err(Refused::new(StatusCode::NOT_FOUND, "no_machine", "no such machine")),
-    };
-
-    if key != LOCAL {
-      forget_place_prefix(&format!("{key}:"));
-    }
-
-    Ok(answer(StatusCode::OK, view))
-  }
-}
-
-crate::route!(FilesMachine);
+crate::route!(MachineRead);
 
 // How long a folder's reading is kept for the pages after its first, and how many folders are kept.
 const KEPT_FOR: Duration = Duration::from_secs(30);
@@ -582,39 +657,16 @@ fn forget_place_prefix(prefix: &str) {
     .retain(|one| !one.place.starts_with(prefix));
 }
 
-/// The column a folder is ordered by.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SortBy {
-  Name,
-  Size,
-  Modified,
-}
-
-impl SortBy {
-  fn read(value: Option<String>) -> Result<Self, Refused> {
-    match value.as_deref() {
-      None | Some("" | "name") => Ok(Self::Name),
-      Some("size") => Ok(Self::Size),
-      Some("modified") => Ok(Self::Modified),
-      Some(other) => Err(Refused::new(
-        StatusCode::BAD_REQUEST,
-        "bad_sort",
-        format!("a folder cannot be sorted by {other}"),
-      )),
-    }
-  }
-}
-
 /// One order over a whole folder: folders first, then the column asked for, names as the tiebreak.
-fn sorted(entries: &[Entry], by: SortBy, descending: bool) -> Vec<Entry> {
+fn sorted(entries: &[Entry], by: EntrySort, descending: bool) -> Vec<Entry> {
   let mut sorted = entries.to_vec();
 
   sorted.sort_by(|one, other| {
     let folders = (other.kind == Kind::Folder).cmp(&(one.kind == Kind::Folder));
     let column = match by {
-      SortBy::Name => Ordering::Equal,
-      SortBy::Size => one.size.cmp(&other.size),
-      SortBy::Modified => one.modified.cmp(&other.modified),
+      EntrySort::Name => Ordering::Equal,
+      EntrySort::ByteCount => one.size.cmp(&other.size),
+      EntrySort::ChangedAt => one.modified.cmp(&other.modified),
     };
     let named = column.then_with(|| order::natural(&one.name, &other.name));
 
@@ -624,30 +676,38 @@ fn sorted(entries: &[Entry], by: SortBy, descending: bool) -> Vec<Entry> {
   sorted
 }
 
+/// The place a route's path names.
+async fn path_place(call: &mut Call) -> Result<String, Refused> {
+  call.path_param("placeName").await
+}
+
+/// The place and the entry a route's path names.
+async fn path_entry(call: &mut Call) -> Result<(String, Within), Refused> {
+  let mut params = call.path_params().await?;
+  let id = params.remove("placeName").unwrap_or_default();
+  let within = Within::read(&params.remove("entryPath").unwrap_or_default())?;
+
+  Ok((id, within))
+}
+
 /// One page of a folder, cut from one order over the whole of it.
-pub struct FilesList;
+pub struct EntriesList;
 
-impl Route for FilesList {
+impl Route for EntriesList {
   const METHOD: Method = Method::GET;
-  const PATH: &'static str = "/api/files/list";
+  const PATH: &'static str = "/places/{placeName}/entries";
 
-  async fn answer(&self, call: Call) -> Result<Response, Refused> {
-    let id = named_place(&call)?;
-    let within = Within::read(&call.query("path").unwrap_or_default())?;
-    let by = SortBy::read(call.query("sort"))?;
-    let descending = match call.query("order").as_deref() {
-      None | Some("" | "asc") => false,
-      Some("desc") => true,
-      Some(_) => {
-        return Err(Refused::new(StatusCode::BAD_REQUEST, "bad_order", "order is asc or desc"));
-      }
-    };
-    let offset = count(&call, "offset")?.unwrap_or(0);
-    let limit = count(&call, "limit")?.unwrap_or(PAGE).clamp(1, PAGE_MOST);
-    let folders_only = call.query("folders").as_deref() == Some("1");
+  async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let id = path_place(&mut call).await?;
+    let query: EntriesQuery = call.query()?;
+    let within = Within::read(query.path.as_deref().unwrap_or_default())?;
+    let by = query.sort.unwrap_or_default();
+    let descending = query.order.unwrap_or_default() == SortOrder::Desc;
+    let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
+    let folders_only = query.folders == Some(true);
     let path = within.joined();
 
-    let fresh = call.query("fresh").as_deref() == Some("1");
+    let fresh = query.fresh == Some(true);
     let entries = match kept(&id, &path).filter(|_| !fresh) {
       Some(entries) => entries,
       None => {
@@ -664,21 +724,38 @@ impl Route for FilesList {
     } else {
       entries.to_vec()
     };
-    let total = shown.len();
-    let page: Vec<Entry> = sorted(&shown, by, descending)
-      .into_iter()
-      .skip(usize::try_from(offset).unwrap_or(usize::MAX))
-      .take(usize::try_from(limit).unwrap_or(usize::MAX))
-      .collect();
+    let total = shown.len() as u64;
+    let (page, more) = page_of(sorted(&shown, by, descending), query.after, limit);
 
     Ok(answer(
       StatusCode::OK,
-      json!({ "place": id, "path": path, "total": total, "offset": offset, "entries": page }),
+      EntryPage {
+        items: page.iter().map(|entry| entry.wire(&id, &within)).collect(),
+        more,
+        total_count: total,
+      },
     ))
   }
 }
 
-crate::route!(FilesList);
+crate::route!(EntriesList);
+
+/// One entry, as it stands now.
+pub struct EntryRead;
+
+impl Route for EntryRead {
+  const METHOD: Method = Method::GET;
+  const PATH: &'static str = "/places/{placeName}/entries/{entryPath}";
+
+  async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let (id, within) = path_entry(&mut call).await?;
+    let places = places_of(&id, call.standing(), false).await?;
+
+    Ok(answer(StatusCode::OK, entry_at(places.place(&id)?, &within).await?))
+  }
+}
+
+crate::route!(EntryRead);
 
 /// The type a file is handed over as, guessed from its name; text is said to be UTF-8.
 fn content_type(name: &str) -> String {
@@ -755,31 +832,29 @@ fn ranged_answer(opened: &Opened, ranged: bool) -> (StatusCode, Option<String>) 
 }
 
 /// A file's bytes, streamed as they are read: the whole, its head, or the one range asked for.
-pub struct FilesRead;
+pub struct ContentRead;
 
-impl Route for FilesRead {
+impl Route for ContentRead {
   const METHOD: Method = Method::GET;
-  const PATH: &'static str = "/api/files/read";
+  const PATH: &'static str = "/places/{placeName}/entries/{entryPath}/content";
 
-  async fn answer(&self, call: Call) -> Result<Response, Refused> {
-    let id = named_place(&call)?;
-    let within = Within::read(&call.query("path").unwrap_or_default())?;
-    let head = count(&call, "head")?;
-    let download = call.query("download").as_deref() == Some("1");
+  async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let (id, within) = path_entry(&mut call).await?;
+    let query: ContentQuery = call.query()?;
     let range = asked_range(&call);
 
     if within.last().is_none() {
       return Err(is_folder());
     }
 
-    let span = range.or(head.map(Span::head)).unwrap_or(Span::WHOLE);
+    let span = range.or(query.head.map(Span::head)).unwrap_or(Span::WHOLE);
     let places = places_of(&id, call.standing(), false).await?;
 
-    read_answer(places.place(&id)?, &within, span, range.is_some(), download).await
+    read_answer(places.place(&id)?, &within, span, range.is_some(), query.download == Some(true)).await
   }
 }
 
-crate::route!(FilesRead);
+crate::route!(ContentRead);
 
 /// The one byte range the request's `Range` header asks for, where it asks for one.
 fn asked_range(call: &Call) -> Option<Span> {

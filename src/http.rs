@@ -12,9 +12,12 @@ use axum::http::{Method, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{MethodFilter, MethodRouter};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
 
 use crate::clients::node::Node;
+use crate::events::Events;
 use crate::settings::Settings;
 use crate::store::Store;
 
@@ -23,7 +26,7 @@ pub use inventory;
 /// One route the service answers, registered beside its answer with `bmo_drive::route!`.
 pub trait Route: Send + Sync + 'static {
   const METHOD: Method;
-  /// The path, in the router's own syntax: `/api/files/shares/{token}`.
+  /// The path, in the router's own syntax: `/shares/{token}`.
   const PATH: &'static str;
 
   fn answer(&self, call: Call) -> impl Future<Output = Result<Response, Refused>> + Send;
@@ -87,21 +90,12 @@ pub fn route_faults() -> Vec<String> {
     .collect()
 }
 
-/// The code of a failure a route did not expect.
-pub const FAILED: &str = "failed";
-/// The code of a body that is not JSON of the route's shape.
-pub const BAD_REQUEST: &str = "bad_request";
-/// The code of a missing or wrong token.
-pub const UNAUTHORIZED: &str = "unauthorized";
-/// The code of a path no route answers.
-pub const NO_ROUTE: &str = "no_route";
-
-/// A refusal: a status, and a body carrying an English sentence under `error` and a snake_case code under
-/// `code` (`docs/api.md`, 「Refusals」).
-#[derive(Debug, PartialEq, Eq)]
+/// A refusal: a status, and a body carrying a kebab-case code under `code` and an English sentence under
+/// `error` (`docs/api.md`, 「Refusals」).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refused {
   pub status: StatusCode,
-  /// The snake_case code a caller matches on and a screen words.
+  /// The kebab-case code a caller matches on.
   pub code: &'static str,
   /// The English sentence, for a log.
   pub error: String,
@@ -120,15 +114,51 @@ impl Refused {
     }
   }
 
-  /// What a route answers for a failure it did not expect: 500, with the failure's own words.
+  /// A body or a query not of the route's shape: 400 `bad-request`, the sentence naming what is wrong.
+  pub fn bad_request(error: impl Into<String>) -> Self {
+    Self::new(StatusCode::BAD_REQUEST, "bad-request", error)
+  }
+
+  /// Nothing at the key the path names: 404 `not-found`.
+  pub fn not_found(error: impl Into<String>) -> Self {
+    Self::new(StatusCode::NOT_FOUND, "not-found", error)
+  }
+
+  /// A name already taken, or a state that does not allow the change: 409 `conflict`.
+  pub fn conflict(error: impl Into<String>) -> Self {
+    Self::new(StatusCode::CONFLICT, "conflict", error)
+  }
+
+  /// A member that stood once and never will again: 410 `gone`.
+  pub fn gone(error: impl Into<String>) -> Self {
+    Self::new(StatusCode::GONE, "gone", error)
+  }
+
+  /// A well-formed request a rule of the service refuses: 422, under the rule's own code.
+  pub fn rule(code: &'static str, error: impl Into<String>) -> Self {
+    Self::new(StatusCode::UNPROCESSABLE_ENTITY, code, error)
+  }
+
+  /// Something this service reached did not answer as asked: 502 `upstream-failed`.
+  pub fn upstream(error: impl Into<String>) -> Self {
+    Self::new(StatusCode::BAD_GATEWAY, "upstream-failed", error)
+  }
+
+  /// What a route answers for a failure it did not expect: 500 `failed`, with the failure's own words.
   pub fn failed(error: impl std::fmt::Display) -> Self {
-    Self::new(StatusCode::INTERNAL_SERVER_ERROR, FAILED, error.to_string())
+    Self::new(StatusCode::INTERNAL_SERVER_ERROR, "failed", error.to_string())
   }
 
   /// The refusal with one more field in its body; `error` and `code` stay its own.
-  pub fn with(mut self, name: impl Into<String>, value: impl serde::Serialize) -> Self {
+  pub fn with(mut self, name: impl Into<String>, value: impl Serialize) -> Self {
     self.more.insert(name.into(), json!(value));
     self
+  }
+}
+
+impl std::fmt::Display for Refused {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(formatter, "{} {}: {}", self.status.as_u16(), self.code, self.error)
   }
 }
 
@@ -136,8 +166,8 @@ impl IntoResponse for Refused {
   fn into_response(self) -> Response {
     let mut body = self.more;
 
-    body.insert("error".into(), json!(self.error));
     body.insert("code".into(), json!(self.code));
+    body.insert("error".into(), json!(self.error));
 
     (self.status, Json(Value::Object(body))).into_response()
   }
@@ -147,20 +177,24 @@ impl IntoResponse for Refused {
 #[derive(Clone, Debug)]
 pub struct Standing {
   pub settings: Arc<Settings>,
-  /// The share links' store, open and migrated.
+  /// The share links' and the events' store, open and migrated.
   pub store: Store,
   /// The node service, at the address the settings name.
   pub node: Node,
+  /// The service's event stream.
+  pub events: Events,
 }
 
 impl Standing {
   pub fn new(settings: Settings, store: Store) -> Self {
     let node = Node::new(&settings.node.address, &settings.node.token);
+    let events = Events::new(store.clone());
 
     Self {
       settings: Arc::new(settings),
       store,
       node,
+      events,
     }
   }
 }
@@ -171,7 +205,7 @@ pub struct Call {
   standing: Arc<Standing>,
 }
 
-// The most a JSON body read whole may carry: 1 MiB, far beyond any route's fields. An upload's bytes are
+// The most a JSON body read whole may carry: 1 MiB, far beyond any route's fields. A file's bytes are
 // streamed, never read whole.
 const BODY_LIMIT: usize = 1024 * 1024;
 
@@ -185,16 +219,21 @@ impl Call {
     &self.standing
   }
 
-  /// The parameters the route's path names, by name.
+  /// The parameters the route's path names, by name, percent-decoded.
   pub async fn path_params(&mut self) -> Result<HashMap<String, String>, Refused> {
     let (mut parts, body) = std::mem::take(&mut self.request).into_parts();
     let read = RawPathParams::from_request_parts(&mut parts, &()).await;
 
     self.request = Request::from_parts(parts, body);
 
-    let params = read.map_err(Refused::failed)?;
+    let params = read.map_err(|why| Refused::bad_request(why.body_text()))?;
 
     Ok(params.iter().map(|(name, value)| (name.to_owned(), value.to_owned())).collect())
+  }
+
+  /// One parameter the route's path names, empty where it names none.
+  pub async fn path_param(&mut self, name: &str) -> Result<String, Refused> {
+    Ok(self.path_params().await?.remove(name).unwrap_or_default())
   }
 
   /// One header's value, where it is given and reads as text.
@@ -207,34 +246,34 @@ impl Call {
       .map(str::to_owned)
   }
 
-  /// One query parameter, the first where it is given more than once.
-  pub fn query(&self, name: &str) -> Option<String> {
-    let Query(pairs) = Query::<Vec<(String, String)>>::try_from_uri(self.request.uri()).ok()?;
-
-    pairs.into_iter().find(|(key, _)| key == name).map(|(_, value)| value)
+  /// The query read as the route's shape; any parameter the shape does not name is passed over.
+  pub fn query<T: DeserializeOwned>(&self) -> Result<T, Refused> {
+    Query::<T>::try_from_uri(self.request.uri())
+      .map(|Query(query)| query)
+      .map_err(|why| Refused::bad_request(format!("the query is not the route's: {}", why.body_text())))
   }
 
-  /// The body read as JSON, whatever its shape; a body that is not JSON is refused. A route reads it once.
-  pub async fn body(&mut self) -> Result<Value, Refused> {
+  /// The body read as JSON of the route's shape. A route reads it once.
+  pub async fn body<T: DeserializeOwned>(&mut self) -> Result<T, Refused> {
     let body = std::mem::take(self.request.body_mut());
     let bytes = axum::body::to_bytes(body, BODY_LIMIT)
       .await
-      .map_err(|why| Refused::new(StatusCode::BAD_REQUEST, BAD_REQUEST, why.to_string()))?;
+      .map_err(|why| Refused::bad_request(why.to_string()))?;
 
     serde_json::from_slice(&bytes)
-      .map_err(|_| Refused::new(StatusCode::BAD_REQUEST, BAD_REQUEST, "the body is not JSON"))
+      .map_err(|why| Refused::bad_request(format!("the body is not the route's: {why}")))
+  }
+
+  /// Whether the caller asks for JSON rather than a stream.
+  pub fn accepts_json(&self) -> bool {
+    self
+      .header(header::ACCEPT)
+      .is_some_and(|accept| accept.split(',').any(|one| one.trim().starts_with("application/json")))
   }
 }
 
-/// A number that is whole, however it was written, as JavaScript's `Number.isInteger` reads one.
-pub fn whole(value: &Value) -> Option<i64> {
-  value
-    .as_i64()
-    .or_else(|| value.as_f64().filter(|number| number.fract() == 0.0).map(|number| number as i64))
-}
-
 /// An answer: a JSON body under a status.
-pub fn answer(status: StatusCode, body: Value) -> Response {
+pub fn answer(status: StatusCode, body: impl Serialize) -> Response {
   (status, Json(body)).into_response()
 }
 
@@ -249,14 +288,14 @@ async fn require_token(State(standing): State<Arc<Standing>>, request: Request, 
 
   match presented {
     Some(token) if !expected.is_empty() && token == expected => next.run(request).await,
-    _ => Refused::new(StatusCode::UNAUTHORIZED, UNAUTHORIZED, "a missing or wrong token").into_response(),
+    _ => Refused::new(StatusCode::UNAUTHORIZED, "unauthorized", "a missing or wrong token").into_response(),
   }
 }
 
 async fn no_route(request: Request) -> Response {
   Refused::new(
     StatusCode::NOT_FOUND,
-    NO_ROUTE,
+    "no-route",
     format!("no route answers {}", route_name(request.method(), request.uri().path())),
   )
   .into_response()
@@ -296,7 +335,7 @@ pub fn router(standing: Standing) -> Result<Router, Vec<String>> {
   let standing = Arc::new(standing);
   let router = by_path
     .into_iter()
-    .fold(Router::new(), |router, (path, methods)| router.route(path, methods))
+    .fold(Router::new(), |router, (path, methods)| router.route(path, methods.fallback(no_route)))
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(standing.clone(), require_token));
 

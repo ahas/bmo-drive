@@ -26,7 +26,7 @@
     <span class="flex shrink-0 items-center justify-center" :style="{ width: `${mark}px`, height: `${mark}px` }">
       <img
         v-if="!props.parent && props.at !== null && showsThumbnail(props.entry, mark)"
-        :src="readUrl({ ...props.at, name: props.entry.name })"
+        :src="contentUrl({ ...props.at, name: props.entry.name })"
         :alt="props.entry.name"
         loading="lazy"
         draggable="false"
@@ -60,7 +60,8 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { VIEW_MARK, entryIcon, listSize, readUrl, showsThumbnail, typeLabel } from "../domain/files";
+import { contentUrl } from "../domain/drive";
+import { VIEW_MARK, entryIcon, listSize, showsThumbnail, typeLabel } from "../domain/files";
 import { formatDateClock } from "bmo-ui/app/domain/time";
 
 import type { FileEntry } from "../../shared/types";

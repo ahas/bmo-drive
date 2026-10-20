@@ -5,7 +5,7 @@
        offered its actions on a right press or a held finger, and takes entries and files dropped on
        it. It reaches its panel's edges and scrolls on its own. -->
   <div class="flex min-h-0 flex-col">
-    <ContentSkeleton v-if="props.items === null && props.loading" :rows="4" list-class="flex flex-col px-1 py-2" :label="$t('files.status.tree_loading')">
+    <ContentSkeleton v-if="props.items === null && props.loading" :rows="4" list-class="flex flex-col px-1 py-2" :label="$t('drive.status.tree_loading')">
       <template #default="{ index }">
         <div class="flex h-8 items-center gap-2 px-2">
           <SkeletonBar class="size-4 shrink-0 rounded-sm" />
@@ -32,7 +32,7 @@
           :model-value="chosen"
           class="w-max min-w-full px-1 py-2 select-none"
           :ui="{ link: 'w-max min-w-full', linkLabel: 'shrink-0 whitespace-nowrap' }"
-          :aria-label="$t('files.action.tree')"
+          :aria-label="$t('drive.action.tree')"
           @select="onSelect"
         >
           <template #item-leading="{ item, expanded: open }">
@@ -41,7 +41,7 @@
           </template>
 
           <template #item-label="{ item }">
-            <SkeletonStatus v-if="(item as FilesTreeItem).loading" :label="$t('files.status.tree_loading')">
+            <SkeletonStatus v-if="(item as FilesTreeItem).loading" :label="$t('drive.status.tree_loading')">
               <SkeletonBar class="block h-4 w-24 rounded-sm" />
             </SkeletonStatus>
             <span

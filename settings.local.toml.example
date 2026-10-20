@@ -8,9 +8,6 @@ token = "drive-token"
 [store]
 path = "/srv/bmo-drive/drive.db"
 
-[console]
-address = "https://console.example.com"
-
 [node]
 address = "http://127.0.0.1:3310"
 token = "node-token"
@@ -20,7 +17,8 @@ config = "/etc/garage.toml"
 profile = "garage"
 
 [share]
-maker = "drive"
+address = "https://files.example.com/files/share"
+actor = "drive-command"
 
 [protect.posix]
 home_named = [{ under = "repos/example", starting = "bmo" }]

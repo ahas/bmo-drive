@@ -19,14 +19,14 @@
     >
       <div v-if="props.failure !== ''" class="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-center" role="alert">
         <p class="text-sm text-error">{{ props.failure }}</p>
-        <UButton color="neutral" variant="outline" size="sm" icon="i-material-symbols-refresh" :label="$t('common.action.refresh')" @click="emit('retry')" />
+        <UButton color="neutral" variant="outline" size="sm" icon="i-material-symbols-refresh" :label="$t('drive.action.refresh')" @click="emit('retry')" />
       </div>
 
       <div
         v-else-if="props.view === 'details'"
         ref="scroller"
         class="relative flex min-h-0 flex-1 flex-col select-none"
-        :aria-label="$t('files.aria.list')"
+        :aria-label="$t('drive.aria.list')"
         @scroll.capture="onScroll"
         @dblclick="onRowOpen"
         @keydown.enter="onRowOpen"
@@ -39,7 +39,7 @@
               type="button"
               class="inline-flex items-center gap-1 rounded-sm hover:text-primary active:text-primary/80"
               :class="column === 'size' ? 'w-full justify-end' : ''"
-              :aria-label="$t('files.aria.sort_by', { name: headerLabel(column) })"
+              :aria-label="$t('drive.aria.sort_by', { name: headerLabel(column) })"
               @click.stop="emit('sort', column)"
             >
               <span>{{ headerLabel(column) }}</span>
@@ -51,7 +51,7 @@
           <template #empty><span /></template>
 
           <template #name-cell="{ row }">
-            <SkeletonStatus v-if="isPending(row.original)" class="flex h-7 items-center gap-2" :label="$t('files.status.list_loading')">
+            <SkeletonStatus v-if="isPending(row.original)" class="flex h-7 items-center gap-2" :label="$t('drive.status.list_loading')">
               <SkeletonBar class="size-5 shrink-0 rounded-sm" />
               <SkeletonBar class="h-4 w-40 rounded-sm" />
             </SkeletonStatus>
@@ -101,7 +101,7 @@
         ref="scroller"
         class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
         :class="props.view === 'content' ? '' : 'p-2'"
-        :aria-label="$t('files.aria.list')"
+        :aria-label="$t('drive.aria.list')"
         role="listbox"
         aria-multiselectable="true"
         @scroll="onScroll"
@@ -113,11 +113,11 @@
       >
         <div :class="GRIDS[props.view]">
           <template v-for="(entry, at) in rows" :key="isPending(entry) ? `pending-${at}` : isParent(entry) ? '..' : entry.name">
-            <SkeletonStatus v-if="isPending(entry)" as="div" :class="SKELETONS[props.view].box" :label="$t('files.status.list_loading')">
+            <SkeletonStatus v-if="isPending(entry)" as="div" :class="SKELETONS[props.view].box" :label="$t('drive.status.list_loading')">
               <SkeletonBar class="shrink-0 rounded-md" :style="{ width: `${skeletonMark}px`, height: `${skeletonMark}px` }" />
               <SkeletonBar class="h-4 w-20 rounded-sm" />
             </SkeletonStatus>
-            <FilesItem
+            <DriveItem
               v-else
               :entry="entry"
               :at="props.at"
@@ -143,7 +143,7 @@
         class="pointer-events-none absolute inset-x-0 top-1/2 flex justify-center p-4 text-sm text-muted"
         role="status"
       >
-        {{ $t("files.status.empty_folder") }}
+        {{ $t("drive.status.empty_folder") }}
       </p>
 
       <!-- Files carried in from the desktop: the whole list says where they will land. -->
@@ -152,7 +152,7 @@
         class="pointer-events-none absolute inset-2 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 text-sm font-medium text-primary"
         role="status"
       >
-        {{ $t("files.status.drop_here") }}
+        {{ $t("drive.status.drop_here") }}
       </div>
 
       <slot name="foot" />
@@ -293,9 +293,9 @@ const rows = computed<FileEntry[]>(() => {
 });
 
 const columns = computed<TableColumn<FileEntry>[]>(() => [
-  { id: "name", header: t("files.label.name"), meta: { class: { th: "w-full ps-4", td: "w-full max-w-0 ps-4" } } },
-  { id: "modified", header: t("files.label.modified") },
-  { id: "size", header: t("files.label.size"), meta: { class: { th: "text-end pe-4", td: "text-end pe-4" } } }
+  { id: "name", header: t("drive.label.name"), meta: { class: { th: "w-full ps-4", td: "w-full max-w-0 ps-4" } } },
+  { id: "modified", header: t("drive.label.modified") },
+  { id: "size", header: t("drive.label.size"), meta: { class: { th: "text-end pe-4", td: "text-end pe-4" } } }
 ]);
 
 // A column's name, as the table's own column says it.
@@ -619,13 +619,13 @@ const footer = computed(() => {
   const count = countText(props.total);
 
   if (selected.value.size > 1) {
-    return t("files.label.chosen_many", { n: count, k: countText(selected.value.size) });
+    return t("drive.label.chosen_many", { n: count, k: countText(selected.value.size) });
   }
 
   if (props.chosen !== null) {
-    return t("files.label.chosen", { n: count, name: props.chosen });
+    return t("drive.label.chosen", { n: count, name: props.chosen });
   }
 
-  return props.entries !== null && props.entries.length < props.total ? t("files.label.count_loaded", { n: count, loaded: countText(props.entries.length) }) : t("files.label.count", { n: count });
+  return props.entries !== null && props.entries.length < props.total ? t("drive.label.count_loaded", { n: count, loaded: countText(props.entries.length) }) : t("drive.label.count", { n: count });
 });
 </script>

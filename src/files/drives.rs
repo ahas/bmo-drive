@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 use super::guard::Guard;
+use crate::wire;
 
 // File systems that are the kernel's own or a view of another one, never a device's.
 const NOT_STORAGE: &[&str] = &[
@@ -52,6 +53,19 @@ pub struct Drive<V = Volume> {
   pub kind: Option<&'static str>,
   pub size_bytes: Option<u64>,
   pub volumes: Vec<V>,
+}
+
+impl<V> Drive<V> {
+  /// The drive as a caller is told of it, each volume told as `volume` says.
+  pub fn wire(&self, volume: impl Fn(&V) -> wire::DriveVolume) -> wire::Drive {
+    wire::Drive {
+      key: self.key.clone(),
+      name: self.name.clone(),
+      kind: self.kind.map(str::to_owned),
+      byte_count: self.size_bytes,
+      volumes: self.volumes.iter().map(volume).collect(),
+    }
+  }
 }
 
 /// A file system mounted on a drive.
