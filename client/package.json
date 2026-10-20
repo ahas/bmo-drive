@@ -9,7 +9,7 @@
     "prepare": "bun x nuxi prepare",
     "api": "openapi-typescript ../docs/openapi.json -o shared/openapi.ts",
     "typecheck": "nuxi typecheck",
-    "check": "bun run typecheck"
+    "check": "bun install --frozen-lockfile && bun run typecheck"
   },
   "dependencies": {
     "@nuxt/ui": "^4.11.2",
