@@ -70,6 +70,10 @@ tokio-util = { version = "0.7.19", features = ["io"] }
 # Garage's own configuration file.
 toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 
+[dev-dependencies]
+# The personal data a tracked file may not hold (PERSONAL-DATA.md).
+regex = "1.13.1"
+
 # Build output kept small: line tables alone for a backtrace, split out, and no incremental cache.
 [profile.dev]
 debug = "line-tables-only"

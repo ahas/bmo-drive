@@ -5,9 +5,10 @@ repository, with where each came from, how many, and what becomes of it. Every s
 the old repository at its commit `3e4c032`, with `git ls-tree`, `git show` and `git grep` against that
 commit; the command that lists a set stands beside it. Nothing here was copied with its history.
 
-The tests are deferred: none is carried, written or run in this phase. They are written and run here
-once the minimal services stand on the new repositories. The deferred tests are listed below so that
-work knows what the old behaviour was held to.
+The old tests are deferred: none of them is carried, written or run in this phase. They are written and
+run here once the minimal services stand on the new repositories. The repository carries one check
+meanwhile, the repository-wide personal-data check (`PERSONAL-DATA.md`). The deferred tests are listed
+below so that work knows what the old behaviour was held to.
 
 ## The server code: 14 files, 6,070 lines
 
@@ -167,7 +168,8 @@ a key for each refusal code (`drive.error.<code>`, `docs/api.md`).
 
 ## Tests: deferred
 
-None is carried. What the old behaviour was held to:
+None of the old tests is carried; the repository carries only the personal-data check beside them. What
+the old behaviour was held to:
 
 | Old place | Tests |
 |---|---|
