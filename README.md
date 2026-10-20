@@ -3,7 +3,7 @@
 The file viewer as one service with its own API: this machine's drives, its Garage and the nodes'
 volumes walked as places, what stands there read and changed, and the share links that hand one file or
 folder to someone with no token. Beside the service the binary carries its command, `bmo-drive file share`,
-its client and its harness plugin, the MCP server `bmo-drive mcp` with the `ahas-drive` skill. Every other
+its client and its harness plugin, the MCP server `bmo-drive mcp` with the `bmo-drive` skill. Every other
 unit is reached through its API, as `docs/api.md` lists.
 
 ## Tests
@@ -20,7 +20,7 @@ build check, `cargo check --all-targets`, and the bundle's typecheck stand besid
 |---|---|
 | `src/` | The service, its command, its client and its MCP server, one crate split into its own modules |
 | `migrations/` | The store, its tables made by these statements in order |
-| `skills/` | The `ahas-drive` skill, the harness plugin's half beside the MCP server |
+| `skills/` | The `bmo-drive` skill, the harness plugin's half beside the MCP server |
 | `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own |
 | `deploy/` | The service's user unit |
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |

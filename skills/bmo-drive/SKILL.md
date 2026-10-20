@@ -1,9 +1,9 @@
 ---
-name: ahas-drive
+name: bmo-drive
 description: Walk, read, write and share files with the bmo-drive MCP server. Use when a task needs the files of a machine's volumes, its S3-compatible store or another machine's volumes through the drive service rather than a local shell, when a file has to be handed to someone as a download link, or when building or checking a caller of the drive service.
 ---
 
-# ahas-drive
+# bmo-drive
 
 The drive service walks files across places: the volumes of the machine it stands on, that machine's
 S3-compatible store, and the volumes of the other machines its node list holds. The `bmo-drive` MCP server

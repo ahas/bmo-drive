@@ -549,7 +549,7 @@ pub fn openapi() -> Value {
     "x-stage": 2,
     "x-calls": ["node"],
     "x-harness": {
-      "plugin": "ahas-drive",
+      "plugin": "bmo-drive",
       "mcp": "bmo-drive mcp",
       "entry": "A harness lists the places with drive_places, a folder with drive_entries, reads and writes \
         files with drive_read and drive_write, and hands someone a link with drive_share.",

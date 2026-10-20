@@ -258,8 +258,8 @@ that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found
 
 ## The harness plugin
 
-The plugin is `ahas-drive`: the MCP server `bmo-drive mcp` starts and the skill
-`skills/ahas-drive/SKILL.md`, which tells a harness when and how to use it. The server reaches the service
+The plugin is `bmo-drive`: the MCP server `bmo-drive mcp` starts and the skill
+`skills/bmo-drive/SKILL.md`, which tells a harness when and how to use it. The server reaches the service
 at `--address`, or at the settings' `server.listen` where none is given, with the settings' token, and each
 tool is one call of the service's own client. A refusal comes back as a tool error carrying the route's
 status, `code` and `error`. A harness lists the places with `drive_places`, a folder with `drive_entries`,

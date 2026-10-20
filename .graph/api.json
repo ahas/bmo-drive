@@ -79,10 +79,10 @@
   {
     "id": "api/mcp",
     "title": "Harness plugin tools",
-    "what": "The ahas-drive MCP tools a harness lists and calls, each one call of the service's client, as docs/api.md and skills/ahas-drive/SKILL.md state them.",
+    "what": "The bmo-drive MCP tools a harness lists and calls, each one call of the service's client, as docs/api.md and skills/bmo-drive/SKILL.md state them.",
     "files": [
       "docs/api.md",
-      "skills/ahas-drive/SKILL.md",
+      "skills/bmo-drive/SKILL.md",
       "src/mcp/mod.rs",
       "src/mcp/tools.rs"
     ],
@@ -96,7 +96,7 @@
       "harness/plugin"
     ],
     "base": "55116a91685e7d13bc40b7b9297b551a76d8b8ad",
-    "changed": 1792499065189,
+    "changed": 1792529689478,
     "boundary": {
       "side": "exposes"
     }
