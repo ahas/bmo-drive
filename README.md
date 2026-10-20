@@ -26,8 +26,8 @@ was held to.
 | `.graph/` | The code graph: its settings and its nodes, one feature to a node |
 
 At the root stand the Cargo manifest, `VERSION`, `testbed.toml`, `rustfmt.toml`, `CLAUDE.md`,
-`korean-ledger.json`, `settings.toml` and `settings.local.toml.example`, the example of the local
-settings a deployment gives.
+`korean-ledger.json`, `settings.toml`, `settings.local.toml.example` (the example of the local
+settings a deployment gives) and `LICENSE`.
 
 ## The console plugin bundle
 
@@ -56,3 +56,7 @@ run typecheck` inside `client/`.
 ## Version
 
 `VERSION` holds the repository's version, the crate's own; `docs/api.md`, 「Versions」, says how it moves.
+
+## License
+
+MIT. The full text stands in `LICENSE`.
