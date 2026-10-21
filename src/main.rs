@@ -1,6 +1,7 @@
 //! `bmo-drive`: the service, its command and its harness plugin in one binary (`docs/api.md`, 「The
 //! command」).
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bmo_drive::client::DriveClient;
@@ -35,6 +36,18 @@ enum Word {
   Openapi,
   /// The nouns this command carries, one a line.
   Nouns,
+  /// Moves the old archive's share links from the item's export into this service's store (TODO #1923).
+  Import {
+    /// The export directory the item's export hand wrote.
+    #[arg(long)]
+    export: PathBuf,
+    /// The store's SQLite file; made and migrated where it does not stand.
+    #[arg(long)]
+    database: PathBuf,
+    /// Reads the export and reports what it would write, writing nothing.
+    #[arg(long)]
+    dry_run: bool,
+  },
   /// The file viewer's entries.
   File {
     #[command(subcommand)]
@@ -65,6 +78,23 @@ async fn main() -> ExitCode {
       print!("{}", bmo_drive::openapi::openapi_json());
       return ExitCode::SUCCESS;
     }
+    // The import reads its own arguments and never the deployment's settings.
+    Word::Import {
+      export,
+      database,
+      dry_run,
+    } => {
+      return match bmo_drive::import::run(&database, &export, dry_run).await {
+        Ok(report) => {
+          report.lines().iter().for_each(|line| println!("{line}"));
+          if report.sample.failures.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+        }
+        Err(why) => {
+          eprintln!("bmo-drive: {why}");
+          ExitCode::FAILURE
+        }
+      };
+    }
     _ => {}
   }
 
@@ -87,6 +117,7 @@ async fn main() -> ExitCode {
       bmo_drive::mcp::serve(client).await
     }
     Word::Nouns | Word::Openapi => Ok(()),
+    Word::Import { .. } => unreachable!("the import is answered before the settings are read"),
     Word::File {
       word: FileWord::Share(asked),
     }

@@ -9,6 +9,7 @@ pub mod events;
 pub mod files;
 pub mod health;
 pub mod http;
+pub mod import;
 pub mod mcp;
 pub mod openapi;
 pub mod settings;
