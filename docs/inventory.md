@@ -38,7 +38,7 @@ the service's own resources (`docs/api.md`).
 
 | Old route | Here |
 |---|---|
-| `GET /files/places` | `GET /places` and `GET /machine`; the node list is the node service's own |
+| `GET /files/places` | `GET /places` and `GET /machine`; the node list, read from the node service, through `GET /nodes` |
 | `GET /files/machine` | `GET /machine` with `nodeName` |
 | `GET /files/list` | `GET /places/{placeName}/entries` |
 | `GET /files/read` | `GET /places/{placeName}/entries/{entryPath}/content` |

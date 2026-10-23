@@ -25,9 +25,11 @@ flowchart TD
 
 ## Owners and the two branches
 
-- **Every request but a link's own reading acts for an owner,** named by an opaque owner key the caller
-  hands with it (`docs/api.md`, 「Owners」). The console sets the key from the person signed in; this
-  service never learns who the person is, only the key, compared exactly.
+- **Every request but a link's own reading and the console bundle's manifest and words acts for an
+  owner,** named by an opaque owner key the caller hands with it beside the role the reader holds
+  (`docs/api.md`, 「Owners」). The console sets both from the person signed in; this service never learns
+  who the person is, only the key, compared exactly, and the role, which opens the routes to a member and
+  an administrator alike.
 - **The files split in two branches:**
   - **the machines:** this machine's volumes, its Garage and the nodes' volumes (「The machines」, 「The
     places」). They are the administrator's alone, the owner whose key the settings name as the
@@ -43,9 +45,9 @@ flowchart TD
 
 - **Every drive of every machine can be walked by the administrator:** this machine, and each node of the
   node list. The
-  service keeps no list of machines of its own and serves none: a caller reads the node list from the node
-  service and asks for a node by its name there, and this service reads the node list again to know the
-  node it is asked for.
+  service keeps no list of machines of its own: it reads the node list from the node service whenever the
+  administrator asks for the nodes or for one of them, answers the nodes as that list names them, and
+  knows a node it is asked for by its name there.
 - **This machine is named by its host name, a node by its label.**
 - **This machine is read whenever it is asked for;** a node's drives are read only when that node is asked
   for, since each reading is a login over the network and a node that does not answer would otherwise hold

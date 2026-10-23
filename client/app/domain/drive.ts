@@ -1,6 +1,5 @@
 import { relayAddress } from "bmo-ui/app/domain/relay";
 import { joinPath, lastName, parentPath } from "./files";
-import { appUrl } from "./urls";
 
 import type { components } from "../../shared/openapi";
 import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FilePlaces, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
@@ -8,15 +7,14 @@ import type { FolderAt } from "./files";
 
 // The Files screen's calls to the drive service, each through the console's relay at the path the
 // service's own API writes it (docs/api.md), and what each answer becomes in the screen's own view of the
-// owner's drive, machines, folders and links. The node list is the node service's, read through the relay
-// the same way, and only where the service answers that the machines are the signed-in owner's.
+// owner's drive, machines, folders and links. The node list is read from the drive service too, and only
+// where it answers that the machines are the signed-in owner's.
 
 type Wire = components["schemas"];
 
 const SERVICE = "drive";
-const NODE_SERVICE = "node";
 
-/** The address one of the service's routes is called at, a path the app's own base stands before. */
+/** The address one of the service's routes is called at, complete as given: the app's base path, the relay and the route. */
 export function drivePath(path: string): string {
   return relayAddress(SERVICE, path);
 }
@@ -56,13 +54,6 @@ function garageOf(places: readonly Wire["Place"][]): FileGarage | null {
   return store === undefined ? null : { place: store.name, disk: store.driveKey ?? null, mount: null, dataDir: null, error: store.reason ?? null, errorCode: store.reasonCode ?? null };
 }
 
-// One node of the node service's list, as its view carries it.
-interface NodeView {
-  name: string;
-  label: string;
-  thisMachine?: boolean;
-}
-
 function spaceOf(owner: Wire["Owner"], places: readonly Wire["Place"][]): FileSpace | null {
   const drive = places.find((one) => one.kind === "drive");
 
@@ -83,13 +74,11 @@ export async function readPlaces(): Promise<FilePlaces> {
 
   const [machine, nodes] = await Promise.all([
     $fetch<Wire["Machine"]>(drivePath("/machine")),
-    // A node service that does not answer leaves this machine alone in the list.
-    $fetch<{ nodes?: NodeView[] }>(relayAddress(NODE_SERVICE, "/nodes/view")).catch(() => ({ nodes: [] }))
+    // A node list that cannot be read leaves this machine alone in the list.
+    $fetch<Wire["NodePage"]>(drivePath("/nodes")).catch((): Wire["NodePage"] => ({ items: [], more: false }))
   ]);
   const local: FileMachine = { key: "local", name: machine.name, local: true, disks: drivesOf(machine), garage: garageOf(places.items), error: null, errorCode: null };
-  const others = (nodes.nodes ?? [])
-    .filter((node) => node.thisMachine !== true)
-    .map((node): FileMachine => ({ key: nodeMachineKey(node.name), name: node.label === "" ? node.name : node.label, local: false, disks: null, garage: null, error: null, errorCode: null }));
+  const others = nodes.items.map((node): FileMachine => ({ key: nodeMachineKey(node.name), name: node.label, local: false, disks: null, garage: null, error: null, errorCode: null }));
 
   return { administrator: true, space, machines: [local, ...others] };
 }
@@ -161,7 +150,7 @@ export function contentUrl(at: FolderAt & { name: string }, how: { download?: bo
 
   const asked = query.toString();
 
-  return appUrl(drivePath(`${entryRoute(at.place, joinPath(at.path, at.name))}/content${asked === "" ? "" : `?${asked}`}`));
+  return drivePath(`${entryRoute(at.place, joinPath(at.path, at.name))}/content${asked === "" ? "" : `?${asked}`}`);
 }
 
 // ---- Changes ------------------------------------------------------------------------------------
@@ -243,7 +232,7 @@ export function sendFile(into: FolderAt, path: string, file: File, conflict: Fil
   return new Promise((done, failed) => {
     const request = new XMLHttpRequest();
 
-    request.open("PUT", appUrl(drivePath(route)));
+    request.open("PUT", drivePath(route));
     request.setRequestHeader("content-type", "application/octet-stream");
     request.upload.onprogress = (event) => progress(event.loaded);
     request.onload = () => {
@@ -315,5 +304,5 @@ export function shareRoute(token: string): string {
 
 /** The address a link's holder downloads what it hands out from. */
 export function shareContentUrl(token: string): string {
-  return appUrl(drivePath(`/shares/${segment(token)}/content`));
+  return drivePath(`/shares/${segment(token)}/content`);
 }

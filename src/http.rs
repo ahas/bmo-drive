@@ -17,8 +17,9 @@ use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
 
 use crate::clients::node::Node;
+use crate::console::Bundle;
 use crate::events::Events;
-use crate::owner::{OWNER_KEY, Owner};
+use crate::owner::{OWNER_KEY, OWNER_ROLE, Owner};
 use crate::settings::Settings;
 use crate::store::Store;
 
@@ -120,6 +121,11 @@ impl Refused {
     Self::new(StatusCode::BAD_REQUEST, "bad-request", error)
   }
 
+  /// A caller the token lets in, asking without what the route needs of the reader: 403 `forbidden`.
+  pub fn forbidden(error: impl Into<String>) -> Self {
+    Self::new(StatusCode::FORBIDDEN, "forbidden", error)
+  }
+
   /// Nothing at the key the path names: 404 `not-found`.
   pub fn not_found(error: impl Into<String>) -> Self {
     Self::new(StatusCode::NOT_FOUND, "not-found", error)
@@ -184,19 +190,31 @@ pub struct Standing {
   pub node: Node,
   /// The service's event stream.
   pub events: Events,
+  /// The console bundle, read from its built folder, or why it could not be.
+  pub console: Result<Arc<Bundle>, String>,
 }
 
 impl Standing {
   pub fn new(settings: Settings, store: Store) -> Self {
     let node = Node::new(&settings.node.address, &settings.node.token);
     let events = Events::new(store.clone());
+    let console = Bundle::read(&settings.console.folder).map(Arc::new);
 
     Self {
       settings: Arc::new(settings),
       store,
       node,
       events,
+      console,
     }
+  }
+
+  /// The console bundle, refused where its folder could not be read.
+  pub fn console(&self) -> Result<&Bundle, Refused> {
+    self
+      .console
+      .as_deref()
+      .map_err(|why| Refused::not_found(format!("the console bundle is not built: {why}")))
   }
 }
 
@@ -265,9 +283,14 @@ impl Call {
       .map_err(|why| Refused::bad_request(format!("the body is not the route's: {why}")))
   }
 
-  /// The owner the request acts for, read from its `Owner-Key` (`docs/api.md`, 「Owners」).
+  /// The owner the request acts for, read from its `Owner-Key`, held by a reader in its `Owner-Role`
+  /// (`docs/api.md`, 「Owners」).
   pub fn owner(&self) -> Result<Owner, Refused> {
-    Owner::checked(self.header(OWNER_KEY).as_deref(), &self.standing.settings)
+    Owner::checked(
+      self.header(OWNER_KEY).as_deref(),
+      self.header(OWNER_ROLE).as_deref(),
+      &self.standing.settings,
+    )
   }
 
   /// Whether the caller asks for JSON rather than a stream.

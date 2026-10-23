@@ -4,7 +4,7 @@
 [package]
 name = "bmo-drive"
 description = "The file viewer over this machine's drives, Garage and the nodes' volumes and each owner's own drive, its share links, its client and its MCP server."
-version = "0.1.0-rev.2"
+version = "0.1.0-rev.3"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -58,6 +58,8 @@ rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"]
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+# The digest a console bundle's file is answered under, so its path follows its bytes.
+sha2 = "0.10.9"
 # A word of a POSIX node's script, quoted as the shell reads it back whole.
 shlex = "2.0.1"
 # A jake hub's answer, a stream of server-sent events.

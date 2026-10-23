@@ -10,12 +10,14 @@ use reqwest::{Method, RequestBuilder, Response, StatusCode, header};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::owner::OWNER_KEY;
+use crate::console::{MANIFEST_PATH, WORDS_PATH};
+use crate::owner::{OWNER_KEY, OWNER_ROLE};
 use crate::settings::Settings;
 use crate::wire::{
-  ArchiveRequest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage, EventPage,
-  EventsQuery, FolderRequest, Health, Machine, MachineQuery, Owner, PlacePage, PlacesQuery, Quota,
-  QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage, WireError, WriteQuery,
+  ArchiveRequest, ConsoleManifest, ConsoleRole, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove,
+  EntryPage, EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery,
+  Owner, PlacePage, PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage,
+  WireError, WriteQuery,
 };
 
 // Everything but the unreserved characters is written percent-encoded in a path segment, a `/` and a `:`
@@ -99,13 +101,15 @@ impl Content {
   }
 }
 
-/// The service at one address, asked with one token, acting for one owner.
+/// The service at one address, asked with one token, acting for one owner in one role.
 #[derive(Clone, Debug)]
 pub struct DriveClient {
   address: String,
   token: String,
   /// The owner key sent as `Owner-Key`; none is sent where it is empty.
   owner: String,
+  /// The role sent as `Owner-Role` beside the key.
+  role: ConsoleRole,
   http: reqwest::Client,
   timeout: Option<Duration>,
 }
@@ -117,21 +121,29 @@ impl DriveClient {
       address: address.into().trim_end_matches('/').to_owned(),
       token: token.into(),
       owner: String::new(),
+      role: ConsoleRole::Member,
       http: reqwest::Client::new(),
       timeout: None,
     }
   }
 
   /// The service the settings name, on this machine, with the settings' token, acting for the
-  /// administrator's key.
+  /// administrator's key in the administrator's role.
   pub fn of_settings(settings: &Settings) -> Self {
     Self::new(format!("http://{}", settings.server.listen), settings.server.token.clone())
       .with_owner(settings.owners.administrator.clone())
+      .with_role(ConsoleRole::Administrator)
   }
 
   /// The client acting for the owner `key`, sent as `Owner-Key` on every route.
   pub fn with_owner(mut self, key: impl Into<String>) -> Self {
     self.owner = key.into();
+    self
+  }
+
+  /// The client acting in `role`, sent as `Owner-Role` beside the key; `member` where none is given.
+  pub fn with_role(mut self, role: ConsoleRole) -> Self {
+    self.role = role;
     self
   }
 
@@ -145,7 +157,7 @@ impl DriveClient {
     let mut request = self.http.request(method, format!("{}{path}", self.address)).bearer_auth(&self.token);
 
     if !self.owner.is_empty() {
-      request = request.header(OWNER_KEY, &self.owner);
+      request = request.header(OWNER_KEY, &self.owner).header(OWNER_ROLE, self.role.name());
     }
 
     match self.timeout {
@@ -229,6 +241,26 @@ impl DriveClient {
   /// `GET /machine`.
   pub async fn machine(&self, query: &MachineQuery) -> Result<Machine, ClientFailure> {
     Self::read(Self::with_query(self.request(Method::GET, "/machine"), query)).await
+  }
+
+  /// `GET /nodes`.
+  pub async fn nodes(&self, query: &NodesQuery) -> Result<NodePage, ClientFailure> {
+    Self::read(Self::with_query(self.request(Method::GET, "/nodes"), query)).await
+  }
+
+  /// `GET /console-manifest`.
+  pub async fn console_manifest(&self) -> Result<ConsoleManifest, ClientFailure> {
+    Self::read(self.request(Method::GET, MANIFEST_PATH)).await
+  }
+
+  /// `GET /console/words`.
+  pub async fn console_words(&self) -> Result<serde_json::Value, ClientFailure> {
+    Self::read(self.request(Method::GET, WORDS_PATH)).await
+  }
+
+  /// `GET /console/{file}`: the module or the stylesheet at the path the manifest names.
+  pub async fn console_file(&self, path: &str) -> Result<Content, ClientFailure> {
+    Self::content_of(self.request(Method::GET, path), None).await
   }
 
   /// `GET /places/{placeName}/entries`.

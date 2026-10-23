@@ -11,10 +11,13 @@ unit is reached through its API, as `docs/api.md` lists.
 The repository carries the repository-wide personal-data check in `tests/personal_data.rs`
 (`PERSONAL-DATA.md`), the import of the old archive's share links in `tests/import.rs`, and the owners and
 their two branches in `tests/owners.rs`: each owner's drive its own alone, the quota judged before bytes
-arrive, the machines the administrator's alone, and share links opening in both branches. `cargo test` runs
-them all. The rest of the behaviour tests are deferred: they are written and run here once the minimal
-services stand on the new repositories, and until then the build check, `cargo check --all-targets`, and the
-bundle's typecheck stand beside them. `docs/inventory.md` lists the tests the old behaviour was held to.
+arrive, the machines the administrator's alone, and share links opening in both branches; and the console
+bundle in `tests/console.rs`: the manifest read through bmo-ui's own reading of it, the guard's refusals,
+and the module's path following its bytes. That one runs bmo-ui's reading with Bun inside `client/`,
+installing the bundle's locked packages first where they are not installed. `cargo test` runs them all.
+The rest of the behaviour tests are deferred: they are written and run here once the minimal services stand
+on the new repositories, and until then the build check, `cargo check --all-targets`, and the bundle's
+typecheck stand beside them. `docs/inventory.md` lists the tests the old behaviour was held to.
 
 ## Layout
 
@@ -23,7 +26,7 @@ bundle's typecheck stand beside them. `docs/inventory.md` lists the tests the ol
 | `src/` | The service, its command, its client and its MCP server, one crate split into its own modules |
 | `migrations/` | The store, its tables made by these statements in order |
 | `skills/` | The `bmo-drive` skill, the harness plugin's half beside the MCP server |
-| `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own |
+| `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own, with its build in `client/console/` |
 | `deploy/` | The service's user unit |
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |
 | `tests/` | The repository-wide personal-data check, `personal_data.rs`, and the behaviour tests standing so far |
@@ -35,18 +38,29 @@ the local settings a deployment gives) and `LICENSE`.
 
 ## The console plugin bundle
 
-`client/` holds the Files screen and its file share page as a Nuxt layer on top of bmo-ui, packed as
-`bmo-drive-client` and declared in `client/console-bundle.json` by bmo-ui's console plugin contract
-(bmo-ui's `docs/console-bundles.md`): the bundle `drive`, its screens under `/files`, calling the service
-`drive`. Its words stand in its own pack, `client/i18n/`, one file to a locale, under `drive.*`, with
-`drive.error.<code>` for each refusal code of `docs/api.md`. A console extends it as it extends bmo-ui and
-owes it bmo-ui itself at the version the bundle's peer names (a packed copy stands in `client/vendor/` for
-the bundle's own install and typecheck) and a relay of the services its screens call: `drive`, and `node`
-for the node list the screen reads from the node service.
+`client/` holds the Files screen and its file share page on top of bmo-ui, by bmo-ui's console plugin
+contract (bmo-ui's `docs/console-bundles.md`): the bundle `drive`, its screens under `/files`, calling the
+service `drive` alone, the node list among what it reads there. Its words stand in its own pack,
+`client/i18n/`, one file to a locale, under `drive.*`, with `drive.error.<code>` for each refusal code of
+`docs/api.md`. Its sources are one set, built two ways:
 
-The screen's types of the service's answers are generated from `docs/openapi.json` into
-`client/shared/openapi.ts` by `bun run api`. The bundle's check is `bun install --frozen-lockfile && bun
-run typecheck` inside `client/`.
+- **The served bundle.** `bun run bundle` builds `client/dist/`: the module `bundle.js`, whose default
+  export holds the two pages' routes, the stylesheet `bundle.css`, the utility classes the screens use
+  built on the layer's tokens, and `words.json`, the language pack as one object keyed by locale. The
+  module leaves every import of `vue`, `vue-router`, `vue-i18n`, `nuxt/app`, `@nuxt/ui` and `bmo-ui`
+  unbundled, written as the package's own path, and carries the rest; the components and the Vue and Nuxt
+  functions the pages use without importing them are imported in the build. The build stands in
+  `client/console/`. The service answers the folder's files with its manifest (`docs/api.md`, 「The console
+  bundle」), and a deployment builds the folder in each release.
+- **The layer pack.** `bun pm pack` inside `client/` packs `bmo-drive-client`, the same pages as a Nuxt
+  layer, for a console that builds its bundles into itself; it finds the bundle by
+  `client/console-bundle.json` in the pack, which names it, its screen path, its service and its language
+  pack. Such a console extends it as it extends bmo-ui and relays the service `drive`.
+
+Either way the console owes the bundle bmo-ui at the version the bundle's peer names; a packed copy stands
+in `client/vendor/` for the bundle's own install, build and typecheck. The screen's types of the service's
+answers are generated from `docs/openapi.json` into `client/shared/openapi.ts` by `bun run api`. The
+bundle's check is `bun install --frozen-lockfile && bun run typecheck` inside `client/`.
 
 ## Documents
 

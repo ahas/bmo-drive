@@ -33,6 +33,12 @@ actor = ""
 # The administrator's owner key, whose alone the machines are; none where empty. A deployment names its own.
 administrator = ""
 
+# The console bundle the service serves (docs/api.md, 「The console bundle」).
+[console]
+# The bundle's built folder, which `bun run bundle` writes inside client/; a relative one is read from where
+# the process starts, a deployment's release.
+folder = "client/dist"
+
 # Where the BMO drive stands and how it is kept (docs/files.md, 「The BMO drive」).
 [storage]
 # local (a root folder on this machine), node (a root folder on a node) or s3 (a key prefix in a bucket).

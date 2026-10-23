@@ -31,7 +31,8 @@ use crate::http::{Call, Refused, Route, Standing, answer};
 use crate::owner::Owner;
 pub(crate) use crate::wire::EntryKind as Kind;
 use crate::wire::{
-  self, ContentQuery, EntriesQuery, EntryPage, EntrySort, MachineQuery, PlacePage, PlacesQuery, SortOrder,
+  self, ContentQuery, EntriesQuery, EntryPage, EntrySort, ListedNode, MachineQuery, NodePage, NodesQuery,
+  PlacePage, PlacesQuery, SortOrder,
 };
 use drives::Drive;
 use garage::Garage;
@@ -642,6 +643,33 @@ impl Route for MachineRead {
 }
 
 crate::route!(MachineRead);
+
+/// The node list as the node service answers it now, the administrator's alone.
+pub struct NodesList;
+
+impl Route for NodesList {
+  const METHOD: Method = Method::GET;
+  const PATH: &'static str = "/nodes";
+
+  async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    call.owner()?.administrator_only("no such route for this owner")?;
+
+    let query: NodesQuery = call.query()?;
+    let all = node::listed(call.standing())
+      .await?
+      .into_iter()
+      .map(|node| ListedNode {
+        name: node.name,
+        label: node.label,
+      })
+      .collect();
+    let (items, more) = page_of(all, query.after, query.limit.unwrap_or(PLACES_MOST).clamp(1, PLACES_MOST));
+
+    Ok(answer(StatusCode::OK, NodePage { items, more }))
+  }
+}
+
+crate::route!(NodesList);
 
 // How long a folder's reading is kept for the pages after its first, and how many folders are kept.
 const KEPT_FOR: Duration = Duration::from_secs(30);

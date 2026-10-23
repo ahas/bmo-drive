@@ -53,6 +53,94 @@
           }
         ]
       },
+      "ConsoleManifest": {
+        "description": "The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The\nconsole bundle」).",
+        "properties": {
+          "apiPrefix": {
+            "description": "The path every call the screens make stands under.",
+            "type": "string"
+          },
+          "bundle": {
+            "description": "The path the module is answered at.",
+            "type": "string"
+          },
+          "events": {
+            "description": "Whether the screens read the service's event stream.",
+            "type": "boolean"
+          },
+          "icon": {
+            "description": "The icon drawn beside that name.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The bundle's name, its words' namespace.",
+            "type": "string"
+          },
+          "ownerKey": {
+            "description": "Whether every call the screens make needs the reader's owner key.",
+            "type": "boolean"
+          },
+          "pushKinds": {
+            "description": "The event kinds a console may raise as a notice to a reader not on the screen.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ConsoleRole"
+          },
+          "screenPath": {
+            "description": "The path the bundle's screens stand under.",
+            "type": "string"
+          },
+          "serviceName": {
+            "description": "The service's name, which a console relays it under.",
+            "type": "string"
+          },
+          "stylesheet": {
+            "description": "The path the stylesheet is answered at.",
+            "type": "string"
+          },
+          "title": {
+            "description": "The key, in the bundle's words, of the name a console's menu gives the screen.",
+            "type": "string"
+          },
+          "websocket": {
+            "description": "Whether the screens open a WebSocket to the service.",
+            "type": "boolean"
+          },
+          "words": {
+            "description": "The path the words are answered at.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "icon",
+          "screenPath",
+          "serviceName",
+          "bundle",
+          "stylesheet",
+          "words",
+          "apiPrefix",
+          "role",
+          "ownerKey",
+          "events",
+          "websocket",
+          "pushKinds"
+        ],
+        "type": "object"
+      },
+      "ConsoleRole": {
+        "description": "The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).",
+        "enum": [
+          "administrator",
+          "member"
+        ],
+        "type": "string"
+      },
       "CopyRequest": {
         "description": "Entries to be copied into a folder of this place or another.",
         "properties": {
@@ -374,6 +462,24 @@
         ],
         "type": "object"
       },
+      "ListedNode": {
+        "description": "A node of the node list, as the administrator reads it.",
+        "properties": {
+          "label": {
+            "description": "What a person reads it as: its label, or its name where the list gives it none.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Its name on the node list, by which a place or a machine asks for it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label"
+        ],
+        "type": "object"
+      },
       "Machine": {
         "description": "A machine and its drives.",
         "properties": {
@@ -399,6 +505,25 @@
           "name",
           "nodeName",
           "drives"
+        ],
+        "type": "object"
+      },
+      "NodePage": {
+        "description": "A page of the node list.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ListedNode"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
         ],
         "type": "object"
       },
@@ -875,10 +1000,136 @@
   "info": {
     "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
     "title": "bmo-drive",
-    "version": "0.1.0-rev.2"
+    "version": "0.1.0-rev.3"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/console-manifest": {
+      "get": {
+        "operationId": "readConsoleManifest",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleManifest"
+                }
+              }
+            },
+            "description": "The console bundle's manifest, by bmo-ui's console plugin contract."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The console bundle's manifest, by bmo-ui's console plugin contract.",
+        "tags": [
+          "console"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "not-found"
+        ]
+      }
+    },
+    "/console/words": {
+      "get": {
+        "operationId": "readConsoleWords",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The console bundle's words: each locale's tree under the locale's code."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The console bundle's words: each locale's tree under the locale's code.",
+        "tags": [
+          "console"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "not-found"
+        ]
+      }
+    },
+    "/console/{file}": {
+      "get": {
+        "operationId": "readConsoleFile",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The file's name, as the manifest's path ends.",
+            "in": "path",
+            "name": "file",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/css": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The console bundle's module or stylesheet, at the path the manifest names."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The console bundle's module or stylesheet, at the path the manifest names.",
+        "tags": [
+          "console"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found"
+        ]
+      }
+    },
     "/events": {
       "get": {
         "operationId": "listEvents",
@@ -891,6 +1142,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -970,6 +1234,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "gone",
           "failed"
@@ -1019,6 +1284,19 @@
             }
           },
           {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "description": "A node, read instead of this machine.",
             "in": "query",
             "name": "nodeName",
@@ -1053,10 +1331,96 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "upstream-failed",
           "failed"
+        ]
+      }
+    },
+    "/nodes": {
+      "get": {
+        "operationId": "listNodes",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "How many nodes were already read.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "description": "How many nodes were already read.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodePage"
+                }
+              }
+            },
+            "description": "The node list as the node service answers it now, this machine left out."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The node list as the node service answers it now, this machine left out.",
+        "tags": [
+          "machine"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found",
+          "upstream-failed"
         ]
       }
     },
@@ -1072,6 +1436,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           }
@@ -1097,6 +1474,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "failed"
         ]
@@ -1114,6 +1492,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1180,6 +1571,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "upstream-failed",
@@ -1199,6 +1591,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1244,6 +1649,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "outside-place",
@@ -1268,6 +1674,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1312,6 +1731,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "conflict",
@@ -1343,6 +1763,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1474,6 +1907,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "outside-place",
@@ -1499,6 +1933,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1535,6 +1982,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "conflict",
@@ -1561,6 +2009,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1604,6 +2065,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "outside-place",
@@ -1625,6 +2087,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1678,6 +2153,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "conflict",
@@ -1710,6 +2186,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1802,6 +2291,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "outside-place",
@@ -1825,6 +2315,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1906,6 +2409,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "conflict",
@@ -1937,6 +2441,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -1991,6 +2508,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "conflict",
@@ -2019,6 +2537,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -2053,6 +2584,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "failed"
@@ -2069,6 +2601,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -2113,6 +2658,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "no-quota",
@@ -2132,6 +2678,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           },
@@ -2184,6 +2743,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "failed"
         ]
@@ -2199,6 +2759,19 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
               "type": "string"
             }
           }
@@ -2244,6 +2817,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "outside-place",
@@ -2273,6 +2847,19 @@
             }
           },
           {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "description": "The share link's token.",
             "in": "path",
             "name": "token",
@@ -2296,6 +2883,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found",
           "failed"
@@ -2419,6 +3007,19 @@
               "minLength": 1,
               "type": "string"
             }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2442,6 +3043,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "forbidden",
           "bad-request",
           "not-found"
         ]
@@ -2480,6 +3082,9 @@
     },
     {
       "name": "shares"
+    },
+    {
+      "name": "console"
     }
   ],
   "x-calls": [

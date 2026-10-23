@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use bmo_drive::client::DriveClient;
 use bmo_drive::command::{self, Failure, NOUNS, ShareArgs};
 use bmo_drive::settings::Settings;
+use bmo_drive::wire::ConsoleRole;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -114,11 +115,12 @@ async fn main() -> ExitCode {
     Word::Mcp { address, owner } => {
       let client = match address {
         Some(address) => DriveClient::new(address, settings.server.token.clone())
-          .with_owner(settings.owners.administrator.clone()),
+          .with_owner(settings.owners.administrator.clone())
+          .with_role(ConsoleRole::Administrator),
         None => DriveClient::of_settings(&settings),
       };
       let client = match owner.filter(|owner| !owner.is_empty()) {
-        Some(owner) => client.with_owner(owner),
+        Some(owner) => client.with_owner(owner).with_role(ConsoleRole::Member),
         None => client,
       };
 

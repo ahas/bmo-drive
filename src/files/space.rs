@@ -344,7 +344,7 @@ async fn quota_owner(call: &mut Call) -> Result<Owner, Refused> {
 
   let key = call.path_param("ownerKey").await?;
 
-  Owner::checked(Some(&key), &call.standing().settings)
+  Owner::keyed(Some(&key), &call.standing().settings)
 }
 
 /// One owner's quota as it stands, with its usage.

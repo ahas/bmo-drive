@@ -160,6 +160,24 @@ pub struct PlacePage {
   pub more: bool,
 }
 
+/// A node of the node list, as the administrator reads it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListedNode {
+  /// Its name on the node list, by which a place or a machine asks for it.
+  pub name: String,
+  /// What a person reads it as: its label, or its name where the list gives it none.
+  pub label: String,
+}
+
+/// A page of the node list.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NodePage {
+  pub items: Vec<ListedNode>,
+  pub more: bool,
+}
+
 /// A machine and its drives.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -385,6 +403,17 @@ pub struct PlacesQuery {
   pub limit: Option<u64>,
 }
 
+/// The query of `GET /nodes`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NodesQuery {
+  /// How many nodes were already read.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub after: Option<u64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub limit: Option<u64>,
+}
+
 /// The query of `GET /machine`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -462,4 +491,46 @@ pub struct EventsQuery {
   pub after: Option<i64>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub limit: Option<u64>,
+}
+
+/// The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ConsoleRole {
+  Administrator,
+  Member,
+}
+
+/// The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The
+/// console bundle」).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsoleManifest {
+  /// The bundle's name, its words' namespace.
+  pub name: String,
+  /// The key, in the bundle's words, of the name a console's menu gives the screen.
+  pub title: String,
+  /// The icon drawn beside that name.
+  pub icon: String,
+  /// The path the bundle's screens stand under.
+  pub screen_path: String,
+  /// The service's name, which a console relays it under.
+  pub service_name: String,
+  /// The path the module is answered at.
+  pub bundle: String,
+  /// The path the stylesheet is answered at.
+  pub stylesheet: String,
+  /// The path the words are answered at.
+  pub words: String,
+  /// The path every call the screens make stands under.
+  pub api_prefix: String,
+  pub role: ConsoleRole,
+  /// Whether every call the screens make needs the reader's owner key.
+  pub owner_key: bool,
+  /// Whether the screens read the service's event stream.
+  pub events: bool,
+  /// Whether the screens open a WebSocket to the service.
+  pub websocket: bool,
+  /// The event kinds a console may raise as a notice to a reader not on the screen.
+  pub push_kinds: Vec<String>,
 }

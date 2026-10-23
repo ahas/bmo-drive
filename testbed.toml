@@ -51,3 +51,15 @@ env_links = [{ link = "settings.local.toml", target = "env/drive.toml" }]
 units = ["deploy/*.service"]
 # Answers 0 once the service the deployed settings name answers ready (docs/api.md, 「Health」).
 health = "~/.local/share/bmo-drive/deploy/bin/bmo-drive health"
+
+# The console bundle the service serves from the release (docs/api.md, 「The console bundle」): its locked
+# packages installed and its folder built inside client/, where the settings' console.folder reads it.
+[[deploy.step]]
+id = "console-bundle"
+phase = "before-flip"
+command = '''
+set -eu
+cd client
+bun install --frozen-lockfile
+bun run bundle
+'''

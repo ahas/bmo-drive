@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/console-manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The console bundle's manifest, by bmo-ui's console plugin contract. */
+        get: operations["readConsoleManifest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The console bundle's words: each locale's tree under the locale's code. */
+        get: operations["readConsoleWords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The console bundle's module or stylesheet, at the path the manifest names. */
+        get: operations["readConsoleFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -47,6 +98,23 @@ export interface paths {
         };
         /** This machine and its drives, or a node and its drives. */
         get: operations["readMachine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The node list as the node service answers it now, this machine left out. */
+        get: operations["listNodes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -292,6 +360,44 @@ export interface components {
         };
         /** @description How a name already taken where an entry lands is settled. */
         Conflict: "refuse" | "replace" | "rename" | "skip";
+        /**
+         * @description The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The
+         *     console bundle」).
+         */
+        ConsoleManifest: {
+            /** @description The path every call the screens make stands under. */
+            apiPrefix: string;
+            /** @description The path the module is answered at. */
+            bundle: string;
+            /** @description Whether the screens read the service's event stream. */
+            events: boolean;
+            /** @description The icon drawn beside that name. */
+            icon: string;
+            /** @description The bundle's name, its words' namespace. */
+            name: string;
+            /** @description Whether every call the screens make needs the reader's owner key. */
+            ownerKey: boolean;
+            /** @description The event kinds a console may raise as a notice to a reader not on the screen. */
+            pushKinds: string[];
+            role: components["schemas"]["ConsoleRole"];
+            /** @description The path the bundle's screens stand under. */
+            screenPath: string;
+            /** @description The service's name, which a console relays it under. */
+            serviceName: string;
+            /** @description The path the stylesheet is answered at. */
+            stylesheet: string;
+            /** @description The key, in the bundle's words, of the name a console's menu gives the screen. */
+            title: string;
+            /** @description Whether the screens open a WebSocket to the service. */
+            websocket: boolean;
+            /** @description The path the words are answered at. */
+            words: string;
+        };
+        /**
+         * @description The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).
+         * @enum {string}
+         */
+        ConsoleRole: "administrator" | "member";
         /** @description Entries to be copied into a folder of this place or another. */
         CopyRequest: {
             /** @description How a name already taken there is settled; refused where none is asked. */
@@ -401,6 +507,13 @@ export interface components {
             reason: string | null;
             version: string;
         };
+        /** @description A node of the node list, as the administrator reads it. */
+        ListedNode: {
+            /** @description What a person reads it as: its label, or its name where the list gives it none. */
+            label: string;
+            /** @description Its name on the node list, by which a place or a machine asks for it. */
+            name: string;
+        };
         /** @description A machine and its drives. */
         Machine: {
             drives: components["schemas"]["Drive"][];
@@ -408,6 +521,11 @@ export interface components {
             name: string;
             /** @description The node, null for this machine. */
             nodeName: string | null;
+        };
+        /** @description A page of the node list. */
+        NodePage: {
+            items: components["schemas"]["ListedNode"][];
+            more: boolean;
         };
         /** @description What the asking owner may reach (`docs/api.md`, 「Owners」). */
         Owner: {
@@ -596,6 +714,78 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    readConsoleManifest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The console bundle's manifest, by bmo-ui's console plugin contract. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleManifest"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    readConsoleWords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The console bundle's words: each locale's tree under the locale's code. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    readConsoleFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path: {
+                /** @description The file's name, as the manifest's path ends. */
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The console bundle's module or stylesheet, at the path the manifest names. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/css": string;
+                    "text/javascript": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     listEvents: {
         parameters: {
             query?: {
@@ -608,6 +798,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
                 /** @description The event to resume after. */
                 "Last-Event-ID"?: string;
             };
@@ -659,6 +851,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path?: never;
             cookie?: never;
@@ -677,12 +871,44 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    listNodes: {
+        parameters: {
+            query?: {
+                /** @description How many nodes were already read. */
+                after?: number | null;
+                limit?: number | null;
+            };
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The node list as the node service answers it now, this machine left out. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     readOwner: {
         parameters: {
             query?: never;
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path?: never;
             cookie?: never;
@@ -713,6 +939,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path?: never;
             cookie?: never;
@@ -737,6 +965,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -768,6 +998,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -811,6 +1043,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -838,6 +1072,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -867,6 +1103,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -894,6 +1132,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -932,6 +1172,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
                 /** @description One byte range of the file. */
                 Range?: string;
             };
@@ -975,6 +1217,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -1017,6 +1261,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The place's name, as GET /places answers it. */
@@ -1057,6 +1303,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The owner key whose quota is read or set. */
@@ -1084,6 +1332,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The owner key whose quota is read or set. */
@@ -1119,6 +1369,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path?: never;
             cookie?: never;
@@ -1143,6 +1395,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path?: never;
             cookie?: never;
@@ -1204,6 +1458,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path: {
                 /** @description The share link's token. */
@@ -1265,6 +1521,8 @@ export interface operations {
             header: {
                 /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
                 "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
             };
             path?: never;
             cookie?: never;

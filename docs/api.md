@@ -11,10 +11,11 @@ in the same commit and follows the version rule (「Versions」).
 
 - **Every route needs `Authorization: Bearer <token>`,** the token of the settings; a missing or wrong
   token is answered 401 `unauthorized`.
-- **Every route but `GET /health`, `GET /shares/{token}` and `GET /shares/{token}/content` needs
-  `Owner-Key: <key>`,** the opaque key of the owner the caller acts for (「Owners」). One of them asked
-  without the header, with an empty one or with one longer than 200 characters is refused 400
-  `bad-request`.
+- **Every route but `GET /health`, the console bundle's manifest and words (「The console bundle」),
+  `GET /shares/{token}` and `GET /shares/{token}/content` needs `Owner-Key: <key>` and `Owner-Role:
+  <role>`:** the opaque key of the owner the caller acts for, and the role the reader holds (「Owners」). One
+  of them asked without a role that allows `member`, or without the key or with an empty one, is refused
+  403 `forbidden`; one asked with a key longer than 200 characters is refused 400 `bad-request`.
 - **Bodies are JSON both ways, keys in camelCase,** but for a file's bytes written or read and a zip's
   answer.
 - **Times are epoch milliseconds.**
@@ -36,11 +37,17 @@ in the same commit and follows the version rule (「Versions」).
 ## Owners
 
 - **The console checks the person.** It signs the person in, decides which owner key stands for their login
-  (the login's user on the account service, its id written as a decimal number) and sets `Owner-Key` on
-  every request it hands on, replacing any the browser sent, so a browser never chooses its own key.
+  (the login's user on the account service, its id written as a decimal number) and which role they hold,
+  `administrator` or `member`, and sets `Owner-Key` and `Owner-Role` on every request it hands on,
+  replacing any the browser sent, so a browser never chooses its own key or role.
 - **The service checks its bearer token, and nothing of the person.** It takes the owner key as given: an
   opaque string of 1 to 200 characters, compared exactly, never parsed. A caller holding the token may act
   for any key, so the token is the console's and the harness's alone.
+- **The role is the floor of every route that takes the key.** The console bundle's manifest names
+  `member` as the least role that opens the Files screen (「The console bundle」), and an administrator
+  holds every role a member holds, so `Owner-Role` is `administrator` or `member` and anything else is
+  refused 403 `forbidden`. The role reaches nothing further: what is the administrator's alone is judged
+  by the key, as follows.
 - **The administrator's key** is the setting `owners.administrator`. The machine branch (「Places」, the
   machines and the nodes), the quotas and the storage are that key's alone: to any other key a machine
   place, `GET /machine`, a node, `GET /storage` and `GET`/`PUT /quotas/{ownerKey}` are answered 404
@@ -103,6 +110,7 @@ kind, its `id` the event number, and its `data` `{"id", "kind", "at", "data"}`.
 |---|---|---|
 | `GET /places` | query `nodeName?`, `after?`, `limit?` | 200, a page of places |
 | `GET /machine` | query `nodeName?` | 200, a machine |
+| `GET /nodes` | query `after?`, `limit?` | 200, a page of the nodes |
 
 - **`GET /places`** lists the asking owner's BMO drive, the place `drive`, then, for the administrator,
   this machine's places, read now: its volumes, then its Garage where it has one. With `nodeName` it lists
@@ -112,6 +120,11 @@ kind, its `id` the event number, and its `data` `{"id", "kind", "at", "data"}`.
   read; `limit` is 1 to 1000, 1000 where none is asked.
 - **`GET /machine`** is this machine and its drives, read now; with `nodeName`, that node, read now, the
   reading replacing the one its places were listed from. It is the administrator's alone.
+- **`GET /nodes`** is the node list as the node service answers it now, in its order, each node `name` and
+  `label` (its name where the list gives it no label), a node the list marks as this machine left out since
+  this machine stands for it. It is the administrator's alone; the cursor `after` is how many nodes were
+  already read, and `limit` is 1 to 1000, 1000 where none is asked. A node service that does not answer is
+  refused 502 `upstream-failed`.
 - **A node that cannot be read** is refused 502 `upstream-failed`, the sentence saying why; a node the node
   list does not hold is refused 404 `not-found`.
 
@@ -242,11 +255,39 @@ starts; an entry that fails once the zip has started ends the answer as broken.
   with 404 `not-found`. They read nothing of the request but the token and the range, and take no owner
   key: the entry is read in the places of the link's own owner.
 
+## The console bundle
+
+The service serves its Files screen as a console bundle by bmo-ui's console plugin contract (bmo-ui's
+`docs/console-bundles.md`): a manifest at a fixed route, and the module, stylesheet and words it names.
+
+| Method and path | Sends | Answers |
+|---|---|---|
+| `GET /console-manifest` | | 200, the manifest |
+| `GET /console/words` | | 200, the words |
+| `GET /console/{file}` | | 200, the module or the stylesheet the manifest names |
+
+- **The manifest** is the contract's shape: `name` `drive`, `title` `drive.title`, `icon`
+  `i-material-symbols-folder-open-outline`, `screenPath` `/files`, `serviceName` `drive`, `bundle` and
+  `stylesheet` (the module's and the stylesheet's paths), `words` `/console/words`, `apiPrefix` `/`, `role`
+  `member`, `ownerKey` true, `events` false, `websocket` false and `pushKinds` empty. The screens call the
+  routes of this document alone, the node list among them (「Places」), and read no event stream.
+- **The module and the stylesheet** stand at `/console/bundle-<digest>.js` and `/console/bundle-<digest>.css`,
+  the digest the first sixteen hexadecimal digits of the SHA-256 of their bytes, so either path changes
+  whenever its bytes do. The module is answered as `text/javascript`, the stylesheet as `text/css`, both
+  with `cache-control: private, max-age=31536000, immutable`; any other file is refused 404 `not-found`.
+- **The words** are one JSON object, each locale's tree of the bundle's language pack under the locale's
+  code (README.md, 「The console plugin bundle」).
+- **What each takes:** the manifest and the words take the bearer token alone; the module and the
+  stylesheet take `Owner-Key` and `Owner-Role` as every route of the screen does (「Conventions」).
+- **What the service reads them from:** the bundle's built folder, the setting `console.folder`, read once
+  at start. A folder that does not hold the module, the stylesheet and the words leaves the four routes
+  refused 404 `not-found`, so a console finds no bundle here.
+
 ## Refusals
 
 Beside the common codes of bmo-chat's `docs/conventions.md` (「Errors」), which this service answers as
-that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found`, `conflict`, `gone`,
-`failed`, `upstream-failed`), these are the service's own, each answered 422 but `quota-exceeded`, answered
+that document states them (`bad-request`, `unauthorized`, `forbidden`, `no-route`, `not-found`, `conflict`,
+`gone`, `failed`, `upstream-failed`), these are the service's own, each answered 422 but `quota-exceeded`, answered
 413:
 
 | Code | When |
@@ -274,13 +315,16 @@ that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found
 | `no-quota` | a quota set for the administrator's own key |
 | `storage-unready` | the drive asked for while its storage cannot be opened: a kind whose adapter has not landed, or no root set |
 
-- **`bad-request`** covers a missing, empty or overlong `Owner-Key`, an owner key whose space's folder name
-  would pass 255 bytes, a body or query not of the route's shape, a field the route needs and does not
+- **`bad-request`** covers an overlong `Owner-Key`, an owner key whose space's folder name would pass 255
+  bytes, a body or query not of the route's shape, a field the route needs and does not
   get, a count, sort, order or conflict not among its own, an upload with no `Content-Length` and an upload
   that ended before its length; the sentence names which.
+- **`forbidden`** covers a route that takes the owner key asked without it or with an empty one, or without
+  an `Owner-Role` that allows `member` (「Owners」).
 - **`not-found`** covers nothing at a path, a place the current reading does not list, a node the node list
-  does not hold, the machine branch, the storage and the quotas asked for by any key but the
-  administrator's, and a share link as above.
+  does not hold, the machine branch, the node list, the storage and the quotas asked for by any key but the
+  administrator's, a share link as above, and the console bundle where it is not built or a file it does
+  not name.
 - **`conflict`** covers a name already taken (with `names`) and a bucket asked to be deleted that still
   holds objects.
 - **`upstream-failed`** covers the node service not answering, a node that could not be reached, whose
@@ -349,9 +393,10 @@ reads and writes files with `drive_read` and `drive_write`, and hands someone a 
 
 `bmo_drive::client` is the service's own Rust client: one method for each route, sending and reading the
 types of `bmo_drive::wire`, which the routes answer with and the OpenAPI document is generated from. It
-acts for the owner key it is given and sends it on every route that takes one; the client of the settings
-acts for the administrator's. The
-command and the MCP server call the service through it, and the console plugin bundle reads the TypeScript
+acts for the owner key and the role it is given and sends both on every route that takes them, the role
+`member` where none is given; the client of the settings acts for the administrator's key in the role
+`administrator`, and so does the MCP server unless `--owner` names another key, which it acts for as a
+`member`. The command and the MCP server call the service through it, and the console plugin bundle reads the TypeScript
 types generated from `docs/openapi.json`.
 
 ## Calls this service makes
@@ -362,7 +407,7 @@ Each to the node service's address with its token as a bearer, as bmo-node's `do
 
 | Call | Route | Why |
 |---|---|---|
-| the node list | `GET /nodes/view` | each node's `name` and `label`, to know a node asked for and name its machine |
+| the node list | `GET /nodes/view` | each node's `name` and `label`, to know a node asked for, name its machine and answer `GET /nodes` |
 | a node's connection | `GET /nodes/{name}/target` | an ssh node's `host`, `port`, `user`, `keyPath?` and `shell?`, or a jake node's `hubUrl`, `tokenFile` and `agent` |
 | a node's login | `POST /nodes/login` with `node` | the arguments that open a batch SSH login to the node, ahead of the command; null where the node has no SSH route |
 
@@ -398,6 +443,7 @@ token lets no caller in.
 | `share` | `address` | the address a link's page stands under; a link's `url` is it, a `/` and the token |
 | `share` | `actor` | who the command records as a link's `actorName`; none where empty |
 | `owners` | `administrator` | the administrator's owner key (「Owners」); none where empty |
+| `console` | `folder` | the console bundle's built folder (「The console bundle」), `client/dist` where none is set; a relative one is read from where the process starts |
 | `storage` | `kind` | where the BMO drive stands: `local` where none is set, `node` or `s3` (`docs/files.md`, 「The BMO drive」) |
 | `storage` | `root` | the root folder of the spaces: on this machine for `local`, on the node for `node`; the key prefix in the bucket for `s3` |
 | `storage` | `node` | the node of the node list a `node` location stands on |

@@ -621,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-drive"
-version = "0.1.0-rev.2"
+version = "0.1.0-rev.3"
 dependencies = [
  "async_zip",
  "aws-runtime",
@@ -648,6 +648,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "shlex",
  "sqlx",
  "sse-stream",

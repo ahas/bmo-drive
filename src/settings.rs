@@ -28,6 +28,7 @@ pub struct Settings {
   pub garage: Garage,
   pub share: Share,
   pub owners: Owners,
+  pub console: Console,
   pub storage: Storage,
   pub quota: Quota,
   pub protect: Protect,
@@ -79,6 +80,13 @@ pub struct Share {
 pub struct Owners {
   /// The administrator's owner key, whose alone the machine branch is; none where empty.
   pub administrator: String,
+}
+
+/// The console bundle the service serves (`docs/api.md`, 「The console bundle」).
+#[derive(Clone, Debug, Deserialize)]
+pub struct Console {
+  /// The bundle's built folder; a relative one is read from where the process starts.
+  pub folder: PathBuf,
 }
 
 /// What kind of location the BMO drive stands in (`docs/files.md`, 「The BMO drive」).

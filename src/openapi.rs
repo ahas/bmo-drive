@@ -7,12 +7,14 @@ use schemars::JsonSchema;
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use serde_json::{Map, Value, json};
 
+use crate::console::{MANIFEST_PATH, WORDS_PATH};
 use crate::events::KINDS;
 use crate::mcp::tools;
 use crate::wire::{
-  ArchiveRequest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage, EventPage,
-  EventsQuery, FolderRequest, Health, Machine, MachineQuery, Owner, PlacePage, PlacesQuery, Quota,
-  QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage, WireError, WriteQuery,
+  ArchiveRequest, ConsoleManifest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage,
+  EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery, Owner,
+  PlacePage, PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage,
+  WireError, WriteQuery,
 };
 
 /// Where the schemas the routes refer to stand in the document.
@@ -34,7 +36,8 @@ struct Operation {
   method: &'static str,
   path: &'static str,
   id: &'static str,
-  /// Whether the route acts for the owner `Owner-Key` names.
+  /// Whether the route acts for the owner `Owner-Key` names, held by a reader in the role `Owner-Role`
+  /// names; such a route can also refuse with `forbidden`.
   owned: bool,
   tag: &'static str,
   summary: &'static str,
@@ -62,15 +65,24 @@ impl Operation {
 
     responses.insert("default".into(), json!({ "$ref": "#/components/responses/Error" }));
 
+    let codes: Vec<&str> = self
+      .codes
+      .iter()
+      .flat_map(|&code| match code {
+        "unauthorized" if self.owned => vec![code, "forbidden"],
+        _ => vec![code],
+      })
+      .collect();
     let mut operation = json!({
       "operationId": self.id,
       "tags": [self.tag],
       "summary": self.summary,
       "responses": responses,
-      "x-codes": self.codes,
+      "x-codes": codes,
     });
 
-    let parameters: Vec<Value> = self.owned.then(owner_key).into_iter().chain(self.parameters).collect();
+    let owner = if self.owned { vec![owner_key(), owner_role()] } else { Vec::new() };
+    let parameters: Vec<Value> = owner.into_iter().chain(self.parameters).collect();
 
     if !parameters.is_empty() {
       operation["parameters"] = parameters.into();
@@ -140,6 +152,17 @@ fn owner_key() -> Value {
     "required": true,
     "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
     "schema": { "type": "string", "minLength": 1, "maxLength": 200 },
+  })
+}
+
+/// The role the reader holds, the floor of every route that takes the owner key (`docs/api.md`, 「Owners」).
+fn owner_role() -> Value {
+  json!({
+    "name": "Owner-Role",
+    "in": "header",
+    "required": true,
+    "description": "The role the reader holds; either allows the console bundle's role, member.",
+    "schema": { "type": "string", "enum": ["administrator", "member"] },
   })
 }
 
@@ -283,6 +306,18 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       body: None,
       answers: vec![(200, json_answer::<Machine>(generator))],
       codes: &["unauthorized", "bad-request", "not-found", "upstream-failed", "failed"],
+    },
+    Operation {
+      method: "get",
+      path: "/nodes",
+      id: "listNodes",
+      owned: true,
+      tag: "machine",
+      summary: "The node list as the node service answers it now, this machine left out.",
+      parameters: query::<NodesQuery>(generator),
+      body: None,
+      answers: vec![(200, json_answer::<NodePage>(generator))],
+      codes: &["unauthorized", "bad-request", "not-found", "upstream-failed"],
     },
     Operation {
       method: "get",
@@ -600,6 +635,48 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         (206, bytes_answer("application/octet-stream")),
       ],
       codes: &["unauthorized", "not-found", "gone", "upstream-failed", "failed"],
+    },
+    Operation {
+      method: "get",
+      path: MANIFEST_PATH,
+      id: "readConsoleManifest",
+      owned: false,
+      tag: "console",
+      summary: "The console bundle's manifest, by bmo-ui's console plugin contract.",
+      parameters: Vec::new(),
+      body: None,
+      answers: vec![(200, json_answer::<ConsoleManifest>(generator))],
+      codes: &["unauthorized", "not-found"],
+    },
+    Operation {
+      method: "get",
+      path: WORDS_PATH,
+      id: "readConsoleWords",
+      owned: false,
+      tag: "console",
+      summary: "The console bundle's words: each locale's tree under the locale's code.",
+      parameters: Vec::new(),
+      body: None,
+      answers: vec![(200, Some(json!({ "application/json": { "schema": { "type": "object" } } })))],
+      codes: &["unauthorized", "not-found"],
+    },
+    Operation {
+      method: "get",
+      path: "/console/{file}",
+      id: "readConsoleFile",
+      owned: true,
+      tag: "console",
+      summary: "The console bundle's module or stylesheet, at the path the manifest names.",
+      parameters: vec![segment("file", "The file's name, as the manifest's path ends.")],
+      body: None,
+      answers: vec![(
+        200,
+        Some(json!({
+          "text/javascript": { "schema": { "type": "string" } },
+          "text/css": { "schema": { "type": "string" } },
+        })),
+      )],
+      codes: &["unauthorized", "bad-request", "not-found"],
     },
   ]
 }

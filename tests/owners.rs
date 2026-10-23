@@ -124,7 +124,7 @@ async fn each_owner_sees_only_its_own_drive() {
   let none = DriveClient::new(&address, TOKEN);
   assert_eq!(
     status(none.places(&PlacesQuery::default()).await.unwrap_err()),
-    (400, "bad-request".into())
+    (403, "forbidden".into())
   );
 }
 

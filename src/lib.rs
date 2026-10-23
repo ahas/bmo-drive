@@ -5,6 +5,7 @@
 pub mod client;
 pub mod clients;
 pub mod command;
+pub mod console;
 pub mod events;
 pub mod files;
 pub mod health;
@@ -34,7 +35,13 @@ pub async fn serve(settings: Settings) -> Result<(), String> {
   }
 
   let listen = settings.server.listen;
-  let router = http::router(Standing::new(settings, store)).map_err(|faults| faults.join("; "))?;
+  let standing = Standing::new(settings, store);
+
+  if let Err(why) = &standing.console {
+    eprintln!("bmo-drive: the console bundle is not served: {why}");
+  }
+
+  let router = http::router(standing).map_err(|faults| faults.join("; "))?;
   let listener = TcpListener::bind(listen)
     .await
     .map_err(|why| format!("{listen} could not be listened on: {why}"))?;
