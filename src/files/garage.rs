@@ -266,6 +266,7 @@ impl Garage {
             kind: Kind::Folder,
             size: None,
             modified: bucket.creation_date().and_then(|at| at.to_millis().ok()),
+            link: None,
           })
         })
         .collect(),
@@ -298,6 +299,7 @@ impl Garage {
               kind: Kind::Folder,
               size: None,
               modified: None,
+              link: None,
             });
           }
         }
@@ -314,6 +316,7 @@ impl Garage {
             kind: Kind::File,
             size: object.size().and_then(|size| u64::try_from(size).ok()),
             modified: object.last_modified().and_then(|at| at.to_millis().ok()),
+            link: None,
           });
         }
       }

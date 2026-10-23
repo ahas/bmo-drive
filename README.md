@@ -14,7 +14,10 @@ their two branches in `tests/owners.rs`: each owner's drive its own alone, the q
 arrive, the machines the administrator's alone, and share links opening in both branches; and the console
 bundle in `tests/console.rs`: the manifest read through bmo-ui's own reading of it, the guard's refusals,
 and the module's path following its bytes. That one runs bmo-ui's reading with Bun inside `client/`,
-installing the bundle's locked packages first where they are not installed. `cargo test` runs them all.
+installing the bundle's locked packages first where they are not installed; links on a volume in
+`tests/links.rs`: a path walking back into itself refused, a link to a folder beside walked once, each link's
+target listed and a folder's zip ending over links; and where the Files screen opens in `tests/screen.rs`, the
+screen's place memory run with Bun the same way. `cargo test` runs them all.
 The rest of the behaviour tests are deferred: they are written and run here once the minimal services stand
 on the new repositories, and until then the build check, `cargo check --all-targets`, and the bundle's
 typecheck stand beside them. `docs/inventory.md` lists the tests the old behaviour was held to.

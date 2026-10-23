@@ -69,7 +69,7 @@ const failed = ref("");
 const removing = ref<string | null>(null);
 
 function iconOf(share: FileShareView): string {
-  return entryIcon({ name: share.name, kind: share.kind, size: null, modified: null });
+  return entryIcon({ name: share.name, kind: share.kind, size: null, modified: null, link: null });
 }
 
 async function read(): Promise<void> {

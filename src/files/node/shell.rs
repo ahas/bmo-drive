@@ -5,8 +5,8 @@
 
 use super::super::drives::Drive;
 use super::super::{
-  Entry, Kind, Refused, Span, cut_short, into_itself, io_kind_refusal, is_folder, not_folder, outside,
-  protected, taken,
+  Entry, Kind, Refused, Span, cut_short, into_itself, io_kind_refusal, is_folder, looped, not_folder,
+  outside, protected, taken,
 };
 
 /// How a script ends where it refuses: each code one reason, the same in every shell's scripts.
@@ -20,6 +20,7 @@ pub mod code {
   pub const TAKEN: i32 = 9;
   pub const CUT_SHORT: i32 = 10;
   pub const INTO_ITSELF: i32 = 11;
+  pub const LOOPED: i32 = 12;
 }
 
 /// What a code a script ended with says, where it is one of the codes above.
@@ -34,6 +35,7 @@ pub fn refusal_of(code: i32) -> Option<Refused> {
     code::TAKEN => taken(),
     code::CUT_SHORT => cut_short(),
     code::INTO_ITSELF => into_itself(),
+    code::LOOPED => looped(),
     _ => return None,
   })
 }
@@ -94,13 +96,17 @@ pub trait Shell: Send + Sync {
   fn reads_uploads(&self) -> bool;
 }
 
-/// A folder's entries out of listing records: each its kind letter (`d`, `f`, anything else), its size,
-/// its modification time in seconds since the epoch, and its name, a tab apart, each record ended by a
-/// NUL so a name may hold any other character.
+/// A folder's entries out of what a listing script prints, every part ended by a NUL so a name may hold
+/// any other character. First a record for each entry: its kind letter (`d`, `f`, anything else), its
+/// size, its modification time in seconds since the epoch, and its name, a tab apart. Then an empty part,
+/// and three parts for each link among them: its name, the kind letter of what it leads to, and its target
+/// as the link writes it. A link the listing could not follow as a folder, such as one leading back above
+/// itself, is the folder its target's kind says it is.
 pub fn read_listing(printed: &[u8]) -> Vec<Entry> {
-  printed
-    .split(|byte| *byte == 0)
-    .filter(|record| !record.is_empty())
+  let mut parts = printed.split(|byte| *byte == 0);
+  let mut entries: Vec<Entry> = parts
+    .by_ref()
+    .take_while(|record| !record.is_empty())
     .filter_map(|record| {
       let record = String::from_utf8_lossy(record);
       let mut cells = record.splitn(4, '\t');
@@ -121,9 +127,25 @@ pub fn read_listing(printed: &[u8]) -> Vec<Entry> {
         kind,
         size: (kind == Kind::File).then(|| size.parse().ok()).flatten(),
         modified: modified.parse::<f64>().ok().map(|seconds| (seconds * 1000.0).round() as i64),
+        link: None,
       })
     })
-    .collect()
+    .collect();
+  let links: Vec<&[u8]> = parts.collect();
+
+  for [name, kind, target] in links.as_chunks::<3>().0 {
+    let name = String::from_utf8_lossy(name);
+
+    if let Some(entry) = entries.iter_mut().find(|entry| entry.name == name) {
+      entry.link = Some(String::from_utf8_lossy(target).into_owned());
+
+      if entry.kind == Kind::Other && *kind == b"d" {
+        entry.kind = Kind::Folder;
+      }
+    }
+  }
+
+  entries
 }
 
 /// Windows' disks and lettered volumes out of the records the Windows drives reading prints: `disk`

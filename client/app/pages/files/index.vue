@@ -187,6 +187,7 @@ import { useIsland } from "bmo-ui/app/domain/island";
 import { useNarrow } from "bmo-ui/app/domain/screen";
 import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
 import { SHARE_SPANS, spanSeconds } from "../../../shared/config";
+import { browserStore, forgetPlace, rememberPlace, rememberedPlace, startingPlace } from "../../domain/place-memory";
 
 import type { FileConflict, FileEntry, FileMachine, FilePlaces, FileShareView, FileSortKey } from "../../../shared/types";
 import type { ShareRoad, ShareSpan } from "bmo-ui/app/domain/share-links";
@@ -197,7 +198,8 @@ import type { BarAction, BarProperty } from "bmo-ui/app/domain/tabs";
 import type { BreadcrumbItem, ContextMenuItem, DropdownMenuItem, SplitterItem } from "@nuxt/ui";
 
 // The Files screen (docs/files.md). The place, the folder, the chosen
-// file, the view and the sort live in the address; how wide the parts are belongs to this browser.
+// file, the view and the sort live in the address; how wide the parts are, and the folder each viewer
+// last opened, belong to this browser.
 
 const { t } = useI18n();
 const route = useRoute();
@@ -646,9 +648,13 @@ async function loadPlaces(): Promise<void> {
     places.value = merged(await readPlaces());
 
     if (open.value === null) {
-      const first = firstPlace(places.value);
+      const remembered = rememberedPlace(browserStore(), places.value.viewer);
+      const start = startingPlace(null, remembered, places.value, firstPlace(places.value));
 
-      if (first !== null) await router.replace({ query: addressOf({ place: first, path: "" }) });
+      if (start !== null) {
+        openedFromMemory = remembered !== null && folderKey(start) === folderKey(remembered) ? start : null;
+        await router.replace({ query: addressOf(start) });
+      }
     }
   } catch (error) {
     placesFailure.value = refusalText(t, error, t("drive.error.places_failed"));
@@ -684,6 +690,23 @@ async function readMachine(key: string): Promise<void> {
 }
 
 let listAsked = 0;
+// The remembered folder the screen opened at, until its first listing answers: one that can no longer be
+// listed is forgotten, and the screen opens where it would with nothing remembered.
+let openedFromMemory: FolderAt | null = null;
+
+function forgetUnlisted(at: FolderAt): void {
+  const remembered = openedFromMemory;
+
+  openedFromMemory = null;
+
+  if (remembered === null || places.value === null || folderKey(remembered) !== folderKey(at)) return;
+
+  forgetPlace(browserStore(), places.value.viewer);
+
+  const first = firstPlace(places.value);
+
+  if (first !== null && (first !== at.place || at.path !== "")) void router.replace({ query: addressOf({ place: first, path: "" }) });
+}
 
 // The open folder's first page. What already stands stays while it is read again, so a sort
 // changed or a fresh read never takes the list down.
@@ -702,8 +725,12 @@ async function loadListing(fresh = false): Promise<void> {
 
     if (mine !== listAsked) return;
 
+    openedFromMemory = null;
     entries.value = page.entries;
     total.value = page.total;
+
+    // A folder that lists is the one the viewer comes back to.
+    if (places.value !== null) rememberPlace(browserStore(), places.value.viewer, at);
 
     // What was chosen and is gone after a change is no longer chosen.
     const names = new Set(page.entries.map((one) => one.name));
@@ -716,6 +743,7 @@ async function loadListing(fresh = false): Promise<void> {
 
     entries.value = null;
     listFailure.value = refusalText(t, error, t("drive.error.list_failed"));
+    forgetUnlisted(at);
   } finally {
     if (mine === listAsked) loading.value = false;
   }

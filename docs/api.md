@@ -63,7 +63,8 @@ in the same commit and follows the version rule (「Versions」).
 | `GET /quotas/{ownerKey}` | | 200, the quota |
 | `PUT /quotas/{ownerKey}` | `quotaBytes` | 200, the quota as it now stands |
 
-- **The owner** is what the asking key may reach: `administrator` (whether the machine branch is its),
+- **The owner** is what the asking key may reach: `ownerKey` (the key itself, as the request gave it, which
+  a screen keeps what it remembers in the browser under), `administrator` (whether the machine branch is its),
   `usedBytes` (the bytes of the files in its space, null where the storage cannot be opened) and
   `quotaBytes` (its quota, null for the administrator, who has none). A screen decides from it whether to
   draw the machines.
@@ -197,8 +198,10 @@ kernel name, or the share's source), `kind` (`nvme`, `ssd`, `hdd`, `usb`, `netwo
 ### What an entry is
 
 `placeName`, `path`, `name` (the path's last name, empty at a place's top), `kind` (`folder`, `file` or
-`other`, a device, a socket or a link leading nowhere), `byteCount` (a file's alone, else null) and
-`changedAt` (when it last changed, or null where the place keeps no time).
+`other`, a device, a socket or a link leading nowhere; a link that leads somewhere is the kind of what it
+leads to), `byteCount` (a file's alone, else null), `changedAt` (when it last changed, or null where the
+place keeps no time) and `linkTarget` (for a symbolic link or a junction, its target as the link writes it,
+else null).
 
 ### A file's answer
 
@@ -294,6 +297,7 @@ that document states them (`bad-request`, `unauthorized`, `forbidden`, `no-route
 |---|---|
 | `bad-name` | a new name that cannot stand in a path |
 | `outside-place` | a path that would leave its place |
+| `link-loop` | a path walking back into itself: a name whose real location is one the path already stood at, or a folder holding one (`docs/files.md`, 「Paths and the fence」) |
 | `place-top` | a change asked of a place's top |
 | `into-itself` | a folder copied or moved into itself or under it |
 | `is-folder` | a folder asked to be read as a file |

@@ -70,7 +70,7 @@ export async function readPlaces(): Promise<FilePlaces> {
   const [owner, places] = await Promise.all([$fetch<Wire["Owner"]>(drivePath("/owner")), $fetch<Wire["PlacePage"]>(drivePath("/places"))]);
   const space = spaceOf(owner, places.items);
 
-  if (!owner.administrator) return { administrator: false, space, machines: [] };
+  if (!owner.administrator) return { administrator: false, viewer: owner.ownerKey, space, machines: [] };
 
   const [machine, nodes] = await Promise.all([
     $fetch<Wire["Machine"]>(drivePath("/machine")),
@@ -80,7 +80,7 @@ export async function readPlaces(): Promise<FilePlaces> {
   const local: FileMachine = { key: "local", name: machine.name, local: true, disks: drivesOf(machine), garage: garageOf(places.items), error: null, errorCode: null };
   const others = nodes.items.map((node): FileMachine => ({ key: nodeMachineKey(node.name), name: node.label, local: false, disks: null, garage: null, error: null, errorCode: null }));
 
-  return { administrator: true, space, machines: [local, ...others] };
+  return { administrator: true, viewer: owner.ownerKey, space, machines: [local, ...others] };
 }
 
 /** The owner's drive with its usage and quota read again, after a change in it. */
@@ -101,7 +101,7 @@ export async function readNode(machine: FileMachine): Promise<FileMachine> {
 // ---- Folders ------------------------------------------------------------------------------------
 
 function entryOf(entry: Wire["Entry"]): FileEntry {
-  return { name: entry.name, kind: entry.kind, size: entry.byteCount ?? null, modified: entry.changedAt ?? null };
+  return { name: entry.name, kind: entry.kind, size: entry.byteCount ?? null, modified: entry.changedAt ?? null, link: entry.linkTarget ?? null };
 }
 
 export interface ListingAsked {

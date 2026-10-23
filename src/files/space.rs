@@ -293,6 +293,7 @@ impl Route for OwnerRead {
     Ok(answer(
       StatusCode::OK,
       wire::Owner {
+        owner_key: owner.key.clone(),
         administrator: owner.administrator,
         used_bytes: usage_of(&standing.settings, &owner.key).await?,
         quota_bytes,

@@ -41,8 +41,14 @@ impl PowerShell {
     let policy = &self.policy;
     let system = policy.system.iter().map(|one| literal(one)).collect::<Vec<_>>().join(", ");
     let home = policy.home.iter().map(|one| literal(one)).collect::<Vec<_>>().join(", ");
-    let (missing, outside, denied, protected, not_folder) =
-      (code::MISSING, code::OUTSIDE, code::DENIED, code::PROTECTED, code::NOT_FOLDER);
+    let (missing, outside, denied, protected, not_folder, looped) = (
+      code::MISSING,
+      code::OUTSIDE,
+      code::DENIED,
+      code::PROTECTED,
+      code::NOT_FOLDER,
+      code::LOOPED,
+    );
 
     format!(
       r#"$ErrorActionPreference = 'Stop'
@@ -74,9 +80,20 @@ function Follow([string]$p) {{
   }}
   exit {missing}
 }}
+function Holds([string]$p, [string]$w) {{
+  $c = [StringComparison]::OrdinalIgnoreCase
+  $p = $p.TrimEnd('\')
+  $w = $w.TrimEnd('\')
+  $w.Equals($p, $c) -or $w.StartsWith($p + '\', $c)
+}}
 function Reach([string[]]$names) {{
   $i = Follow $top
-  foreach ($n in $names) {{ $i = Follow ([IO.Path]::Combine($i.FullName, $n)) }}
+  $walked = @($i.FullName)
+  foreach ($n in $names) {{
+    $i = Follow ([IO.Path]::Combine($i.FullName, $n))
+    foreach ($w in $walked) {{ if (Holds $i.FullName $w) {{ exit {looped} }} }}
+    $walked += $i.FullName
+  }}
   $i
 }}
 function Entry([string[]]$folder, [string]$name) {{
@@ -163,11 +180,19 @@ if (-not $d.PSIsContainer) {{ exit {} }}
 try {{ [void][IO.Directory]::EnumerateFileSystemEntries($d.FullName).GetEnumerator().MoveNext() }} catch {{ exit {} }}
 $out = [Console]::OpenStandardOutput()
 $epoch = New-Object DateTime 1970, 1, 1, 0, 0, 0, ([DateTimeKind]::Utc)
-foreach ($e in @(Get-ChildItem -LiteralPath $d.FullName -Force -ErrorAction SilentlyContinue)) {{
+$all = @(Get-ChildItem -LiteralPath $d.FullName -Force -ErrorAction SilentlyContinue)
+foreach ($e in $all) {{
   $k = if ($e.PSIsContainer) {{ 'd' }} elseif ($e -is [IO.FileInfo]) {{ 'f' }} else {{ 'o' }}
   $s = if ($k -eq 'f') {{ $e.Length }} else {{ 0 }}
   $m = ($e.LastWriteTimeUtc - $epoch).TotalSeconds.ToString([Globalization.CultureInfo]::InvariantCulture)
   $b = [Text.Encoding]::UTF8.GetBytes("$k`t$s`t$m`t$($e.Name)`0")
+  $out.Write($b, 0, $b.Length)
+}}
+$out.WriteByte(0)
+foreach ($e in $all) {{
+  if ($e.LinkType -ne 'SymbolicLink' -and $e.LinkType -ne 'Junction') {{ continue }}
+  $k = if ($e.PSIsContainer) {{ 'd' }} else {{ 'f' }}
+  $b = [Text.Encoding]::UTF8.GetBytes("$($e.Name)`0$k`0$(@($e.Target)[0])`0")
   $out.Write($b, 0, $b.Length)
 }}
 $out.Flush()

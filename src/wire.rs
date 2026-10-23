@@ -93,6 +93,8 @@ pub struct Place {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Owner {
+  /// The asking owner's key, as the request gave it.
+  pub owner_key: String,
   /// Whether the machine branch is this owner's.
   pub administrator: bool,
   /// The bytes of the files in its space; null where the storage cannot be opened.
@@ -237,6 +239,8 @@ pub struct Entry {
   pub byte_count: Option<u64>,
   /// When it last changed, in epoch milliseconds, or null where the place keeps no time.
   pub changed_at: Option<i64>,
+  /// For a symbolic link or a junction, its target as the link writes it; null for anything else.
+  pub link_target: Option<String>,
 }
 
 /// An entry's key alone, as an event of its deletion carries it.

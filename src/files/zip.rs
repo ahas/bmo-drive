@@ -18,8 +18,8 @@ use tokio_util::io::ReaderStream;
 
 use super::change::kind_of;
 use super::{
-  Kind, OUTSIDE_PLACE, Opened, Place, Places, Span, Within, disposition, header_value, order, path_place,
-  places_of, shown,
+  Kind, LINK_LOOP, OUTSIDE_PLACE, Opened, Place, Places, Span, Within, disposition, header_value, order,
+  path_place, places_of, shown,
 };
 use crate::http::{Call, Refused, Route, Standing};
 use crate::owner::Owner;
@@ -98,10 +98,11 @@ fn local_stamp(at: DateTime<Utc>) -> ZipDateTime {
     .build()
 }
 
-/// Whether a reading was refused for leading out of the folder: a link to somewhere else, which the
-/// zip leaves out as the fence leaves it out, rather than a failure that cuts the zip short.
+/// Whether a reading was refused for leading out of the folder or back into a folder already walked: a
+/// link to somewhere else, which the zip leaves out as the fence leaves it out, rather than a failure that
+/// cuts the zip short.
 fn fenced_out(refused: &Refused) -> bool {
-  refused.code == OUTSIDE_PLACE
+  refused.code == OUTSIDE_PLACE || refused.code == LINK_LOOP
 }
 
 /// A folder still to be walked: where it stands, the path its entries take in the zip, and when it

@@ -216,6 +216,13 @@ fn outside() -> Refused {
   Refused::rule(OUTSIDE_PLACE, "the path would leave its place")
 }
 
+/// The code of a path walking back into a folder it already stood in.
+const LINK_LOOP: &str = "link-loop";
+
+fn looped() -> Refused {
+  Refused::rule(LINK_LOOP, "the path walks back into a folder it already stood in")
+}
+
 fn taken() -> Refused {
   Refused::conflict("the name is already taken")
 }
@@ -288,6 +295,8 @@ struct Entry {
   size: Option<u64>,
   /// When it last changed, in epoch milliseconds.
   modified: Option<i64>,
+  /// A link's target as the link writes it; none for anything that is no link.
+  link: Option<String>,
 }
 
 impl Entry {
@@ -300,6 +309,7 @@ impl Entry {
       kind: self.kind,
       byte_count: self.size,
       changed_at: self.modified,
+      link_target: self.link.clone(),
     }
   }
 }
@@ -313,6 +323,7 @@ fn top_entry(place_name: &str) -> wire::Entry {
     kind: Kind::Folder,
     byte_count: None,
     changed_at: None,
+    link_target: None,
   }
 }
 

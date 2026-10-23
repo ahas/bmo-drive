@@ -172,10 +172,19 @@ flowchart TD
 - **A path that would leave its place is refused,** before anything is opened:
   - a name that is `.` or `..`, an empty name between two slashes, or a name holding a NUL;
   - on a Windows node, also a name holding `\`, `:` or another character Windows does not allow in a name;
-  - on a volume, a path whose real location (every symbolic link and junction followed) is not under the
-    volume's own real root, so a link pointing out of the volume opens nothing.
+  - on a volume, a path any of whose steps has its real location (every symbolic link and junction
+    followed) outside the volume's own real root, so a link pointing out of the volume opens nothing, nor
+    anything reached through it.
+- **A path that walks back into itself is refused** `link-loop`, so links never open a path without end.
+  Each name is followed to its real location in turn, from the place's top, and a name is refused where its
+  real location is one the path already stood at, or a folder holding one of them: a link to its own
+  folder, to a folder above it, or back to a folder walked earlier in the path. A link to a folder beside or
+  below is walked as the folder it leads to, once.
+- **The path stays the names the caller walked,** links and all; the real locations are the service's to
+  judge by and go into no answer.
 - **On a node the fence stands on the node,** in the same script that then lists the folder or streams the
-  file, so what is read is what was checked.
+  file, so what is read is what was checked; a path walking back into itself is refused there by the same
+  rule.
 - **A place the request names must be one the current reading lists;** any other name is refused as not
   found, so the fence is the reading itself rather than a list kept beside it.
 
@@ -194,6 +203,9 @@ flowchart TD
 - **An entry carries** its place, its path and name, its kind (folder, file, or other: a device, a socket, a
   link that leads nowhere), its size in bytes for a file and the time it last changed. Garage's folders
   carry no size or time, since a prefix has neither; its buckets carry the time they were made.
+- **A link is listed as what it leads to,** a folder or a file, and carries its target as the link itself
+  writes it, so a screen marks it as a link and says where it leads. Anything that is no link carries no
+  target, and Garage holds no links.
 - **A reading that does not end is cut off:** a folder on a share that stopped answering, or a node that
   stopped answering, is refused after some seconds rather than holding the request.
 
@@ -229,7 +241,8 @@ flowchart TD
   - the archive is ZIP64, so a file or a whole past 4 GB is carried as readily as a small one;
   - a folder is walked as a place of its own, cut down to it, by the same readings a listing and a file
     use: the fence stands at the folder, so a link leading out of it (elsewhere on the same volume as much
-    as off it) opens nothing and is left out, as is an entry that is neither a folder nor a file;
+    as off it) opens nothing and is left out, as is a link walking back into a folder already walked and an
+    entry that is neither a folder nor a file;
   - it is saved under the one entry's name, or under the name of the folder several stand in, and at a
     place's top under the place's own last name;
   - its length is not known before it ends, so it is answered with no length and takes no range;
@@ -386,3 +399,13 @@ flowchart TD
   decide it; for any other owner it reads neither the machines nor the node list.
 - **The usage is read again after every change** the screen makes, and a write refused over the quota is
   said in the screen's own words.
+- **The address names the place, the folder and the chosen file,** so the browser's history steps through
+  the folders walked and a reload opens the same folder.
+- **The last folder each viewer opened is remembered in the browser,** under the viewer's owner key as the
+  service answers it, as a convenience: the screen opened with an address that names no place opens at
+  that folder, where the place is still one the viewer reaches. A remembered folder that can no longer be
+  listed is forgotten and the screen opens where it would with nothing remembered. Storage the browser
+  refuses or clears leaves nothing remembered and changes nothing else.
+- **A link is marked as one** in the open folder's list, with the target it names, and a link refused for
+  walking back into itself is said in one sentence in the screen's own words; the path bar keeps the names
+  walked.

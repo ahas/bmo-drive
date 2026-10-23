@@ -444,6 +444,8 @@ export interface components {
              */
             changedAt: number | null;
             kind: components["schemas"]["EntryKind"];
+            /** @description For a symbolic link or a junction, its target as the link writes it; null for anything else. */
+            linkTarget: string | null;
             /** @description The path's last name, empty at a place's top. */
             name: string;
             /** @description Its names from the place's top, joined by `/`. */
@@ -531,6 +533,8 @@ export interface components {
         Owner: {
             /** @description Whether the machine branch is this owner's. */
             administrator: boolean;
+            /** @description The asking owner's key, as the request gave it. */
+            ownerKey: string;
             /**
              * Format: uint64
              * @description Its quota; null for the administrator, who has none.

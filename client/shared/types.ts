@@ -59,6 +59,9 @@ export interface FileSpace {
 export interface FilePlaces {
   // Whether the machines are the signed-in owner's, as the service answers it; none are read where not.
   administrator: boolean;
+  // The signed-in owner's key, as the service answers it: what the screen remembers in the browser is kept
+  // under it, so each viewer has their own.
+  viewer: string;
   space: FileSpace | null;
   machines: FileMachine[];
 }
@@ -82,6 +85,8 @@ export interface FileEntry {
   size: number | null;
   // Epoch milliseconds.
   modified: number | null;
+  // For a link, its target as the link writes it; null for anything else.
+  link: string | null;
 }
 
 // One page of a folder, and how many entries the whole folder holds.

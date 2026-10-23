@@ -1,5 +1,6 @@
 //! A mounted volume walked as files (`docs/files.md`, 「Paths and the fence」): every path is followed to
-//! its real location, links and all, and refused where that is not under the volume's own mount. A
+//! its real location name by name, links and all, and refused where a step is not under the volume's own
+//! mount or walks back into a folder the path already stood in. A
 //! change lands on an entry itself — its folder followed, its own name kept, so a link is changed as
 //! the link it is — and is refused where this machine's guard refuses it.
 
@@ -18,7 +19,7 @@ use tokio_util::io::ReaderStream;
 use super::drives::Volume;
 use super::{
   Entry, Kind, Opened, Pending, Place, Refused, Span, Upload, Within, cut_short, into_itself, io_refusal,
-  is_folder, not_folder, outside, protected, scratch_name, taken,
+  is_folder, looped, not_folder, outside, protected, scratch_name, taken,
 };
 
 // How long a reading of the disk may take. A share that stopped answering would otherwise hold the
@@ -242,13 +243,29 @@ async fn fill(scratch: &Path, mut upload: Upload) -> Result<(), Refused> {
   if written == upload.length { Ok(()) } else { Err(cut_short()) }
 }
 
-/// Where a path really leads, refused where that is outside the volume.
+/// Where a path really leads, each name followed in turn from the volume's top: refused where a step
+/// leads outside the volume, or back to where the path already stood or to a folder holding that, so a
+/// link to its own folder or above it never opens a path without end.
 fn real(mount: &Path, within: &Within) -> Result<PathBuf, Refused> {
   let root = fs::canonicalize(mount).map_err(|why| io_refusal(&why))?;
-  let joined = within.names.iter().fold(root.clone(), |path, name| path.join(name));
-  let real = fs::canonicalize(&joined).map_err(|why| io_refusal(&why))?;
+  let mut walked = vec![root.clone()];
+  let mut real = root.clone();
 
-  if real.starts_with(&root) { Ok(real) } else { Err(outside()) }
+  for name in &within.names {
+    real = fs::canonicalize(real.join(name)).map_err(|why| io_refusal(&why))?;
+
+    if !real.starts_with(&root) {
+      return Err(outside());
+    }
+
+    if walked.iter().any(|stood| stood.starts_with(&real)) {
+      return Err(looped());
+    }
+
+    walked.push(real.clone());
+  }
+
+  Ok(real)
 }
 
 /// Work on the disk, done off the answering threads and given up past its limit.
@@ -311,14 +328,20 @@ async fn open(mount: PathBuf, within: Within, span: Span) -> Result<Opened, Refu
   })
 }
 
-/// One entry as the folder holds it, its link followed where it is one.
+/// One entry as the folder holds it, its link followed where it is one and its target kept.
 fn entry(path: &Path, name: String) -> Entry {
+  let link = fs::symlink_metadata(path)
+    .is_ok_and(|meta| meta.is_symlink())
+    .then(|| fs::read_link(path).ok())
+    .flatten()
+    .map(|target| target.to_string_lossy().into_owned());
   let Ok(meta) = fs::metadata(path) else {
     return Entry {
       name,
       kind: Kind::Other,
       size: None,
       modified: None,
+      link,
     };
   };
   let modified = meta
@@ -333,6 +356,7 @@ fn entry(path: &Path, name: String) -> Entry {
       kind: Kind::Folder,
       size: None,
       modified,
+      link,
     }
   } else if meta.is_file() {
     Entry {
@@ -340,6 +364,7 @@ fn entry(path: &Path, name: String) -> Entry {
       kind: Kind::File,
       size: Some(meta.len()),
       modified,
+      link,
     }
   } else {
     Entry {
@@ -347,6 +372,7 @@ fn entry(path: &Path, name: String) -> Entry {
       kind: Kind::Other,
       size: None,
       modified,
+      link,
     }
   }
 }

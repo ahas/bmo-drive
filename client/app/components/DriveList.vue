@@ -75,6 +75,10 @@
                 @cancel="emit('rename-cancel')"
               />
               <span v-else class="min-w-0 truncate" :class="row.original.kind === 'other' ? 'text-muted' : 'text-highlighted'">{{ row.original.name }}</span>
+              <span v-if="row.original.link !== null && props.renaming !== row.original.name" class="flex min-w-0 shrink items-center gap-1 text-muted" :title="$t('drive.label.link_target', { target: row.original.link })">
+                <UIcon :name="LINK_ICON" class="size-4 shrink-0" :aria-label="$t('drive.label.link_target', { target: row.original.link })" />
+                <span class="min-w-0 truncate text-sm">{{ row.original.link }}</span>
+              </span>
             </span>
           </template>
 
@@ -257,8 +261,11 @@ interface Pending {
   pending: true;
 }
 
+// The mark beside an entry that is a link, with the target it names.
+const LINK_ICON = "i-material-symbols-link";
+
 // The row heading the list that goes to the folder above.
-const PARENT_ROW: FileEntry = { name: "..", kind: "folder", size: null, modified: null };
+const PARENT_ROW: FileEntry = { name: "..", kind: "folder", size: null, modified: null, link: null };
 
 function isPending(row: FileEntry | Pending): row is Pending {
   return "pending" in row;

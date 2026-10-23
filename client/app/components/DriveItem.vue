@@ -11,6 +11,7 @@
     :data-folder="props.entry.kind === 'folder' ? '' : undefined"
     :draggable="!props.parent && !props.renaming"
     tabindex="-1"
+    :title="linkText ?? undefined"
     class="group relative flex min-w-0 cursor-default rounded-md transition-colors select-none focus-inset"
     :class="[LAYOUT[props.view], props.selected ? 'bg-accented/60' : props.dropping ? 'bg-primary/15 outline-2 outline-primary' : 'hover:bg-elevated active:bg-accented/50', props.cut ? 'opacity-50' : '']"
   >
@@ -23,7 +24,7 @@
       :aria-label="props.entry.name"
     />
 
-    <span class="flex shrink-0 items-center justify-center" :style="{ width: `${mark}px`, height: `${mark}px` }">
+    <span class="relative flex shrink-0 items-center justify-center" :style="{ width: `${mark}px`, height: `${mark}px` }">
       <img
         v-if="!props.parent && props.at !== null && showsThumbnail(props.entry, mark)"
         :src="contentUrl({ ...props.at, name: props.entry.name })"
@@ -33,6 +34,7 @@
         class="max-h-full max-w-full rounded-sm object-contain"
       />
       <UIcon v-else :name="props.parent ? PARENT_ICON : entryIcon(props.entry)" :style="{ width: `${iconSize}px`, height: `${iconSize}px` }" />
+      <UIcon v-if="linkText !== null" :name="LINK_ICON" class="absolute right-0 bottom-0 size-4 rounded-sm bg-default text-muted" :aria-label="linkText" />
     </span>
 
     <span class="flex min-w-0 flex-col" :class="stacked ? 'w-full items-center text-center' : 'flex-1 justify-center'">
@@ -46,7 +48,7 @@
       </span>
 
       <template v-if="!props.parent && (props.view === 'tiles' || props.view === 'content')">
-        <span class="truncate text-sm text-muted">{{ typeLabel(t, props.entry) }}</span>
+        <span class="truncate text-sm text-muted">{{ linkText ?? typeLabel(t, props.entry) }}</span>
         <span v-if="props.view === 'tiles' && props.entry.size !== null" class="truncate text-sm text-muted tabular-nums">{{ listSize(props.entry.size) }}</span>
       </template>
     </span>
@@ -88,6 +90,10 @@ const props = withDefaults(defineProps<Props>(), { parent: false, selected: fals
 const emit = defineEmits<{ rename: [name: string]; "rename-cancel": [] }>();
 
 const PARENT_ICON = "i-material-symbols-drive-folder-upload-outline";
+// The mark on an entry that is a link, which says the target it names.
+const LINK_ICON = "i-material-symbols-link";
+
+const linkText = computed(() => (props.parent || props.entry.link === null ? null : t("drive.label.link_target", { target: props.entry.link })));
 
 // The views whose mark stands over the name, and how each view lays an entry out.
 const STACKED = new Set(["huge", "large", "medium"]);

@@ -58,7 +58,7 @@ const shared = computed(() => (data.value ? sharedView(data.value) : null));
 const failed = computed(() => (error.value ? refusalText(t, error.value, t("drive.error.share_not_found")) : ""));
 const download = computed(() => shareContentUrl(token.value));
 const expired = computed(() => shared.value !== null && shared.value.expiresAt !== null && shared.value.expiresAt <= now.value);
-const icon = computed(() => (shared.value === null ? "" : entryIcon({ name: shared.value.name, kind: shared.value.kind, size: null, modified: null })));
+const icon = computed(() => (shared.value === null ? "" : entryIcon({ name: shared.value.name, kind: shared.value.kind, size: null, modified: null, link: null })));
 
 useHead({
   title: computed(() => shared.value?.name ?? t("drive.title")),

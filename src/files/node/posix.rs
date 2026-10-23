@@ -1,6 +1,7 @@
 //! A node reached in a POSIX shell: a Linux node over an ssh login or a jake hub's exec, and a WSL
 //! node, whose Windows drives are read through the Windows beneath it. Every path is followed with
-//! `realpath` to where it really stands before anything is opened, and every change is held to the
+//! `realpath` to where it really stands, name by name, before anything is opened, and every change is
+//! held to the
 //! settings' protected locations for such a machine, under the node's own home.
 
 use std::borrow::Cow;
@@ -32,7 +33,9 @@ fn words(names: &[String]) -> String {
 }
 
 impl Posix {
-  /// The functions every script stands on: the volume's real top, the fence, and the guard.
+  /// The functions every script stands on: the volume's real top, the fence, and the guard. The fence
+  /// follows a path one name at a time, keeping where each step stood as `s0`, `s1` and on, since a POSIX
+  /// shell has no list a path with any character in it fits into.
   fn prelude(&self, root: &str) -> String {
     let policy = &self.policy;
     let tops = policy.top.iter().map(|one| quoted(one).into_owned()).collect::<Vec<_>>().join(" ");
@@ -54,17 +57,29 @@ impl Posix {
         )
       })
       .collect::<String>();
-    let (missing, outside, protected) = (code::MISSING, code::OUTSIDE, code::PROTECTED);
+    let (missing, outside, protected, looped) =
+      (code::MISSING, code::OUTSIDE, code::PROTECTED, code::LOOPED);
 
     format!(
       r#"top=$(realpath -e -- {root}) || exit {missing}
 inside() {{ case "${{1%/}}/" in "${{top%/}}/"*) return 0 ;; esac; return 1; }}
 reach() {{
   p=$top
-  for n in "$@"; do p=${{p%/}}/$n; done
-  r=$(realpath -e -- "$p") || exit {missing}
-  inside "$r" || exit {outside}
-  printf '%s\n' "$r"
+  s0=$top
+  i=0
+  for n in "$@"; do
+    p=$(realpath -e -- "${{p%/}}/$n") || exit {missing}
+    inside "$p" || exit {outside}
+    j=0
+    while [ "$j" -le "$i" ]; do
+      eval "s=\$s$j"
+      case "${{s%/}}/" in "${{p%/}}/"*) exit {looped} ;; esac
+      j=$((j + 1))
+    done
+    i=$((i + 1))
+    eval "s$i=\$p"
+  done
+  printf '%s\n' "$p"
 }}
 there() {{ [ -e "$1" ] || [ -L "$1" ]; }}
 near() {{
@@ -216,6 +231,8 @@ exit 0
 [ -d \"$d\" ] || exit {}
 [ -r \"$d\" ] && [ -x \"$d\" ] || exit {}
 find -L \"$d\" -mindepth 1 -maxdepth 1 -printf '%y\\t%s\\t%T@\\t%f\\0' 2>/dev/null
+printf '\\0'
+find \"$d\" -mindepth 1 -maxdepth 1 -type l -printf '%f\\0%Y\\0%l\\0' 2>/dev/null
 exit 0
 ",
         words(names),

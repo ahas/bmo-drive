@@ -269,6 +269,13 @@
           "kind": {
             "$ref": "#/components/schemas/EntryKind"
           },
+          "linkTarget": {
+            "description": "For a symbolic link or a junction, its target as the link writes it; null for anything else.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "name": {
             "description": "The path's last name, empty at a place's top.",
             "type": "string"
@@ -287,7 +294,8 @@
           "name",
           "kind",
           "byteCount",
-          "changedAt"
+          "changedAt",
+          "linkTarget"
         ],
         "type": "object"
       },
@@ -534,6 +542,10 @@
             "description": "Whether the machine branch is this owner's.",
             "type": "boolean"
           },
+          "ownerKey": {
+            "description": "The asking owner's key, as the request gave it.",
+            "type": "string"
+          },
           "quotaBytes": {
             "description": "Its quota; null for the administrator, who has none.",
             "format": "uint64",
@@ -554,6 +566,7 @@
           }
         },
         "required": [
+          "ownerKey",
           "administrator",
           "usedBytes",
           "quotaBytes"
@@ -1000,7 +1013,7 @@
   "info": {
     "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
     "title": "bmo-drive",
-    "version": "0.1.0-rev.3"
+    "version": "0.1.0-rev.4"
   },
   "openapi": "3.1.0",
   "paths": {
