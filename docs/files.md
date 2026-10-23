@@ -1,15 +1,16 @@
 # The file viewer
 
 - **What this says:** what a caller of this service may read and change on this machine and on the nodes
-  of the node list, how this service finds it, fences it, hands it over and changes it, and the share
-  links that hand one entry to someone who holds no token. The routes, the command, the harness plugin and
-  the settings are `docs/api.md`.
+  of the node list, and in each owner's own BMO drive with its quota; how this service finds it, fences
+  it, hands it over and changes it; and the share links that hand one entry to someone who holds no token.
+  The routes, the command, the harness plugin and the settings are `docs/api.md`.
 - **It does what a file explorer does,** on every place alike: reading, and making a folder, uploading,
   renaming, copying, moving and deleting (「Changing files」). The locations the deployment and the machines
   stand on are never changed (「Protected locations」).
-- **It is for whoever holds the token.** The token opens every route; the one road out to anyone else is a
-  share link, which hands one file or folder to whoever holds it as a download and nothing else (「Share
-  links」).
+- **It is for whoever holds the token, acting for an owner.** The token opens every route, and each request
+  names the owner it acts for (「Owners and the two branches」): the machines are the administrator's alone,
+  and the BMO drive is every owner's own space. The one road out to anyone else is a share link, which hands
+  one file or folder to whoever holds it as a download and nothing else (「Share links」).
 
 ```mermaid
 flowchart TD
@@ -19,11 +20,29 @@ flowchart TD
   Drive --> Node[node service: the node list and each node's connection]
   Drive --> Roads[each node's own road]
   Roads --> Nodes[the nodes' volumes]
+  Drive --> Storage[the drive's storage location: one space per owner]
 ```
+
+## Owners and the two branches
+
+- **Every request but a link's own reading acts for an owner,** named by an opaque owner key the caller
+  hands with it (`docs/api.md`, 「Owners」). The console sets the key from the person signed in; this
+  service never learns who the person is, only the key, compared exactly.
+- **The files split in two branches:**
+  - **the machines:** this machine's volumes, its Garage and the nodes' volumes (「The machines」, 「The
+    places」). They are the administrator's alone, the owner whose key the settings name as the
+    administrator's. To every other key they are answered as if they did not stand: none of them is
+    listed, and a machine place, this machine or a node asked for is not found.
+  - **the BMO drive:** one personal space for every owner key, the administrator's among them (「The BMO
+    drive」). Each owner sees only their own.
+- **A caller learns which branches are its from the service,** never from a name: the service answers
+  whether the machines are the asking owner's, beside its drive's usage and quota, so a screen draws the
+  machines for the administrator alone without knowing who that is.
 
 ## The machines
 
-- **Every drive of every machine can be walked:** this machine, and each node of the node list. The
+- **Every drive of every machine can be walked by the administrator:** this machine, and each node of the
+  node list. The
   service keeps no list of machines of its own and serves none: a caller reads the node list from the node
   service and asks for a node by its name there, and this service reads the node list again to know the
   node it is asked for.
@@ -98,6 +117,51 @@ flowchart TD
   profile is missing or unreadable still has the place, carrying the reason it cannot be opened.
 - **Walking it:** its top level is the buckets the profile's key may list; under a bucket, each level is
   the common prefixes up to the next `/` as folders and the objects at that level as files.
+
+## The BMO drive
+
+- **Where it stands is a setting, never a list of machines:** the storage location the settings name, of
+  one of three kinds:
+  - `local`: a root folder on this machine;
+  - `node`: a root folder on a node of the node list, reached over the node's own road;
+  - `s3`: a key prefix in a bucket of an S3 store, reached through an AWS profile.
+  The service serves the `local` kind. A `node` or an `s3` location is a declared kind whose adapter is
+  still to land: its place is listed carrying the reason it cannot be opened, and every reading and change
+  of it is refused `storage-unready`; a `local` location with no root set is refused the same way. What
+  follows holds for every kind.
+- **Each owner's space is one folder under the root,** named by the owner key percent-encoded: every byte
+  but an ASCII letter, a digit, `-` and `_` written as `%` and two hex digits. The folder is that key's
+  alone, is never `.` or `..` and holds no `/`, and a copy of the root restores every space with nothing
+  beside it. It is made the first time its owner reaches it. A key whose folder name would pass 255 bytes
+  names no space.
+- **It is the place named `drive`, whichever owner asks:** the name stands for the asking owner's own
+  space, so no owner can name another's. It is walked, read, changed and zipped as a volume is (「Paths and
+  the fence」, 「Reading a file」, 「Changing files」), its folder standing as its top: a link leading out of
+  it opens nothing.
+- **Nothing in an owner's space is protected from its owner.** The protected locations (「Protected
+  locations」) guard the machine branch, which is how the root, standing among the deployment's data, is
+  changed through the drive alone.
+- **Copying and moving between the drive and a machine place** are the administrator's alone, since only
+  the administrator reaches both; such a copy streams as any copy between two places does.
+- **How the storage is backed up is the settings' statement,** answered beside the location, so the
+  console shows the owner where the drive stands and how it is kept; the service itself copies nothing.
+
+### Quotas
+
+- **Each owner's space has a quota,** the bytes its files may hold together: the settings' default, 5 GiB,
+  unless the administrator set another for that owner. The administrator's own space has none.
+- **Usage is the bytes of the files in the space,** counted at each asking by walking the space; folders
+  and links count nothing.
+- **A write is judged before it starts.** A file written, or entries copied into the space, whose bytes
+  would take the usage past the quota is refused 413 `quota-exceeded` before anything is changed:
+  - a file written over frees the bytes of the file it replaces;
+  - a copy counts every file it carries, and frees nothing it replaces;
+  - a move or a rename inside the space, making a folder and deleting change no quota's judgement;
+  - two writes started together are each judged against the usage before either, so together they may
+    pass the quota by what the later one carries.
+- **A quota set below the usage** refuses every write that adds bytes until files are deleted; nothing is
+  deleted for it.
+- **The administrator reads and sets each owner's quota** by the owner's key (`docs/api.md`, 「Owners」).
 
 ## Paths and the fence
 
@@ -247,18 +311,22 @@ flowchart TD
 
 ### What a link is
 
-- **A row of the share table,** naming the entry by its place and its path, whether it is a file or a
-  folder, who made it where the maker names someone, when, and when it stops opening. A link is a row
-  rather than a signature: it is listed, read back and taken away before its time.
+- **A row of the share table,** naming the entry by its place and its path, the owner key it was made
+  for, whether it is a file or a folder, who made it where the maker names someone, when, and when it stops
+  opening. A link is a row rather than a signature: it is listed, read back and taken away before its time.
+- **Links work in both branches.** A link of a machine place is the administrator's; a link of `drive`
+  opens the space of the owner it was made for, whoever later holds it.
+- **A row that names no owner is the administrator's,** and the service writes the administrator's key into
+  it as it starts: the old archive's links arrive with none.
 - **The token is the whole of the link:** wide, random and URL-safe, so no place or path can be read out of
   it or altered in it.
   - It never begins with a dash: a token is handed on command lines, such as the command's `--remove` or a
     `curl`, and every one of them reads a leading dash as an option of its own.
-- **The request names nothing but the token.** The place and the path come from the row, so a link reaches
-  its own entry and, for a folder, only what the folder's zip carries, which no link under the folder leads
-  out of.
-- **One live link per entry:** asking for a link where one stands hands back the one that stands, and a
-  link is given another life by being taken away and made again.
+- **The request names nothing but the token.** The place, the path and the owner come from the row, so a
+  link reaches its own entry and, for a folder, only what the folder's zip carries, which no link under the
+  folder leads out of.
+- **One live link per entry of an owner:** asking for a link where one stands hands back the one that
+  stands, and a link is given another life by being taken away and made again.
 - **It follows the path, not the file.** An entry renamed, moved or deleted leaves its link opening
   nothing, and a new file put at the same path is what the link then hands out.
 
@@ -287,9 +355,11 @@ flowchart TD
 
 ### Making and ending links
 
+- **Each owner lists and takes away its own links;** another owner's link is answered as if it did not
+  stand. A link's holder needs no owner (「What the holder sees」).
 - **On the Files screen** of this repository's console plugin bundle, a file or folder is shared from its
-  context menu and from the toolbar's menu, and the screen lists every live link.
-- **From a shell, `bmo-drive file share`** (`docs/api.md`, 「The command」):
+  context menu and from the toolbar's menu, and the screen lists the owner's live links.
+- **From a shell, `bmo-drive file share`,** acting for the administrator (`docs/api.md`, 「The command」):
   - `bmo-drive file share <path> [--days <n> | --forever]`: a link for a file or folder on this machine, the
     path read as it stands on this machine and given to the volume it lies on, the deepest mount point that
     holds it;
@@ -301,3 +371,16 @@ flowchart TD
 - **Every link is made through the share routes,** the only code that writes the table. The entry is read
   before any row is written, and whether it is a file or a folder is judged there, never taken from the
   caller.
+
+## The Files screen
+
+- **The console plugin bundle's Files screen** (README.md, 「The console plugin bundle」) walks the places
+  as a file explorer does: a tree of places and folders, the open folder's list, and a preview.
+- **The signed-in owner's BMO drive stands at the top of its tree,** with its usage and its quota beside its
+  name (the usage alone where it has none), and opens where the address names no place and the machines
+  are not the owner's.
+- **The machines stand below it only where the service answers that they are the owner's:** this machine
+  with its drives and Garage, then each node of the node list. The screen reads no name and no node list to
+  decide it; for any other owner it reads neither the machines nor the node list.
+- **The usage is read again after every change** the screen makes, and a write refused over the quota is
+  said in the screen's own words.

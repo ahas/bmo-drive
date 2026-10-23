@@ -1,5 +1,6 @@
 # How the testbed checks, builds and deploys this repository, in the testbed's declaration format. The suite
-# runs the repository-wide personal-data check (PERSONAL-DATA.md); the behaviour tests are deferred (README.md).
+# runs the repository-wide personal-data check (PERSONAL-DATA.md) and the behaviour tests standing so far
+# (README.md).
 
 testbed = 0
 name = "bmo-drive"

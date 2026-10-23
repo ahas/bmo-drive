@@ -42,6 +42,19 @@ impl Store {
   pub fn pool(&self) -> &SqlitePool {
     &self.pool
   }
+
+  /// Every link and kept event that names no owner given to `owner`, the administrator's key
+  /// (`docs/files.md`, 「What a link is」).
+  pub async fn adopt(&self, owner: &str) -> Result<(), StoreError> {
+    for statement in [
+      "UPDATE file_shares SET owner = $1 WHERE owner = ''",
+      "UPDATE events SET owner = $1 WHERE owner = ''",
+    ] {
+      sqlx::query(statement).bind(owner).execute(&self.pool).await?;
+    }
+
+    Ok(())
+  }
 }
 
 /// Why the store could not be opened.

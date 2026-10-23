@@ -27,6 +27,9 @@ pub struct Settings {
   pub node: Node,
   pub garage: Garage,
   pub share: Share,
+  pub owners: Owners,
+  pub storage: Storage,
+  pub quota: Quota,
   pub protect: Protect,
 }
 
@@ -69,6 +72,49 @@ pub struct Share {
   pub address: String,
   /// Who the command records as a link's maker; none where empty.
   pub actor: String,
+}
+
+/// The owners requests act for (`docs/api.md`, 「Owners」).
+#[derive(Clone, Debug, Deserialize)]
+pub struct Owners {
+  /// The administrator's owner key, whose alone the machine branch is; none where empty.
+  pub administrator: String,
+}
+
+/// What kind of location the BMO drive stands in (`docs/files.md`, 「The BMO drive」).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageKind {
+  /// A root folder on this machine.
+  #[default]
+  Local,
+  /// A root folder on a node of the node list.
+  Node,
+  /// A key prefix in a bucket of an S3 store.
+  S3,
+}
+
+/// Where the BMO drive stands and how it is kept.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Storage {
+  pub kind: StorageKind,
+  /// The root folder of the spaces, or the key prefix in the bucket.
+  pub root: String,
+  /// The node a `node` location stands on.
+  pub node: String,
+  /// The bucket of an `s3` location.
+  pub bucket: String,
+  /// The AWS profile an `s3` location is reached through.
+  pub profile: String,
+  /// How the storage is backed up, as the owner decided it; none where empty.
+  pub backup: String,
+}
+
+/// The spaces' quotas.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Quota {
+  /// The quota of a space no quota was set for.
+  pub default_bytes: u64,
 }
 
 /// Where the file viewer never changes anything (`docs/files.md`, 「Protected locations」).

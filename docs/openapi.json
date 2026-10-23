@@ -402,6 +402,39 @@
         ],
         "type": "object"
       },
+      "Owner": {
+        "description": "What the asking owner may reach (`docs/api.md`, 「Owners」).",
+        "properties": {
+          "administrator": {
+            "description": "Whether the machine branch is this owner's.",
+            "type": "boolean"
+          },
+          "quotaBytes": {
+            "description": "Its quota; null for the administrator, who has none.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "usedBytes": {
+            "description": "The bytes of the files in its space; null where the storage cannot be opened.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "administrator",
+          "usedBytes",
+          "quotaBytes"
+        ],
+        "type": "object"
+      },
       "Place": {
         "description": "One root files are walked under.",
         "properties": {
@@ -413,7 +446,7 @@
             ]
           },
           "freeBytes": {
-            "description": "The bytes free on a volume of this machine; null for Garage and a node's volume.",
+            "description": "The bytes free on a volume of this machine, or left in the drive; null for Garage and a node's volume.",
             "format": "uint64",
             "minimum": 0,
             "type": [
@@ -436,7 +469,7 @@
             ]
           },
           "name": {
-            "description": "Its key: `volume:<mount>`, `garage` or `node:<nodeName>:<mount>`.",
+            "description": "Its key: `drive`, `volume:<mount>`, `garage` or `node:<nodeName>:<mount>`.",
             "type": "string"
           },
           "nodeName": {
@@ -478,6 +511,11 @@
         "description": "What kind of root a place is.",
         "oneOf": [
           {
+            "const": "drive",
+            "description": "The asking owner's BMO drive.",
+            "type": "string"
+          },
+          {
             "const": "volume",
             "description": "A volume of this machine.",
             "type": "string"
@@ -510,6 +548,62 @@
         "required": [
           "items",
           "more"
+        ],
+        "type": "object"
+      },
+      "Quota": {
+        "description": "One owner's quota and usage.",
+        "properties": {
+          "defaulted": {
+            "description": "Whether no quota was set for the key and the default stands.",
+            "type": "boolean"
+          },
+          "ownerKey": {
+            "type": "string"
+          },
+          "quotaBytes": {
+            "description": "The bytes its files may hold together; null for the administrator's key.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "usedBytes": {
+            "description": "The bytes of the files in its space; null where the storage cannot be opened.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ownerKey",
+          "quotaBytes",
+          "usedBytes",
+          "defaulted"
+        ],
+        "type": "object"
+      },
+      "QuotaRequest": {
+        "description": "A quota to be set.",
+        "properties": {
+          "quotaBytes": {
+            "default": null,
+            "description": "The bytes the owner's files may hold together; null or absent for the default.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "quotaBytes"
         ],
         "type": "object"
       },
@@ -673,6 +767,74 @@
         ],
         "type": "string"
       },
+      "Storage": {
+        "description": "Where the BMO drive stands and how it is kept, as the settings state it.",
+        "properties": {
+          "backup": {
+            "description": "How it is backed up, as the settings say it; null where they say nothing.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "defaultQuotaBytes": {
+            "description": "The quota of a space no quota was set for.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StorageKind"
+          },
+          "location": {
+            "description": "The root folder, `<node>:<root>`, or `s3://<bucket>/<root>`.",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why it cannot be opened, an English sentence; null where it opens.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasonCode": {
+            "description": "The code of that reason, null where it opens.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "location",
+          "backup",
+          "defaultQuotaBytes",
+          "reason",
+          "reasonCode"
+        ],
+        "type": "object"
+      },
+      "StorageKind": {
+        "description": "What kind of location the BMO drive stands in.",
+        "oneOf": [
+          {
+            "const": "local",
+            "description": "A root folder on this machine.",
+            "type": "string"
+          },
+          {
+            "const": "node",
+            "description": "A root folder on a node of the node list.",
+            "type": "string"
+          },
+          {
+            "const": "s3",
+            "description": "A key prefix in a bucket of an S3 store.",
+            "type": "string"
+          }
+        ]
+      },
       "WireError": {
         "description": "A failure, in the common error shape.",
         "properties": {
@@ -711,9 +873,9 @@
     }
   },
   "info": {
-    "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
+    "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
     "title": "bmo-drive",
-    "version": "0.1.0-rev.1"
+    "version": "0.1.0-rev.2"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -721,6 +883,17 @@
       "get": {
         "operationId": "listEvents",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "An event number: the events after it.",
             "in": "query",
@@ -835,6 +1008,17 @@
         "operationId": "readMachine",
         "parameters": [
           {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
             "description": "A node, read instead of this machine.",
             "in": "query",
             "name": "nodeName",
@@ -876,10 +1060,63 @@
         ]
       }
     },
+    "/owner": {
+      "get": {
+        "operationId": "readOwner",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Owner"
+                }
+              }
+            },
+            "description": "What the asking owner may reach: whether the machines are its, and its drive's usage and quota."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "What the asking owner may reach: whether the machines are its, and its drive's usage and quota.",
+        "tags": [
+          "owners"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed"
+        ]
+      }
+    },
     "/places": {
       "get": {
         "operationId": "listPlaces",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "How many places were already read.",
             "in": "query",
@@ -931,13 +1168,13 @@
                 }
               }
             },
-            "description": "The places files live in: this machine's, or a node's volumes."
+            "description": "The places files live in: the owner's drive and this machine's, or a node's volumes."
           },
           "default": {
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "The places files live in: this machine's, or a node's volumes.",
+        "summary": "The places files live in: the owner's drive and this machine's, or a node's volumes.",
         "tags": [
           "places"
         ],
@@ -954,6 +1191,17 @@
       "post": {
         "operationId": "createArchive",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1002,6 +1250,7 @@
           "name-repeated",
           "no-permission",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1011,6 +1260,17 @@
       "post": {
         "operationId": "createCopies",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1058,12 +1318,14 @@
           "outside-place",
           "place-top",
           "into-itself",
+          "quota-exceeded",
           "protected",
           "no-permission",
           "failed-io",
           "outside-bucket",
           "no-bucket",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1073,6 +1335,17 @@
       "get": {
         "operationId": "listEntries",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1208,6 +1481,7 @@
           "no-permission",
           "failed-io",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1217,6 +1491,17 @@
       "delete": {
         "operationId": "deleteEntry",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1250,6 +1535,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "bad-request",
           "not-found",
           "conflict",
           "outside-place",
@@ -1259,6 +1545,7 @@
           "failed-io",
           "no-bucket",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1266,6 +1553,17 @@
       "get": {
         "operationId": "readEntry",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1306,10 +1604,12 @@
         ],
         "x-codes": [
           "unauthorized",
+          "bad-request",
           "not-found",
           "outside-place",
           "no-permission",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1317,6 +1617,17 @@
       "patch": {
         "operationId": "moveEntry",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1381,6 +1692,7 @@
           "bucket-move",
           "no-bucket",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1390,6 +1702,17 @@
       "get": {
         "operationId": "readContent",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1486,6 +1809,7 @@
           "no-permission",
           "bucket-not-file",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1493,6 +1817,17 @@
       "put": {
         "operationId": "writeContent",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1576,6 +1911,7 @@
           "conflict",
           "outside-place",
           "place-top",
+          "quota-exceeded",
           "folder-taken",
           "protected",
           "no-permission",
@@ -1583,6 +1919,7 @@
           "outside-bucket",
           "no-bucket",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1592,6 +1929,17 @@
       "post": {
         "operationId": "createFolder",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's name, as GET /places answers it.",
             "in": "path",
@@ -1653,7 +2001,121 @@
           "failed-io",
           "no-bucket",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
+          "failed"
+        ]
+      }
+    },
+    "/quotas/{ownerKey}": {
+      "get": {
+        "operationId": "readQuota",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The owner key whose quota is read or set.",
+            "in": "path",
+            "name": "ownerKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quota"
+                }
+              }
+            },
+            "description": "One owner's quota and usage."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One owner's quota and usage.",
+        "tags": [
+          "owners"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "not-found",
+          "failed"
+        ]
+      },
+      "put": {
+        "operationId": "setQuota",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The owner key whose quota is read or set.",
+            "in": "path",
+            "name": "ownerKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quota"
+                }
+              }
+            },
+            "description": "Set one owner's quota, or return it to the default."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Set one owner's quota, or return it to the default.",
+        "tags": [
+          "owners"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "not-found",
+          "no-quota",
           "failed"
         ]
       }
@@ -1662,6 +2124,17 @@
       "get": {
         "operationId": "listShares",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "A `createdAt`: the links made before it.",
             "in": "query",
@@ -1717,6 +2190,19 @@
       },
       "post": {
         "operationId": "createShare",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1765,6 +2251,7 @@
           "bad-expiry",
           "no-permission",
           "garage-closed",
+          "storage-unready",
           "upstream-failed",
           "failed"
         ]
@@ -1774,6 +2261,17 @@
       "delete": {
         "operationId": "deleteShare",
         "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
           {
             "description": "The share link's token.",
             "in": "path",
@@ -1798,6 +2296,7 @@
         ],
         "x-codes": [
           "unauthorized",
+          "bad-request",
           "not-found",
           "failed"
         ]
@@ -1905,6 +2404,48 @@
           "failed"
         ]
       }
+    },
+    "/storage": {
+      "get": {
+        "operationId": "readStorage",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Storage"
+                }
+              }
+            },
+            "description": "Where the drive stands and how it is backed up, as the settings state it."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Where the drive stands and how it is backed up, as the settings state it.",
+        "tags": [
+          "owners"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "not-found"
+        ]
+      }
     }
   },
   "security": [
@@ -1921,6 +2462,9 @@
   "tags": [
     {
       "name": "health"
+    },
+    {
+      "name": "owners"
     },
     {
       "name": "events"

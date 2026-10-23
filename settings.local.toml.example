@@ -20,6 +20,17 @@ profile = "garage"
 address = "https://files.example.com/files/share"
 actor = "drive-command"
 
+[owners]
+administrator = "1"
+
+[storage]
+kind = "local"
+root = "/srv/bmo-data/drive/spaces"
+backup = "The data root's hourly snapshot, kept on this machine and copied off it."
+
+[quota]
+default_bytes = 5368709120
+
 [protect.posix]
 home_named = [{ under = "repos/example", starting = "bmo" }]
 

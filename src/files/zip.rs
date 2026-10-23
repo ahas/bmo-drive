@@ -22,6 +22,7 @@ use super::{
   places_of, shown,
 };
 use crate::http::{Call, Refused, Route, Standing};
+use crate::owner::Owner;
 use crate::wire::ArchiveRequest;
 
 // How much of the zip stands written ahead of the receiver. Enough to keep a file's reading moving
@@ -241,6 +242,7 @@ impl Route for ArchivesCreate {
   const PATH: &'static str = "/places/{placeName}/archives";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let id = path_place(&mut call).await?;
     let asked: ArchiveRequest = call.body().await?;
     let mut paths = Vec::new();
@@ -249,19 +251,21 @@ impl Route for ArchivesCreate {
       paths.push(Within::read(path)?);
     }
 
-    zip_answer(call.standing(), id, paths).await
+    zip_answer(call.standing(), &owner, id, paths).await
   }
 }
 
 crate::route!(ArchivesCreate);
 
-/// The entries at `paths` of the place `id` answered as one zip, streamed as it is written.
+/// The entries at `paths` of the place `id`, as `owner` reaches it, answered as one zip, streamed as it
+/// is written.
 pub(super) async fn zip_answer(
   standing: &Standing,
+  owner: &Owner,
   id: String,
   paths: Vec<Within>,
 ) -> Result<Response, Refused> {
-  let places = places_of(&id, standing, false).await?;
+  let places = places_of(&id, owner, standing, false).await?;
 
   if paths.is_empty() {
     return Err(Refused::bad_request("no entry was named"));

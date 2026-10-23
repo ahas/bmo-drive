@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the asking owner may reach: whether the machines are its, and its drive's usage and quota. */
+        get: operations["readOwner"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/places": {
         parameters: {
             query?: never;
@@ -62,7 +79,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The places files live in: this machine's, or a node's volumes. */
+        /** The places files live in: the owner's drive and this machine's, or a node's volumes. */
         get: operations["listPlaces"];
         put?: never;
         post?: never;
@@ -177,6 +194,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/quotas/{ownerKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One owner's quota and usage. */
+        get: operations["readQuota"];
+        /** Set one owner's quota, or return it to the default. */
+        put: operations["setQuota"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shares": {
         parameters: {
             query?: never;
@@ -222,6 +257,23 @@ export interface paths {
         };
         /** The shared bytes: a file as a download, a folder as its zip. */
         get: operations["readShareContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where the drive stands and how it is backed up, as the settings state it. */
+        get: operations["readStorage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -357,13 +409,28 @@ export interface components {
             /** @description The node, null for this machine. */
             nodeName: string | null;
         };
+        /** @description What the asking owner may reach (`docs/api.md`, 「Owners」). */
+        Owner: {
+            /** @description Whether the machine branch is this owner's. */
+            administrator: boolean;
+            /**
+             * Format: uint64
+             * @description Its quota; null for the administrator, who has none.
+             */
+            quotaBytes: number | null;
+            /**
+             * Format: uint64
+             * @description The bytes of the files in its space; null where the storage cannot be opened.
+             */
+            usedBytes: number | null;
+        };
         /** @description One root files are walked under. */
         Place: {
             /** @description The drive it stands on, where it stands on a listed one. */
             driveKey: string | null;
             /**
              * Format: uint64
-             * @description The bytes free on a volume of this machine; null for Garage and a node's volume.
+             * @description The bytes free on a volume of this machine, or left in the drive; null for Garage and a node's volume.
              */
             freeBytes: number | null;
             kind: components["schemas"]["PlaceKind"];
@@ -371,7 +438,7 @@ export interface components {
             label: string;
             /** @description Where it is mounted, null for Garage. */
             mount: string | null;
-            /** @description Its key: `volume:<mount>`, `garage` or `node:<nodeName>:<mount>`. */
+            /** @description Its key: `drive`, `volume:<mount>`, `garage` or `node:<nodeName>:<mount>`. */
             name: string;
             /** @description The node it stands on, null for this machine. */
             nodeName: string | null;
@@ -381,11 +448,36 @@ export interface components {
             reasonCode: string | null;
         };
         /** @description What kind of root a place is. */
-        PlaceKind: "volume" | "store" | "node";
+        PlaceKind: "drive" | "volume" | "store" | "node";
         /** @description A page of places. */
         PlacePage: {
             items: components["schemas"]["Place"][];
             more: boolean;
+        };
+        /** @description One owner's quota and usage. */
+        Quota: {
+            /** @description Whether no quota was set for the key and the default stands. */
+            defaulted: boolean;
+            ownerKey: string;
+            /**
+             * Format: uint64
+             * @description The bytes its files may hold together; null for the administrator's key.
+             */
+            quotaBytes: number | null;
+            /**
+             * Format: uint64
+             * @description The bytes of the files in its space; null where the storage cannot be opened.
+             */
+            usedBytes: number | null;
+        };
+        /** @description A quota to be set. */
+        QuotaRequest: {
+            /**
+             * Format: uint64
+             * @description The bytes the owner's files may hold together; null or absent for the default.
+             * @default null
+             */
+            quotaBytes: number | null;
         };
         /** @description A part of a file, read. */
         ReadOutput: {
@@ -457,6 +549,25 @@ export interface components {
          * @enum {string}
          */
         SortOrder: "asc" | "desc";
+        /** @description Where the BMO drive stands and how it is kept, as the settings state it. */
+        Storage: {
+            /** @description How it is backed up, as the settings say it; null where they say nothing. */
+            backup: string | null;
+            /**
+             * Format: uint64
+             * @description The quota of a space no quota was set for.
+             */
+            defaultQuotaBytes: number;
+            kind: components["schemas"]["StorageKind"];
+            /** @description The root folder, `<node>:<root>`, or `s3://<bucket>/<root>`. */
+            location: string;
+            /** @description Why it cannot be opened, an English sentence; null where it opens. */
+            reason: string | null;
+            /** @description The code of that reason, null where it opens. */
+            reasonCode: string | null;
+        };
+        /** @description What kind of location the BMO drive stands in. */
+        StorageKind: "local" | "node" | "s3";
         /** @description A failure, in the common error shape. */
         WireError: {
             /** @description The kebab-case code a caller matches on. */
@@ -494,7 +605,9 @@ export interface operations {
                 kinds?: string | null;
                 limit?: number | null;
             };
-            header?: {
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
                 /** @description The event to resume after. */
                 "Last-Event-ID"?: string;
             };
@@ -543,7 +656,10 @@ export interface operations {
                 /** @description A node, read instead of this machine. */
                 nodeName?: string | null;
             };
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -561,6 +677,30 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    readOwner: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the asking owner may reach: whether the machines are its, and its drive's usage and quota. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Owner"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     listPlaces: {
         parameters: {
             query?: {
@@ -570,13 +710,16 @@ export interface operations {
                 /** @description A node, whose volumes are listed instead of this machine's places. */
                 nodeName?: string | null;
             };
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The places files live in: this machine's, or a node's volumes. */
+            /** @description The places files live in: the owner's drive and this machine's, or a node's volumes. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -591,7 +734,10 @@ export interface operations {
     createArchive: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -619,7 +765,10 @@ export interface operations {
     createCopies: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -659,7 +808,10 @@ export interface operations {
                 path?: string | null;
                 sort?: components["schemas"]["EntrySort"] | null;
             };
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -683,7 +835,10 @@ export interface operations {
     readEntry: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -709,7 +864,10 @@ export interface operations {
     deleteEntry: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -733,7 +891,10 @@ export interface operations {
     moveEntry: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -768,7 +929,9 @@ export interface operations {
                 /** @description The first so many bytes alone. */
                 head?: number | null;
             };
-            header?: {
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
                 /** @description One byte range of the file. */
                 Range?: string;
             };
@@ -809,7 +972,10 @@ export interface operations {
                 /** @description How a name already taken is settled; replaced where none is asked. */
                 conflict?: components["schemas"]["Conflict"] | null;
             };
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -848,7 +1014,10 @@ export interface operations {
     createFolder: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The place's name, as GET /places answers it. */
                 placeName: string;
@@ -882,6 +1051,64 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    readQuota: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
+            path: {
+                /** @description The owner key whose quota is read or set. */
+                ownerKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One owner's quota and usage. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quota"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    setQuota: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
+            path: {
+                /** @description The owner key whose quota is read or set. */
+                ownerKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaRequest"];
+            };
+        };
+        responses: {
+            /** @description Set one owner's quota, or return it to the default. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quota"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     listShares: {
         parameters: {
             query?: {
@@ -889,7 +1116,10 @@ export interface operations {
                 after?: number | null;
                 limit?: number | null;
             };
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -910,7 +1140,10 @@ export interface operations {
     createShare: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -968,7 +1201,10 @@ export interface operations {
     deleteShare: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
             path: {
                 /** @description The share link's token. */
                 token: string;
@@ -1018,6 +1254,30 @@ export interface operations {
                 };
                 content: {
                     "application/octet-stream": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    readStorage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where the drive stands and how it is backed up, as the settings state it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Storage"];
                 };
             };
             default: components["responses"]["Error"];

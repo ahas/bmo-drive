@@ -1,18 +1,20 @@
 # bmo-drive
 
 The file viewer as one service with its own API: this machine's drives, its Garage and the nodes'
-volumes walked as places, what stands there read and changed, and the share links that hand one file or
-folder to someone with no token. Beside the service the binary carries its command, `bmo-drive file share`,
+volumes walked as places by the administrator, each owner's own BMO drive with its quota, what stands there
+read and changed, and the share links that hand one file or folder to someone with no token. Beside the service the binary carries its command, `bmo-drive file share`,
 its client and its harness plugin, the MCP server `bmo-drive mcp` with the `bmo-drive` skill. Every other
 unit is reached through its API, as `docs/api.md` lists.
 
 ## Tests
 
-The repository carries one test, the repository-wide personal-data check in `tests/personal_data.rs`
-(`PERSONAL-DATA.md`), and runs it with `cargo test --test personal_data`. The behaviour tests are deferred:
-they are written and run here once the minimal services stand on the new repositories, and until then the
-build check, `cargo check --all-targets`, and the bundle's typecheck stand beside the one test.
-`docs/inventory.md` lists the tests the old behaviour was held to.
+The repository carries the repository-wide personal-data check in `tests/personal_data.rs`
+(`PERSONAL-DATA.md`), the import of the old archive's share links in `tests/import.rs`, and the owners and
+their two branches in `tests/owners.rs`: each owner's drive its own alone, the quota judged before bytes
+arrive, the machines the administrator's alone, and share links opening in both branches. `cargo test` runs
+them all. The rest of the behaviour tests are deferred: they are written and run here once the minimal
+services stand on the new repositories, and until then the build check, `cargo check --all-targets`, and the
+bundle's typecheck stand beside them. `docs/inventory.md` lists the tests the old behaviour was held to.
 
 ## Layout
 
@@ -24,7 +26,7 @@ build check, `cargo check --all-targets`, and the bundle's typecheck stand besid
 | `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own |
 | `deploy/` | The service's user unit |
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |
-| `tests/` | The repository-wide personal-data check, `personal_data.rs` |
+| `tests/` | The repository-wide personal-data check, `personal_data.rs`, and the behaviour tests standing so far |
 | `.graph/` | The code graph: its settings and its nodes, one feature to a node. The area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
 
 At the root stand the Cargo manifest, `VERSION`, `testbed.toml`, `rustfmt.toml`, `CLAUDE.md`,

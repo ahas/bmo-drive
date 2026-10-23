@@ -4,13 +4,13 @@ import { formatStamp } from "bmo-ui/app/domain/time";
 import { faultText } from "./refusals";
 import { fileSizeText } from "./sizes";
 
-import type { FileDrive, FileDriveKind, FileEntry, FileGarage, FileMachine, FilePlaces, FileSortKey, FileVolume } from "../../shared/types";
+import type { FileDrive, FileDriveKind, FileEntry, FileGarage, FileMachine, FilePlaces, FileSortKey, FileSpace, FileVolume } from "../../shared/types";
 import type { BarProperty } from "bmo-ui/app/domain/tabs";
 import type { Translate } from "bmo-ui/shared/wording";
 
 // The Files screen's own reckoning: where a folder stands, how its list is ordered, paged and laid
-// out, what a file can be previewed as, what the clipboard holds, and the tree's roots — the machines,
-// each with its drives — out of the places the service reads (docs/files.md).
+// out, what a file can be previewed as, what the clipboard holds, and the tree's roots — the owner's
+// drive, then the machines, each with its drives — out of the places the service reads (docs/files.md).
 
 /** How many entries a page of the list carries; the tree asks for its folders a larger page at once. */
 export const PAGE = 200;
@@ -258,6 +258,22 @@ const DRIVE_ICONS: Record<FileDriveKind, string> = {
 
 export const GARAGE_ICON = "i-material-symbols-inventory-2-outline";
 
+export const SPACE_ICON = "i-material-symbols-folder-special-outline";
+
+/** Whether a place is the signed-in owner's drive. */
+export function isSpace(places: FilePlaces | null, place: string): boolean {
+  return places?.space?.place === place;
+}
+
+/** What the owner's drive holds, as its row says it: the usage, and the quota beside it where there is one. */
+export function spaceUsage(t: Translate, space: FileSpace): string | undefined {
+  if (space.usedBytes === null) return undefined;
+
+  const used = fileSizeText(space.usedBytes);
+
+  return space.quotaBytes === null ? used : t("drive.label.space_usage", { used, quota: fileSizeText(space.quotaBytes) });
+}
+
 export function machineIcon(machine: FileMachine): string {
   return machine.local ? "i-material-symbols-computer-outline" : "i-material-symbols-dns-outline";
 }
@@ -307,6 +323,8 @@ export function findPlace(places: FilePlaces | null, place: string): PlaceFound 
  * read it is the mount point its own name carries.
  */
 export function placeLabel(t: Translate, places: FilePlaces | null, place: string): string {
+  if (isSpace(places, place)) return t("drive.label.space");
+
   const found = findPlace(places, place);
 
   if (found === null) {
@@ -328,17 +346,24 @@ export function garageWhere(machine: FileMachine, garage: FileGarage): string {
   return [drive?.name, garage.mount].filter((one): one is string => one !== null && one !== undefined).join(" · ");
 }
 
-/** The first place to open where the address names none: this machine's root volume, else its first. */
+/**
+ * The first place to open where the address names none: the owner's drive where the machines are not the
+ * owner's; else this machine's root volume, else its first, else the drive.
+ */
 export function firstPlace(places: FilePlaces): string | null {
+  const space = places.space?.error === null ? places.space.place : null;
+
+  if (!places.administrator) return space;
+
   const here = places.machines.find((one) => one.local);
   const volumes = (here?.disks ?? []).flatMap((drive) => drive.volumes);
 
-  return (volumes.find((one) => one.mount === "/") ?? volumes[0])?.place ?? here?.garage?.place ?? null;
+  return (volumes.find((one) => one.mount === "/") ?? volumes[0])?.place ?? here?.garage?.place ?? space;
 }
 
 /** The machines with one of them replaced by a fresh reading of it. */
 export function withMachine(places: FilePlaces, read: FileMachine): FilePlaces {
-  return { machines: places.machines.map((one) => (one.key === read.key ? read : one)) };
+  return { ...places, machines: places.machines.map((one) => (one.key === read.key ? read : one)) };
 }
 
 // ---- The tree -----------------------------------------------------------------------------------
@@ -452,10 +477,26 @@ function driveItems(t: Translate, machine: FileMachine, drives: readonly FileDri
   return [...items, folderItem({ place: garage.place, path: "" }, t("drive.label.garage"), GARAGE_ICON, context, where === "" ? undefined : where)];
 }
 
-/** The tree: each machine — this one first — opening onto its drives and their volumes, and Garage. */
+/** The owner's drive as the tree's first row, its usage beside its name. */
+function spaceItem(t: Translate, space: FileSpace, context: TreeContext): FilesTreeItem {
+  const at = { place: space.place, path: "" };
+
+  if (space.error !== null) {
+    return { value: folderKey(at), label: t("drive.label.space"), note: faultText(t, space.errorCode, space.error), failed: true, icon: SPACE_ICON, disabled: true };
+  }
+
+  return folderItem(at, t("drive.label.space"), SPACE_ICON, context, spaceUsage(t, space));
+}
+
+/** The tree: the owner's drive, then each machine — this one first — opening onto its drives and their volumes, and Garage. */
 export function filesTree(t: Translate, places: FilePlaces, known: ReadonlyMap<string, FolderChildren>): FilesTreeItem[] {
   const context: TreeContext = { known, more: (count) => t("drive.label.more_folders", { n: countText(count) }) };
+  const space = places.space === null ? [] : [spaceItem(t, places.space, context)];
 
+  return [...space, ...machineItems(t, places, context)];
+}
+
+function machineItems(t: Translate, places: FilePlaces, context: TreeContext): FilesTreeItem[] {
   return places.machines.map((machine): FilesTreeItem => {
     const key = machineRowKey(machine.key);
     const item: FilesTreeItem = { value: key, label: machine.name, icon: machineIcon(machine), machine: machine.key };
@@ -471,13 +512,15 @@ export function filesTree(t: Translate, places: FilePlaces, known: ReadonlyMap<s
   });
 }
 
-/** Every row key from a machine down to a folder, which the tree unfolds to show it. */
+/** Every row key from a machine, or from the owner's drive, down to a folder, which the tree unfolds to show it. */
 export function keysTo(places: FilePlaces, at: FolderAt): string[] {
   const found = findPlace(places, at.place);
   const machine = found?.machine.key ?? machineKeyOf(at.place);
   const names = at.path === "" ? [] : at.path.split("/");
   const own = names.slice(0, -1).map((_, depth) => folderKey({ place: at.place, path: names.slice(0, depth + 1).join("/") }));
   const drive = found?.drive;
+
+  if (isSpace(places, at.place)) return [...(at.path === "" ? [] : [folderKey({ place: at.place, path: "" })]), ...own];
 
   return [
     machineRowKey(machine),

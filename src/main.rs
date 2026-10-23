@@ -31,6 +31,9 @@ enum Word {
     /// The service's base address; the settings' own where none is given.
     #[arg(long, value_name = "url")]
     address: Option<String>,
+    /// The owner key the tools act for; the settings' administrator where none is given.
+    #[arg(long, value_name = "key", env = "BMO_DRIVE_OWNER")]
+    owner: Option<String>,
   },
   /// Prints the OpenAPI document the code generates.
   Openapi,
@@ -108,10 +111,15 @@ async fn main() -> ExitCode {
   let done = match command.word {
     Word::Serve => bmo_drive::serve(settings).await,
     Word::Health => bmo_drive::health::ask(&settings).await,
-    Word::Mcp { address } => {
+    Word::Mcp { address, owner } => {
       let client = match address {
-        Some(address) => DriveClient::new(address, settings.server.token.clone()),
+        Some(address) => DriveClient::new(address, settings.server.token.clone())
+          .with_owner(settings.owners.administrator.clone()),
         None => DriveClient::of_settings(&settings),
+      };
+      let client = match owner.filter(|owner| !owner.is_empty()) {
+        Some(owner) => client.with_owner(owner),
+        None => client,
       };
 
       bmo_drive::mcp::serve(client).await

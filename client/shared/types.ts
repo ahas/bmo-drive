@@ -1,5 +1,5 @@
-// The Files screen's own view of what the service answers (docs/api.md): the machines with their drives
-// and places, a folder's entries and the share links, as the screen draws them. The service's own shapes
+// The Files screen's own view of what the service answers (docs/api.md): the signed-in owner's drive, the
+// machines with their drives and places, a folder's entries and the share links, as the screen draws them. The service's own shapes
 // are the generated `openapi.ts`; the screen's calls turn each answer into these (app/domain/drive.ts).
 export type FileDriveKind = "nvme" | "ssd" | "hdd" | "usb" | "network" | "virtual";
 
@@ -44,7 +44,22 @@ export interface FileMachine {
   errorCode?: string | null;
 }
 
+// The signed-in owner's BMO drive (docs/files.md, "The BMO drive"): its place, the bytes its files hold and
+// its quota, and why it cannot be opened, where it cannot.
+export interface FileSpace {
+  place: string;
+  // Null where the storage cannot be opened.
+  usedBytes: number | null;
+  // Null where the owner has no quota.
+  quotaBytes: number | null;
+  error: string | null;
+  errorCode: string | null;
+}
+
 export interface FilePlaces {
+  // Whether the machines are the signed-in owner's, as the service answers it; none are read where not.
+  administrator: boolean;
+  space: FileSpace | null;
   machines: FileMachine[];
 }
 

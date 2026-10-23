@@ -11,16 +11,17 @@ use crate::events::KINDS;
 use crate::mcp::tools;
 use crate::wire::{
   ArchiveRequest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage, EventPage,
-  EventsQuery, FolderRequest, Health, Machine, MachineQuery, PlacePage, PlacesQuery, Share, SharePage,
-  ShareRequest, SharesQuery, WireError, WriteQuery,
+  EventsQuery, FolderRequest, Health, Machine, MachineQuery, Owner, PlacePage, PlacesQuery, Quota,
+  QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage, WireError, WriteQuery,
 };
 
 /// Where the schemas the routes refer to stand in the document.
 const SCHEMAS: &str = "/components/schemas";
 
 const DESCRIPTION: &str = "Files across places: a machine's drives, an S3-compatible store and the volumes \
-  of other machines, read, written, moved and shared by link. The paths carry no prefix; whatever serves \
-  the service to a browser mounts it under its own.";
+  of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, \
+  moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it \
+  under its own.";
 
 /// What a route takes as its body.
 enum Body {
@@ -33,6 +34,8 @@ struct Operation {
   method: &'static str,
   path: &'static str,
   id: &'static str,
+  /// Whether the route acts for the owner `Owner-Key` names.
+  owned: bool,
   tag: &'static str,
   summary: &'static str,
   parameters: Vec<Value>,
@@ -67,8 +70,10 @@ impl Operation {
       "x-codes": self.codes,
     });
 
-    if !self.parameters.is_empty() {
-      operation["parameters"] = self.parameters.into();
+    let parameters: Vec<Value> = self.owned.then(owner_key).into_iter().chain(self.parameters).collect();
+
+    if !parameters.is_empty() {
+      operation["parameters"] = parameters.into();
     }
 
     match self.body {
@@ -127,6 +132,21 @@ fn token() -> Value {
   segment("token", "The share link's token.")
 }
 
+/// The owner a route acts for (`docs/api.md`, 「Owners」).
+fn owner_key() -> Value {
+  json!({
+    "name": "Owner-Key",
+    "in": "header",
+    "required": true,
+    "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+    "schema": { "type": "string", "minLength": 1, "maxLength": 200 },
+  })
+}
+
+fn owner_key_segment() -> Value {
+  segment("ownerKey", "The owner key whose quota is read or set.")
+}
+
 /// A header parameter.
 fn header(name: &str, description: &str) -> Value {
   json!({ "name": name, "in": "header", "required": false, "description": description, "schema": { "type": "string" } })
@@ -162,6 +182,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/health",
       id: "readHealth",
+      owned: false,
       tag: "health",
       summary: "Readiness and version.",
       parameters: Vec::new(),
@@ -171,8 +192,57 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
     },
     Operation {
       method: "get",
+      path: "/owner",
+      id: "readOwner",
+      owned: true,
+      tag: "owners",
+      summary: "What the asking owner may reach: whether the machines are its, and its drive's usage and quota.",
+      parameters: Vec::new(),
+      body: None,
+      answers: vec![(200, json_answer::<Owner>(generator))],
+      codes: &["unauthorized", "bad-request", "failed"],
+    },
+    Operation {
+      method: "get",
+      path: "/storage",
+      id: "readStorage",
+      owned: true,
+      tag: "owners",
+      summary: "Where the drive stands and how it is backed up, as the settings state it.",
+      parameters: Vec::new(),
+      body: None,
+      answers: vec![(200, json_answer::<Storage>(generator))],
+      codes: &["unauthorized", "bad-request", "not-found"],
+    },
+    Operation {
+      method: "get",
+      path: "/quotas/{ownerKey}",
+      id: "readQuota",
+      owned: true,
+      tag: "owners",
+      summary: "One owner's quota and usage.",
+      parameters: vec![owner_key_segment()],
+      body: None,
+      answers: vec![(200, json_answer::<Quota>(generator))],
+      codes: &["unauthorized", "bad-request", "not-found", "failed"],
+    },
+    Operation {
+      method: "put",
+      path: "/quotas/{ownerKey}",
+      id: "setQuota",
+      owned: true,
+      tag: "owners",
+      summary: "Set one owner's quota, or return it to the default.",
+      parameters: vec![owner_key_segment()],
+      body: json_body::<QuotaRequest>(generator),
+      answers: vec![(200, json_answer::<Quota>(generator))],
+      codes: &["unauthorized", "bad-request", "not-found", "no-quota", "failed"],
+    },
+    Operation {
+      method: "get",
       path: "/events",
       id: "listEvents",
+      owned: true,
       tag: "events",
       summary: "The service's one event stream (SSE), or a page of it with Accept: application/json.",
       parameters: [
@@ -194,8 +264,9 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/places",
       id: "listPlaces",
+      owned: true,
       tag: "places",
-      summary: "The places files live in: this machine's, or a node's volumes.",
+      summary: "The places files live in: the owner's drive and this machine's, or a node's volumes.",
       parameters: query::<PlacesQuery>(generator),
       body: None,
       answers: vec![(200, json_answer::<PlacePage>(generator))],
@@ -205,6 +276,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/machine",
       id: "readMachine",
+      owned: true,
       tag: "machine",
       summary: "This machine and its drives, or a node and its drives.",
       parameters: query::<MachineQuery>(generator),
@@ -216,6 +288,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/places/{placeName}/entries",
       id: "listEntries",
+      owned: true,
       tag: "entries",
       summary: "The entries under a path of a place.",
       parameters: [vec![place_name()], query::<EntriesQuery>(generator)].concat(),
@@ -230,6 +303,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "no-permission",
         "failed-io",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -238,6 +312,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/places/{placeName}/entries/{entryPath}",
       id: "readEntry",
+      owned: true,
       tag: "entries",
       summary: "One entry.",
       parameters: vec![place_name(), entry_path()],
@@ -245,10 +320,12 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       answers: vec![(200, json_answer::<Entry>(generator))],
       codes: &[
         "unauthorized",
+        "bad-request",
         "not-found",
         "outside-place",
         "no-permission",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -257,6 +334,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "patch",
       path: "/places/{placeName}/entries/{entryPath}",
       id: "moveEntry",
+      owned: true,
       tag: "entries",
       summary: "Rename or move an entry.",
       parameters: vec![place_name(), entry_path()],
@@ -278,6 +356,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "bucket-move",
         "no-bucket",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -286,6 +365,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "delete",
       path: "/places/{placeName}/entries/{entryPath}",
       id: "deleteEntry",
+      owned: true,
       tag: "entries",
       summary: "Delete an entry.",
       parameters: vec![place_name(), entry_path()],
@@ -293,6 +373,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       answers: vec![(204, None)],
       codes: &[
         "unauthorized",
+        "bad-request",
         "not-found",
         "conflict",
         "outside-place",
@@ -302,6 +383,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "failed-io",
         "no-bucket",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -310,6 +392,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/places/{placeName}/entries/{entryPath}/content",
       id: "readContent",
+      owned: true,
       tag: "entries",
       summary: "A file's bytes, with Range.",
       parameters: [vec![place_name(), entry_path()], query::<ContentQuery>(generator), vec![range.clone()]]
@@ -328,6 +411,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "no-permission",
         "bucket-not-file",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -336,6 +420,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "put",
       path: "/places/{placeName}/entries/{entryPath}/content",
       id: "writeContent",
+      owned: true,
       tag: "entries",
       summary: "Write a file's bytes.",
       parameters: [vec![place_name(), entry_path()], query::<WriteQuery>(generator)].concat(),
@@ -348,6 +433,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "conflict",
         "outside-place",
         "place-top",
+        "quota-exceeded",
         "folder-taken",
         "protected",
         "no-permission",
@@ -355,6 +441,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "outside-bucket",
         "no-bucket",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -363,6 +450,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "post",
       path: "/places/{placeName}/folders",
       id: "createFolder",
+      owned: true,
       tag: "entries",
       summary: "Make a folder.",
       parameters: vec![place_name()],
@@ -380,6 +468,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "failed-io",
         "no-bucket",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -388,6 +477,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "post",
       path: "/places/{placeName}/copies",
       id: "createCopies",
+      owned: true,
       tag: "entries",
       summary: "Copy entries to a folder of this place or another.",
       parameters: vec![place_name()],
@@ -401,12 +491,14 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "outside-place",
         "place-top",
         "into-itself",
+        "quota-exceeded",
         "protected",
         "no-permission",
         "failed-io",
         "outside-bucket",
         "no-bucket",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -415,6 +507,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "post",
       path: "/places/{placeName}/archives",
       id: "createArchive",
+      owned: true,
       tag: "entries",
       summary: "The named entries as one zip, answered as bytes and kept nowhere.",
       parameters: vec![place_name()],
@@ -428,6 +521,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "name-repeated",
         "no-permission",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -436,6 +530,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/shares",
       id: "listShares",
+      owned: true,
       tag: "shares",
       summary: "The live share links, the newest first.",
       parameters: query::<SharesQuery>(generator),
@@ -447,6 +542,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "post",
       path: "/shares",
       id: "createShare",
+      owned: true,
       tag: "shares",
       summary: "Share an entry by link, until a time or never.",
       parameters: Vec::new(),
@@ -461,6 +557,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
         "bad-expiry",
         "no-permission",
         "garage-closed",
+        "storage-unready",
         "upstream-failed",
         "failed",
       ],
@@ -469,6 +566,7 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "get",
       path: "/shares/{token}",
       id: "readShare",
+      owned: false,
       tag: "shares",
       summary: "A share link and what it opens.",
       parameters: vec![token()],
@@ -480,17 +578,19 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       method: "delete",
       path: "/shares/{token}",
       id: "deleteShare",
+      owned: true,
       tag: "shares",
       summary: "End a share link.",
       parameters: vec![token()],
       body: None,
       answers: vec![(204, None)],
-      codes: &["unauthorized", "not-found", "failed"],
+      codes: &["unauthorized", "bad-request", "not-found", "failed"],
     },
     Operation {
       method: "get",
       path: "/shares/{token}/content",
       id: "readShareContent",
+      owned: false,
       tag: "shares",
       summary: "The shared bytes: a file as a download, a folder as its zip.",
       parameters: vec![token(), range],

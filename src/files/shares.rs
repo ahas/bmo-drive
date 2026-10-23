@@ -3,8 +3,8 @@
 //! link hands out.
 //!
 //! A link is a row rather than a signature: it is listed, read back and taken away before its time.
-//! The row, never the request, names the place and the path, so a token reaches the one entry it was
-//! written for.
+//! The row, never the request, names the owner, the place and the path, so a token reaches the one entry
+//! it was written for, in the places of the owner it was made for.
 
 use axum::http::{HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
@@ -19,6 +19,7 @@ use super::zip::{entry_name, zip_answer};
 use super::{Kind, Place, Span, Within, asked_range, is_folder, places_of, read_answer};
 use crate::events::now_ms;
 use crate::http::{Call, Refused, Route, Standing, answer};
+use crate::owner::Owner;
 use crate::wire::{Share, ShareKey, ShareKind, SharePage, ShareRequest, SharesQuery};
 
 // How many random bytes a token carries.
@@ -47,6 +48,8 @@ fn kind_read(text: &str) -> Option<ShareKind> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Link {
   token: String,
+  /// The owner key it was made for.
+  owner: String,
   place: String,
   path: String,
   kind: ShareKind,
@@ -62,6 +65,7 @@ impl Link {
 
     Ok(Self {
       token: row.try_get("token")?,
+      owner: row.try_get("owner")?,
       place: row.try_get("place")?,
       path: row.try_get("path")?,
       kind: kind_read(&kind)
@@ -97,7 +101,7 @@ impl Link {
 macro_rules! select {
   ($rest:literal) => {
     concat!(
-      "SELECT share_token AS token, place, path, kind, created_by, created_at, expires_at FROM file_shares ",
+      "SELECT share_token AS token, owner, place, path, kind, created_by, created_at, expires_at FROM file_shares ",
       $rest
     )
   };
@@ -156,15 +160,26 @@ async fn sweep(standing: &Standing, now: i64) -> Result<(), Refused> {
     .await?
       > 0
     {
-      standing.events.publish("share.deleted", ShareKey { token: link.token }).await;
+      standing
+        .events
+        .publish(&link.owner, "share.deleted", ShareKey { token: link.token })
+        .await;
     }
   }
 
   Ok(())
 }
 
-async fn of_entry(store: &SqlitePool, place: String, path: String) -> Result<Option<Link>, Refused> {
-  let statement = sqlx::query(select!("WHERE place = $1 AND path = $2")).bind(place).bind(path);
+async fn of_entry(
+  store: &SqlitePool,
+  owner: String,
+  place: String,
+  path: String,
+) -> Result<Option<Link>, Refused> {
+  let statement = sqlx::query(select!("WHERE owner = $1 AND place = $2 AND path = $3"))
+    .bind(owner)
+    .bind(place)
+    .bind(path);
 
   Ok(read(store, statement).await?.pop())
 }
@@ -175,15 +190,17 @@ async fn of_token(store: &SqlitePool, token: String) -> Result<Option<Link>, Ref
   Ok(read(store, sqlx::query(select!("WHERE share_token = $1")).bind(token)).await?.pop())
 }
 
-/// The link of one entry: the one that stands, kept as it was made, or this one, and whether it was made
-/// now. The table holds one row per entry, so the writing and the looking are one step each and two askings
-/// at once hand back one link; a link is never quietly replaced while somebody may still be handing it out.
+/// The link of one entry of an owner: the one that stands, kept as it was made, or this one, and whether it
+/// was made now. The table holds one row per entry of an owner, so the writing and the looking are one step
+/// each and two askings at once hand back one link; a link is never quietly replaced while somebody may still
+/// be handing it out.
 async fn kept_or_made(store: &SqlitePool, link: Link) -> Result<(Link, bool), Refused> {
   let statement = sqlx::query(
-    "INSERT INTO file_shares (share_token, place, path, kind, created_by, created_at, expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (place, path) DO NOTHING",
+    "INSERT INTO file_shares (share_token, owner, place, path, kind, created_by, created_at, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (owner, place, path) DO NOTHING",
   )
   .bind(link.token)
+  .bind(link.owner.clone())
   .bind(link.place.clone())
   .bind(link.path.clone())
   .bind(kind_text(link.kind))
@@ -191,7 +208,7 @@ async fn kept_or_made(store: &SqlitePool, link: Link) -> Result<(Link, bool), Re
   .bind(link.created_at)
   .bind(link.expires_at);
   let made = write(store, statement).await? > 0;
-  let standing = of_entry(store, link.place, link.path)
+  let standing = of_entry(store, link.owner, link.place, link.path)
     .await?
     .ok_or_else(|| Refused::failed("the link was neither kept nor made"))?;
 
@@ -227,17 +244,19 @@ async fn standing_entry(place: &dyn Place, within: &Within) -> Result<ShareKind,
   }
 }
 
-/// The link a holder's token names, with its entry still standing as the kind it was shared as.
-async fn holding(standing: &Standing, token: String) -> Result<Link, Refused> {
+/// The link a holder's token names, with its entry still standing as the kind it was shared as in the
+/// places of the owner it was made for.
+async fn holding(standing: &Standing, token: String) -> Result<(Link, Owner), Refused> {
   let link = opened(standing.store.pool(), token).await?;
+  let owner = Owner::of_key(link.owner.clone(), &standing.settings);
   let within = Within::read(&link.path)?;
-  let places = places_of(&link.place, standing, false).await?;
+  let places = places_of(&link.place, &owner, standing, false).await?;
 
   if standing_entry(places.place(&link.place)?, &within).await? != link.kind {
     return Err(Refused::not_found("the shared entry no longer stands at its path"));
   }
 
-  Ok(link)
+  Ok((link, owner))
 }
 
 /// What nothing may keep, since a link runs out.
@@ -248,7 +267,7 @@ fn uncached(mut response: Response) -> Response {
   response
 }
 
-/// The live links, the newest first, links whose time has passed swept first.
+/// The asking owner's live links, the newest first, links whose time has passed swept first.
 pub struct SharesList;
 
 impl Route for SharesList {
@@ -256,16 +275,19 @@ impl Route for SharesList {
   const PATH: &'static str = "/shares";
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let query: SharesQuery = call.query()?;
     let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
     let standing = call.standing();
 
     sweep(standing, now_ms()).await?;
 
-    let statement =
-      sqlx::query(select!("WHERE created_at < $1 ORDER BY created_at DESC, place, path LIMIT $2"))
-        .bind(query.after.unwrap_or(i64::MAX))
-        .bind(i64::try_from(limit + 1).unwrap_or(i64::MAX));
+    let statement = sqlx::query(select!(
+      "WHERE owner = $1 AND created_at < $2 ORDER BY created_at DESC, place, path LIMIT $3"
+    ))
+    .bind(owner.key)
+    .bind(query.after.unwrap_or(i64::MAX))
+    .bind(i64::try_from(limit + 1).unwrap_or(i64::MAX));
     let mut links = read(standing.store.pool(), statement).await?;
     let more = links.len() as u64 > limit;
 
@@ -289,6 +311,7 @@ impl Route for SharesCreate {
   const PATH: &'static str = "/shares";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let asked: ShareRequest = call.body().await?;
     let at = now_ms();
 
@@ -298,7 +321,7 @@ impl Route for SharesCreate {
 
     let standing = call.standing();
     let within = Within::read(&asked.path)?;
-    let places = places_of(&asked.place_name, standing, false).await?;
+    let places = places_of(&asked.place_name, &owner, standing, false).await?;
     let kind = standing_entry(places.place(&asked.place_name)?, &within).await?;
 
     sweep(standing, at).await?;
@@ -307,6 +330,7 @@ impl Route for SharesCreate {
       standing.store.pool(),
       Link {
         token: new_token(),
+        owner: owner.key.clone(),
         place: asked.place_name,
         path: within.joined(),
         kind,
@@ -319,7 +343,7 @@ impl Route for SharesCreate {
     let share = link.share(&standing.settings.share.address);
 
     if made {
-      standing.events.publish("share.created", &share).await;
+      standing.events.publish(&owner.key, "share.created", &share).await;
     }
 
     Ok(answer(if made { StatusCode::CREATED } else { StatusCode::OK }, share))
@@ -337,7 +361,7 @@ impl Route for ShareRead {
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
     let token = call.path_param("token").await?;
-    let link = holding(call.standing(), token).await?;
+    let (link, _) = holding(call.standing(), token).await?;
 
     Ok(uncached(answer(StatusCode::OK, link.share(&call.standing().settings.share.address))))
   }
@@ -345,7 +369,7 @@ impl Route for ShareRead {
 
 crate::route!(ShareRead);
 
-/// One link taken away by its token; it stops at once.
+/// One link of the asking owner taken away by its token; it stops at once.
 pub struct ShareDelete;
 
 impl Route for ShareDelete {
@@ -353,14 +377,17 @@ impl Route for ShareDelete {
   const PATH: &'static str = "/shares/{token}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let token = call.path_param("token").await?;
-    let statement = sqlx::query("DELETE FROM file_shares WHERE share_token = $1").bind(token.clone());
+    let statement = sqlx::query("DELETE FROM file_shares WHERE share_token = $1 AND owner = $2")
+      .bind(token.clone())
+      .bind(owner.key.clone());
 
     if write(call.standing().store.pool(), statement).await? == 0 {
       return Err(Refused::not_found("no such share link"));
     }
 
-    call.standing().events.publish("share.deleted", ShareKey { token }).await;
+    call.standing().events.publish(&owner.key, "share.deleted", ShareKey { token }).await;
 
     Ok(StatusCode::NO_CONTENT.into_response())
   }
@@ -378,17 +405,17 @@ impl Route for ShareContent {
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
     let token = call.path_param("token").await?;
-    let link = holding(call.standing(), token).await?;
+    let (link, owner) = holding(call.standing(), token).await?;
     let within = Within::read(&link.path)?;
     let response = match link.kind {
-      ShareKind::Folder => zip_answer(call.standing(), link.place, vec![within]).await?,
+      ShareKind::Folder => zip_answer(call.standing(), &owner, link.place, vec![within]).await?,
       ShareKind::File => {
         if within.last().is_none() {
           return Err(is_folder());
         }
 
         let range = asked_range(&call);
-        let places = places_of(&link.place, call.standing(), false).await?;
+        let places = places_of(&link.place, &owner, call.standing(), false).await?;
 
         read_answer(
           places.place(&link.place)?,

@@ -1,6 +1,6 @@
-//! The file viewer (`docs/files.md`): this machine's drives, its Garage and the nodes' volumes, each a place
-//! a caller walks and changes as a file explorer does, and the routes that read them (`docs/api.md`,
-//! 「Places」 and 「Entries」).
+//! The file viewer (`docs/files.md`): this machine's drives, its Garage and the nodes' volumes, the
+//! administrator's alone, and each owner's own BMO drive, each a place a caller walks and changes as a file
+//! explorer does, and the routes that read them (`docs/api.md`, 「Places」 and 「Entries」).
 
 mod change;
 mod drives;
@@ -9,6 +9,7 @@ mod guard;
 mod node;
 mod order;
 pub mod shares;
+mod space;
 mod volume;
 mod zip;
 
@@ -27,6 +28,7 @@ use http_range_header::{EndPosition, StartPosition};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 
 use crate::http::{Call, Refused, Route, Standing, answer};
+use crate::owner::Owner;
 pub(crate) use crate::wire::EntryKind as Kind;
 use crate::wire::{
   self, ContentQuery, EntriesQuery, EntryPage, EntrySort, MachineQuery, PlacePage, PlacesQuery, SortOrder,
@@ -34,6 +36,7 @@ use crate::wire::{
 use drives::Drive;
 use garage::Garage;
 use guard::Guard;
+use space::{Room, SPACE, Space, kept_name, space_place};
 
 /// What one of a place's answers is still waiting on.
 type Pending<'a, T> = Pin<Box<dyn Future<Output = Result<T, Refused>> + Send + 'a>>;
@@ -121,10 +124,15 @@ impl Place for Prefixed<'_> {
   }
 }
 
-/// A machine's places as one reading of it lists them.
+/// A machine's places as one reading of it lists them, or an owner's space.
 trait Places: Send + Sync {
   /// The place a request names, where the reading lists it; anything else is no place.
   fn place(&self, id: &str) -> Result<&dyn Place, Refused>;
+
+  /// What a place with a quota still takes; none where bytes arrive with no quota judged.
+  fn room(&self) -> Option<&Room> {
+    None
+  }
 }
 
 /// A path inside a place: names that each stay where they are, the empty list being the place's top.
@@ -532,8 +540,26 @@ impl Places for Machine {
   }
 }
 
-/// The reading of the machine a place stands on.
-async fn places_of(id: &str, standing: &Standing, fresh: bool) -> Result<Arc<dyn Places>, Refused> {
+/// Nothing where `owner` reaches the place `id`: its own space always, the machine branch as the
+/// administrator alone; to anyone else a machine place is no place.
+fn reaches(id: &str, owner: &Owner) -> Result<(), Refused> {
+  if id == SPACE { Ok(()) } else { owner.administrator_only("no such place") }
+}
+
+/// The places a place name reaches for `owner`: its own space, or the reading of the machine the place
+/// stands on, the machine branch being the administrator's alone.
+async fn places_of(
+  id: &str,
+  owner: &Owner,
+  standing: &Standing,
+  fresh: bool,
+) -> Result<Arc<dyn Places>, Refused> {
+  reaches(id, owner)?;
+
+  if id == SPACE {
+    return Ok(Arc::new(Space::of(owner, standing).await?));
+  }
+
   match node::node_of(id) {
     Some(name) => Ok(node::machine(standing, name, fresh).await?),
     None => Ok(Machine::current(fresh, standing).await?),
@@ -565,10 +591,22 @@ impl Route for PlacesList {
   const PATH: &'static str = "/places";
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let query: PlacesQuery = call.query()?;
     let all = match named_node(query.node_name) {
-      Some(name) => node::machine(call.standing(), &name, false).await?.places()?,
-      None => Machine::current(true, call.standing()).await?.places().await,
+      Some(name) => {
+        owner.administrator_only("no such node")?;
+        node::machine(call.standing(), &name, false).await?.places()?
+      }
+      None => {
+        let mut all = vec![space_place(&owner, call.standing()).await?];
+
+        if owner.administrator {
+          all.extend(Machine::current(true, call.standing()).await?.places().await);
+        }
+
+        all
+      }
     };
     let (items, more) = page_of(all, query.after, query.limit.unwrap_or(PLACES_MOST).clamp(1, PLACES_MOST));
 
@@ -586,6 +624,8 @@ impl Route for MachineRead {
   const PATH: &'static str = "/machine";
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    call.owner()?.administrator_only("no such machine")?;
+
     let query: MachineQuery = call.query()?;
     let machine = match named_node(query.node_name) {
       Some(name) => {
@@ -698,6 +738,7 @@ impl Route for EntriesList {
   const PATH: &'static str = "/places/{placeName}/entries";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let id = path_place(&mut call).await?;
     let query: EntriesQuery = call.query()?;
     let within = Within::read(query.path.as_deref().unwrap_or_default())?;
@@ -706,15 +747,19 @@ impl Route for EntriesList {
     let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
     let folders_only = query.folders == Some(true);
     let path = within.joined();
+    let kept_as = kept_name(&id, &owner);
+
+    // A kept reading is handed out only to an owner who reaches the place at all.
+    reaches(&id, &owner)?;
 
     let fresh = query.fresh == Some(true);
-    let entries = match kept(&id, &path).filter(|_| !fresh) {
+    let entries = match kept(&kept_as, &path).filter(|_| !fresh) {
       Some(entries) => entries,
       None => {
-        let places = places_of(&id, call.standing(), false).await?;
+        let places = places_of(&id, &owner, call.standing(), false).await?;
         let read = Arc::new(places.place(&id)?.read_folder(&within).await?);
 
-        keep(&id, &path, read.clone());
+        keep(&kept_as, &path, read.clone());
         read
       }
     };
@@ -748,8 +793,9 @@ impl Route for EntryRead {
   const PATH: &'static str = "/places/{placeName}/entries/{entryPath}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let (id, within) = path_entry(&mut call).await?;
-    let places = places_of(&id, call.standing(), false).await?;
+    let places = places_of(&id, &owner, call.standing(), false).await?;
 
     Ok(answer(StatusCode::OK, entry_at(places.place(&id)?, &within).await?))
   }
@@ -839,6 +885,7 @@ impl Route for ContentRead {
   const PATH: &'static str = "/places/{placeName}/entries/{entryPath}/content";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let (id, within) = path_entry(&mut call).await?;
     let query: ContentQuery = call.query()?;
     let range = asked_range(&call);
@@ -848,7 +895,7 @@ impl Route for ContentRead {
     }
 
     let span = range.or(query.head.map(Span::head)).unwrap_or(Span::WHOLE);
-    let places = places_of(&id, call.standing(), false).await?;
+    let places = places_of(&id, &owner, call.standing(), false).await?;
 
     read_answer(places.place(&id)?, &within, span, range.is_some(), query.download == Some(true)).await
   }

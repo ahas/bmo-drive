@@ -28,6 +28,29 @@ address = "http://localhost:3000/files/share"
 # Who the file share command records as a link's maker; none where empty.
 actor = ""
 
+# The owners requests act for (docs/api.md, 「Owners」).
+[owners]
+# The administrator's owner key, whose alone the machines are; none where empty. A deployment names its own.
+administrator = ""
+
+# Where the BMO drive stands and how it is kept (docs/files.md, 「The BMO drive」).
+[storage]
+# local (a root folder on this machine), node (a root folder on a node) or s3 (a key prefix in a bucket).
+kind = "local"
+# The root folder of the spaces, or the key prefix in the bucket. A deployment names its own.
+root = ""
+# The node a node location stands on.
+node = ""
+# The bucket of an s3 location, and the AWS profile it is reached through.
+bucket = ""
+profile = ""
+# How the storage is backed up, as the owner decided it: a sentence the console shows. None where empty.
+backup = ""
+
+[quota]
+# The quota of a space no quota was set for: 5 GiB.
+default_bytes = 5368709120
+
 # Where the file viewer never changes anything (docs/files.md, 「Protected locations」). Reading them is
 # untouched.
 

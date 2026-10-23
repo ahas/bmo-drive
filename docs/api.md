@@ -11,6 +11,10 @@ in the same commit and follows the version rule (「Versions」).
 
 - **Every route needs `Authorization: Bearer <token>`,** the token of the settings; a missing or wrong
   token is answered 401 `unauthorized`.
+- **Every route but `GET /health`, `GET /shares/{token}` and `GET /shares/{token}/content` needs
+  `Owner-Key: <key>`,** the opaque key of the owner the caller acts for (「Owners」). One of them asked
+  without the header, with an empty one or with one longer than 200 characters is refused 400
+  `bad-request`.
 - **Bodies are JSON both ways, keys in camelCase,** but for a file's bytes written or read and a zip's
   answer.
 - **Times are epoch milliseconds.**
@@ -29,6 +33,45 @@ in the same commit and follows the version rule (「Versions」).
 
 `GET /health` answers `ready` (the store is open and migrated), `reason` (null while ready) and `version`.
 
+## Owners
+
+- **The console checks the person.** It signs the person in, decides which owner key stands for their login
+  (the login's user on the account service, its id written as a decimal number) and sets `Owner-Key` on
+  every request it hands on, replacing any the browser sent, so a browser never chooses its own key.
+- **The service checks its bearer token, and nothing of the person.** It takes the owner key as given: an
+  opaque string of 1 to 200 characters, compared exactly, never parsed. A caller holding the token may act
+  for any key, so the token is the console's and the harness's alone.
+- **The administrator's key** is the setting `owners.administrator`. The machine branch (「Places」, the
+  machines and the nodes), the quotas and the storage are that key's alone: to any other key a machine
+  place, `GET /machine`, a node, `GET /storage` and `GET`/`PUT /quotas/{ownerKey}` are answered 404
+  `not-found`, as if they did not stand. An empty setting makes no key the administrator.
+- **Every other route acts for the key it is given:** the place `drive` is that owner's own space
+  (`docs/files.md`, 「The BMO drive」), the share links listed and taken away are that owner's, and the
+  events read are that owner's.
+
+| Method and path | Sends | Answers |
+|---|---|---|
+| `GET /owner` | | 200, the owner |
+| `GET /storage` | | 200, the storage |
+| `GET /quotas/{ownerKey}` | | 200, the quota |
+| `PUT /quotas/{ownerKey}` | `quotaBytes` | 200, the quota as it now stands |
+
+- **The owner** is what the asking key may reach: `administrator` (whether the machine branch is its),
+  `usedBytes` (the bytes of the files in its space, null where the storage cannot be opened) and
+  `quotaBytes` (its quota, null for the administrator, who has none). A screen decides from it whether to
+  draw the machines.
+- **The storage** is the settings' statement of where the BMO drive stands and how it is kept: `kind`
+  (`local`, `node` or `s3`), `location` (the root folder for `local`, `<node>:<root>` for `node`,
+  `s3://<bucket>/<root>` for `s3`), `backup` (the settings' sentence of how it is backed up, null where they
+  state none), `defaultQuotaBytes`, and `reason` and `reasonCode` (why it cannot be opened, else null; the
+  code is `storage-unready`).
+- **A quota** is `ownerKey`, `quotaBytes` (null for the administrator's key), `usedBytes` (null where the
+  storage cannot be opened) and `defaulted` (true where no quota was set for the key and the default
+  stands). Any key may be asked, a key that never reached its space among them.
+- **`PUT /quotas/{ownerKey}`** sets the key's quota to `quotaBytes`, at least 0; `quotaBytes` null or absent
+  returns the key to the default. The administrator's own key is refused 422 `no-quota`. A quota set below
+  the usage deletes nothing (`docs/files.md`, 「Quotas」).
+
 ## Events
 
 `GET /events` is the service's one event stream, as server-sent events. Each event's SSE `event` is its
@@ -44,6 +87,9 @@ kind, its `id` the event number, and its `data` `{"id", "kind", "at", "data"}`.
 
 - **Only changes made through this service are events.** A file changed on the disk by anything else is
   not seen.
+- **Each event is one owner's,** and a reader reads the events of its own owner key alone: a change is the
+  owner's it was made for, a link's making and taking away the link's owner's, a link swept the link's
+  owner's. The event numbers are the service's one sequence, so a reader's numbers have gaps.
 - **A reader resumes** with `Last-Event-ID` or `after` (an event number), and narrows with `kinds`, a
   comma-separated list of kinds. The service keeps the last 10,000 events; a resume from before them is
   answered 410 `gone`.
@@ -58,12 +104,14 @@ kind, its `id` the event number, and its `data` `{"id", "kind", "at", "data"}`.
 | `GET /places` | query `nodeName?`, `after?`, `limit?` | 200, a page of places |
 | `GET /machine` | query `nodeName?` | 200, a machine |
 
-- **`GET /places`** lists this machine's places, read now: its volumes, then its Garage where it has one.
-  With `nodeName` it lists that node's volumes instead, from the node's reading of the last minute or, where
-  none stands, read now (`docs/files.md`, 「A node's drives」). The places stand in that one order, and the cursor `after` is how many of them were
-  already read; `limit` is 1 to 1000, 1000 where none is asked.
+- **`GET /places`** lists the asking owner's BMO drive, the place `drive`, then, for the administrator,
+  this machine's places, read now: its volumes, then its Garage where it has one. With `nodeName` it lists
+  that node's volumes instead, from the node's reading of the last minute or, where none stands, read now
+  (`docs/files.md`, 「A node's drives」), and to any key but the administrator's it is refused 404
+  `not-found`. The places stand in that one order, and the cursor `after` is how many of them were already
+  read; `limit` is 1 to 1000, 1000 where none is asked.
 - **`GET /machine`** is this machine and its drives, read now; with `nodeName`, that node, read now, the
-  reading replacing the one its places were listed from.
+  reading replacing the one its places were listed from. It is the administrator's alone.
 - **A node that cannot be read** is refused 502 `upstream-failed`, the sentence saying why; a node the node
   list does not hold is refused 404 `not-found`.
 
@@ -71,16 +119,17 @@ kind, its `id` the event number, and its `data` `{"id", "kind", "at", "data"}`.
 
 | Field | What it is |
 |---|---|
-| `name` | its key: `volume:<mount>` for a volume of this machine, `garage` for Garage, `node:<nodeName>:<mount>` for a node's volume |
-| `kind` | `volume`, `store` (Garage) or `node` |
-| `label` | what a person reads it as: the mount, `Garage`, or the mount on the node |
-| `freeBytes` | the bytes free on a volume of this machine; null for Garage and a node's volume |
-| `nodeName` | the node it stands on, null for this machine |
-| `driveKey` | the drive it stands on (「What a machine is」), null for Garage where its data stands on no listed drive |
-| `mount` | where it is mounted, null for Garage |
+| `name` | its key: `drive` for the asking owner's BMO drive, `volume:<mount>` for a volume of this machine, `garage` for Garage, `node:<nodeName>:<mount>` for a node's volume |
+| `kind` | `drive`, `volume`, `store` (Garage) or `node` |
+| `label` | what a person reads it as: `drive`, the mount, `Garage`, or the mount on the node |
+| `freeBytes` | the bytes free on a volume of this machine; for the drive, what is left of its quota, or for the administrator the bytes free where the root stands; null for Garage and a node's volume |
+| `nodeName` | the node it stands on, null for this machine and the drive |
+| `driveKey` | the drive it stands on (「What a machine is」), null for the BMO drive and for Garage where its data stands on no listed drive |
+| `mount` | where it is mounted, null for the BMO drive and Garage |
 | `reason`, `reasonCode` | why it cannot be opened, an English sentence and a code, else null |
 
-Garage's `reasonCode` is `garage-config-unreadable` (Garage's configuration file could not be read),
+The drive's `reasonCode` is `storage-unready` (「Owners」, the storage). Garage's `reasonCode` is
+`garage-config-unreadable` (Garage's configuration file could not be read),
 `aws-config-unreadable` (the AWS configuration could not be read), `garage-profile-missing` (the profile is
 not in it) or `garage-profile-incomplete` (the profile lacks its endpoint, region or keys).
 
@@ -125,6 +174,9 @@ kernel name, or the share's source), `kind` (`nvme`, `ssd`, `hdd`, `usb`, `netwo
 - **`copies`** copies the entries at `paths` of this place into the folder at `to` of the place
   `toPlaceName`, this same one where none is named. A move between two places is a copy followed by a
   `DELETE` of each entry copied.
+- **The quota** of the drive is judged before a file's bytes are written or entries are copied into it
+  (`docs/files.md`, 「Quotas」): a write past it is refused 413 `quota-exceeded`, the body carrying
+  `usedBytes` and `quotaBytes` beside the code, before anything is changed.
 - **`archives`** zips the entries at `paths`. One folder named is zipped with its entries under their paths
   from it; otherwise each named entry stands at the zip's top under its own name, a folder with everything
   under it, and two named entries sharing a name are refused 422 `name-repeated`.
@@ -165,7 +217,7 @@ starts; an entry that fails once the zip has started ends the answer as broken.
 
 | Method and path | Sends | Answers |
 |---|---|---|
-| `GET /shares` | query `after?`, `limit?` | 200, a page of the live links, the newest first |
+| `GET /shares` | query `after?`, `limit?` | 200, a page of the asking owner's live links, the newest first |
 | `POST /shares` | `placeName`, `path`, `expiresAt?`, `actorName?` | 201, the link made; 200, the live link that already stands for that entry |
 | `GET /shares/{token}` | | 200, the link |
 | `DELETE /shares/{token}` | | 204 |
@@ -175,6 +227,10 @@ starts; an entry that fails once the zip has started ends the answer as broken.
   place's top the place's last name), `kind` (`file` or `folder`), `url` (the address its page stands
   at), `actorName` (who made it, null where none was named), `createdAt` and `expiresAt` (null for no
   end).
+- **A link is its owner's,** the key it was made for (`docs/files.md`, 「Share links」): `POST /shares` reads
+  the entry in the asking owner's places, so a link of `drive` is of that owner's space; `GET /shares` lists
+  the asking owner's links; `DELETE /shares/{token}` takes away the asking owner's link alone, another's
+  answered 404 `not-found`.
 - **`GET /shares`** sweeps the links whose time has passed first. Its cursor `after` is a `createdAt`: the
   page holds the links made before it. `limit` is 1 to 1000, 100 where none is asked.
 - **`expiresAt`** is when the link stops opening, a time to come, or null or absent for a link with no end;
@@ -183,13 +239,15 @@ starts; an entry that fails once the zip has started ends the answer as broken.
   `not-shareable`, nothing there 404 `not-found`.
 - **`GET /shares/{token}` and its content** refuse a token that names no link with 404 `not-found`, one
   whose time has passed with 410 `gone`, and a link whose entry no longer stands as that kind at its path
-  with 404 `not-found`. They read nothing of the request but the token and the range.
+  with 404 `not-found`. They read nothing of the request but the token and the range, and take no owner
+  key: the entry is read in the places of the link's own owner.
 
 ## Refusals
 
 Beside the common codes of bmo-chat's `docs/conventions.md` (「Errors」), which this service answers as
 that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found`, `conflict`, `gone`,
-`failed`, `upstream-failed`), these are the service's own, each answered 422:
+`failed`, `upstream-failed`), these are the service's own, each answered 422 but `quota-exceeded`, answered
+413:
 
 | Code | When |
 |---|---|
@@ -212,12 +270,17 @@ that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found
 | `garage-closed` | Garage was asked for while it cannot be opened; the sentence gives its place's reason |
 | `bad-expiry` | an `expiresAt` already passed |
 | `not-shareable` | a share link asked for what is neither a file nor a folder |
+| `quota-exceeded` | a write into the drive that would take its usage past its quota; answered 413 with `usedBytes` and `quotaBytes` |
+| `no-quota` | a quota set for the administrator's own key |
+| `storage-unready` | the drive asked for while its storage cannot be opened: a kind whose adapter has not landed, or no root set |
 
-- **`bad-request`** covers a body or query not of the route's shape, a field the route needs and does not
+- **`bad-request`** covers a missing, empty or overlong `Owner-Key`, an owner key whose space's folder name
+  would pass 255 bytes, a body or query not of the route's shape, a field the route needs and does not
   get, a count, sort, order or conflict not among its own, an upload with no `Content-Length` and an upload
   that ended before its length; the sentence names which.
 - **`not-found`** covers nothing at a path, a place the current reading does not list, a node the node list
-  does not hold, and a share link as above.
+  does not hold, the machine branch, the storage and the quotas asked for by any key but the
+  administrator's, and a share link as above.
 - **`conflict`** covers a name already taken (with `names`) and a bucket asked to be deleted that still
   holds objects.
 - **`upstream-failed`** covers the node service not answering, a node that could not be reached, whose
@@ -234,8 +297,8 @@ that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found
 - **`bmo-drive serve`** opens and migrates the store and answers the routes.
 - **`bmo-drive health`** asks the service the settings name, waiting at most five seconds, and ends 0
   where it answers ready.
-- **`bmo-drive mcp [--address <url>]`** serves the harness tools over MCP on standard input and output
-  (「The harness plugin」).
+- **`bmo-drive mcp [--address <url>] [--owner <key>]`** serves the harness tools over MCP on standard input
+  and output (「The harness plugin」).
 - **`bmo-drive openapi`** prints the OpenAPI document the code generates, the one committed as
   `docs/openapi.json`.
 - **`bmo-drive nouns`** prints the nouns the command carries, one a line, each marked `home` after a tab,
@@ -247,7 +310,8 @@ that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found
   - `--place <name> <path> [--days <n> | --forever]`: the path read inside that place;
   - `--list`: every live link;
   - `--remove <token>`: one link taken away.
-  - It records the settings' actor as who made a link.
+  - It records the settings' actor as who made a link, and acts for the administrator's key
+    (「Owners」), since its places are this machine's.
   - **What it prints:** for each link, `file-share: <kind> <placeName> <path>, until <time>` (or `no
     expiry`; the path `(top)` at a place's top), `page: <url>` and `token: <token>`; `file-share: no live
     links.` where there are none; `file-share: the link is taken away.` on a removal. With `--json` it
@@ -260,7 +324,8 @@ that document states them (`bad-request`, `unauthorized`, `no-route`, `not-found
 
 The plugin is `bmo-drive`: the MCP server `bmo-drive mcp` starts and the skill
 `skills/bmo-drive/SKILL.md`, which tells a harness when and how to use it. The server reaches the service
-at `--address`, or at the settings' `server.listen` where none is given, with the settings' token, and each
+at `--address`, or at the settings' `server.listen` where none is given, with the settings' token; it acts
+for the owner key `--owner` or `BMO_DRIVE_OWNER` gives, else the settings' `owners.administrator`; and each
 tool is one call of the service's own client. A refusal comes back as a tool error carrying the route's
 status, `code` and `error`. A harness lists the places with `drive_places`, a folder with `drive_entries`,
 reads and writes files with `drive_read` and `drive_write`, and hands someone a link with `drive_share`.
@@ -283,7 +348,9 @@ reads and writes files with `drive_read` and `drive_write`, and hands someone a 
 ## The client
 
 `bmo_drive::client` is the service's own Rust client: one method for each route, sending and reading the
-types of `bmo_drive::wire`, which the routes answer with and the OpenAPI document is generated from. The
+types of `bmo_drive::wire`, which the routes answer with and the OpenAPI document is generated from. It
+acts for the owner key it is given and sends it on every route that takes one; the client of the settings
+acts for the administrator's. The
 command and the MCP server call the service through it, and the console plugin bundle reads the TypeScript
 types generated from `docs/openapi.json`.
 
@@ -330,6 +397,13 @@ token lets no caller in.
 | `store` | `path` | the SQLite file the share links and the kept events stand in |
 | `share` | `address` | the address a link's page stands under; a link's `url` is it, a `/` and the token |
 | `share` | `actor` | who the command records as a link's `actorName`; none where empty |
+| `owners` | `administrator` | the administrator's owner key (「Owners」); none where empty |
+| `storage` | `kind` | where the BMO drive stands: `local` where none is set, `node` or `s3` (`docs/files.md`, 「The BMO drive」) |
+| `storage` | `root` | the root folder of the spaces: on this machine for `local`, on the node for `node`; the key prefix in the bucket for `s3` |
+| `storage` | `node` | the node of the node list a `node` location stands on |
+| `storage` | `bucket`, `profile` | the bucket of an `s3` location and the AWS profile it is reached through |
+| `storage` | `backup` | how the storage is backed up, as the owner decided it: a sentence `GET /storage` answers; none where empty |
+| `quota` | `default_bytes` | the quota of a space no quota was set for, 5 GiB where none is set |
 | `node` | `address`, `token` | the node service's base address and its token |
 | `garage` | `config` | Garage's configuration file, `/etc/garage.toml` where none is set |
 | `garage` | `profile` | the AWS profile Garage is reached through, `garage` where none is set |

@@ -12,6 +12,7 @@ pub mod http;
 pub mod import;
 pub mod mcp;
 pub mod openapi;
+pub mod owner;
 pub mod settings;
 pub mod store;
 pub mod wire;
@@ -27,6 +28,11 @@ use crate::store::Store;
 /// Opens the store, then answers the routes on the settings' address until the process is told to stop.
 pub async fn serve(settings: Settings) -> Result<(), String> {
   let store = Store::open(&settings.store.path).await.map_err(|why| why.to_string())?;
+
+  if !settings.owners.administrator.is_empty() {
+    store.adopt(&settings.owners.administrator).await.map_err(|why| why.to_string())?;
+  }
+
   let listen = settings.server.listen;
   let router = http::router(Standing::new(settings, store)).map_err(|faults| faults.join("; "))?;
   let listener = TcpListener::bind(listen)

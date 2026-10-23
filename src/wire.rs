@@ -56,6 +56,8 @@ pub struct EventPage {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PlaceKind {
+  /// The asking owner's BMO drive.
+  Drive,
   /// A volume of this machine.
   Volume,
   /// Garage, the object storage this machine runs.
@@ -68,12 +70,12 @@ pub enum PlaceKind {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Place {
-  /// Its key: `volume:<mount>`, `garage` or `node:<nodeName>:<mount>`.
+  /// Its key: `drive`, `volume:<mount>`, `garage` or `node:<nodeName>:<mount>`.
   pub name: String,
   pub kind: PlaceKind,
   /// What a person reads it as.
   pub label: String,
-  /// The bytes free on a volume of this machine; null for Garage and a node's volume.
+  /// The bytes free on a volume of this machine, or left in the drive; null for Garage and a node's volume.
   pub free_bytes: Option<u64>,
   /// The node it stands on, null for this machine.
   pub node_name: Option<String>,
@@ -85,6 +87,69 @@ pub struct Place {
   pub reason: Option<String>,
   /// The code of that reason, null where it opens.
   pub reason_code: Option<String>,
+}
+
+/// What the asking owner may reach (`docs/api.md`, 「Owners」).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Owner {
+  /// Whether the machine branch is this owner's.
+  pub administrator: bool,
+  /// The bytes of the files in its space; null where the storage cannot be opened.
+  pub used_bytes: Option<u64>,
+  /// Its quota; null for the administrator, who has none.
+  pub quota_bytes: Option<u64>,
+}
+
+/// What kind of location the BMO drive stands in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageKind {
+  /// A root folder on this machine.
+  Local,
+  /// A root folder on a node of the node list.
+  Node,
+  /// A key prefix in a bucket of an S3 store.
+  S3,
+}
+
+/// Where the BMO drive stands and how it is kept, as the settings state it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Storage {
+  pub kind: StorageKind,
+  /// The root folder, `<node>:<root>`, or `s3://<bucket>/<root>`.
+  pub location: String,
+  /// How it is backed up, as the settings say it; null where they say nothing.
+  pub backup: Option<String>,
+  /// The quota of a space no quota was set for.
+  pub default_quota_bytes: u64,
+  /// Why it cannot be opened, an English sentence; null where it opens.
+  pub reason: Option<String>,
+  /// The code of that reason, null where it opens.
+  pub reason_code: Option<String>,
+}
+
+/// One owner's quota and usage.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Quota {
+  pub owner_key: String,
+  /// The bytes its files may hold together; null for the administrator's key.
+  pub quota_bytes: Option<u64>,
+  /// The bytes of the files in its space; null where the storage cannot be opened.
+  pub used_bytes: Option<u64>,
+  /// Whether no quota was set for the key and the default stands.
+  pub defaulted: bool,
+}
+
+/// A quota to be set.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QuotaRequest {
+  /// The bytes the owner's files may hold together; null or absent for the default.
+  #[serde(default)]
+  pub quota_bytes: Option<u64>,
 }
 
 /// A page of places.

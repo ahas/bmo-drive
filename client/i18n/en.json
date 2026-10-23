@@ -21,6 +21,8 @@
       "share_folder": "Folder · zip",
       "size": "Size",
       "size_exact": "{size} ({bytes} bytes)",
+      "space": "BMO drive",
+      "space_usage": "{used} of {quota}",
       "span_1h": "1 hour",
       "span_6h": "6 hours",
       "span_24h": "24 hours",
@@ -134,7 +136,10 @@
       "garage-config-unreadable": "Garage's configuration could not be read.",
       "aws-config-unreadable": "The AWS configuration could not be read.",
       "garage-profile-missing": "The AWS profile is missing.",
-      "garage-profile-incomplete": "The AWS profile lacks a value it needs."
+      "garage-profile-incomplete": "The AWS profile lacks a value it needs.",
+      "quota-exceeded": "The drive has no room left for it within its quota.",
+      "no-quota": "The administrator's drive has no quota.",
+      "storage-unready": "The drive's storage cannot be opened."
     }
   }
 }

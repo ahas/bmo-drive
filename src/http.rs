@@ -18,6 +18,7 @@ use serde_json::{Map, Value, json};
 
 use crate::clients::node::Node;
 use crate::events::Events;
+use crate::owner::{OWNER_KEY, Owner};
 use crate::settings::Settings;
 use crate::store::Store;
 
@@ -262,6 +263,11 @@ impl Call {
 
     serde_json::from_slice(&bytes)
       .map_err(|why| Refused::bad_request(format!("the body is not the route's: {why}")))
+  }
+
+  /// The owner the request acts for, read from its `Owner-Key` (`docs/api.md`, 「Owners」).
+  pub fn owner(&self) -> Result<Owner, Refused> {
+    Owner::checked(self.header(OWNER_KEY).as_deref(), &self.standing.settings)
   }
 
   /// Whether the caller asks for JSON rather than a stream.

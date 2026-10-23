@@ -3,12 +3,13 @@ import { joinPath, lastName, parentPath } from "./files";
 import { appUrl } from "./urls";
 
 import type { components } from "../../shared/openapi";
-import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FilePlaces, FileShareView, FileSortKey, SharedFileView } from "../../shared/types";
+import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FilePlaces, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
 import type { FolderAt } from "./files";
 
 // The Files screen's calls to the drive service, each through the console's relay at the path the
-// service's own API writes it (docs/api.md), and what each answer becomes in the screen's own view of
-// machines, folders and links. The node list is the node service's, read through the relay the same way.
+// service's own API writes it (docs/api.md), and what each answer becomes in the screen's own view of the
+// owner's drive, machines, folders and links. The node list is the node service's, read through the relay
+// the same way, and only where the service answers that the machines are the signed-in owner's.
 
 type Wire = components["schemas"];
 
@@ -62,11 +63,26 @@ interface NodeView {
   thisMachine?: boolean;
 }
 
-/** This machine read now with its drives and Garage, then each node of the node list with its drives unread. */
+function spaceOf(owner: Wire["Owner"], places: readonly Wire["Place"][]): FileSpace | null {
+  const drive = places.find((one) => one.kind === "drive");
+
+  return drive === undefined
+    ? null
+    : { place: drive.name, usedBytes: owner.usedBytes ?? null, quotaBytes: owner.quotaBytes ?? null, error: drive.reason ?? null, errorCode: drive.reasonCode ?? null };
+}
+
+/**
+ * The signed-in owner's drive, then, where the service answers that the machines are the owner's, this
+ * machine read now with its drives and Garage and each node of the node list with its drives unread.
+ */
 export async function readPlaces(): Promise<FilePlaces> {
-  const [machine, places, nodes] = await Promise.all([
+  const [owner, places] = await Promise.all([$fetch<Wire["Owner"]>(drivePath("/owner")), $fetch<Wire["PlacePage"]>(drivePath("/places"))]);
+  const space = spaceOf(owner, places.items);
+
+  if (!owner.administrator) return { administrator: false, space, machines: [] };
+
+  const [machine, nodes] = await Promise.all([
     $fetch<Wire["Machine"]>(drivePath("/machine")),
-    $fetch<Wire["PlacePage"]>(drivePath("/places")),
     // A node service that does not answer leaves this machine alone in the list.
     $fetch<{ nodes?: NodeView[] }>(relayAddress(NODE_SERVICE, "/nodes/view")).catch(() => ({ nodes: [] }))
   ]);
@@ -75,7 +91,14 @@ export async function readPlaces(): Promise<FilePlaces> {
     .filter((node) => node.thisMachine !== true)
     .map((node): FileMachine => ({ key: nodeMachineKey(node.name), name: node.label === "" ? node.name : node.label, local: false, disks: null, garage: null, error: null, errorCode: null }));
 
-  return { machines: [local, ...others] };
+  return { administrator: true, space, machines: [local, ...others] };
+}
+
+/** The owner's drive with its usage and quota read again, after a change in it. */
+export async function readSpace(space: FileSpace): Promise<FileSpace> {
+  const owner = await $fetch<Wire["Owner"]>(drivePath("/owner"));
+
+  return { ...space, usedBytes: owner.usedBytes ?? null, quotaBytes: owner.quotaBytes ?? null };
 }
 
 /** One node's machine, read now. */

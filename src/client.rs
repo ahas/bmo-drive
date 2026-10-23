@@ -1,6 +1,6 @@
 //! The service's own client (`docs/api.md`, 「The client」): one method for each route, sending and reading
-//! the types of `wire`. The command and the MCP server reach the service through it, and so may any other
-//! Rust caller.
+//! the types of `wire`, acting for the owner key it is given. The command and the MCP server reach the
+//! service through it, and so may any other Rust caller.
 
 use std::time::Duration;
 
@@ -10,11 +10,12 @@ use reqwest::{Method, RequestBuilder, Response, StatusCode, header};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::owner::OWNER_KEY;
 use crate::settings::Settings;
 use crate::wire::{
   ArchiveRequest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage, EventPage,
-  EventsQuery, FolderRequest, Health, Machine, MachineQuery, PlacePage, PlacesQuery, Share, SharePage,
-  ShareRequest, SharesQuery, WireError, WriteQuery,
+  EventsQuery, FolderRequest, Health, Machine, MachineQuery, Owner, PlacePage, PlacesQuery, Quota,
+  QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage, WireError, WriteQuery,
 };
 
 // Everything but the unreserved characters is written percent-encoded in a path segment, a `/` and a `:`
@@ -98,11 +99,13 @@ impl Content {
   }
 }
 
-/// The service at one address, asked with one token.
+/// The service at one address, asked with one token, acting for one owner.
 #[derive(Clone, Debug)]
 pub struct DriveClient {
   address: String,
   token: String,
+  /// The owner key sent as `Owner-Key`; none is sent where it is empty.
+  owner: String,
   http: reqwest::Client,
   timeout: Option<Duration>,
 }
@@ -113,14 +116,23 @@ impl DriveClient {
     Self {
       address: address.into().trim_end_matches('/').to_owned(),
       token: token.into(),
+      owner: String::new(),
       http: reqwest::Client::new(),
       timeout: None,
     }
   }
 
-  /// The service the settings name, on this machine, with the settings' token.
+  /// The service the settings name, on this machine, with the settings' token, acting for the
+  /// administrator's key.
   pub fn of_settings(settings: &Settings) -> Self {
     Self::new(format!("http://{}", settings.server.listen), settings.server.token.clone())
+      .with_owner(settings.owners.administrator.clone())
+  }
+
+  /// The client acting for the owner `key`, sent as `Owner-Key` on every route.
+  pub fn with_owner(mut self, key: impl Into<String>) -> Self {
+    self.owner = key.into();
+    self
   }
 
   /// The client giving up on any call that has not answered within `timeout`.
@@ -130,7 +142,11 @@ impl DriveClient {
   }
 
   fn request(&self, method: Method, path: &str) -> RequestBuilder {
-    let request = self.http.request(method, format!("{}{path}", self.address)).bearer_auth(&self.token);
+    let mut request = self.http.request(method, format!("{}{path}", self.address)).bearer_auth(&self.token);
+
+    if !self.owner.is_empty() {
+      request = request.header(OWNER_KEY, &self.owner);
+    }
 
     match self.timeout {
       Some(timeout) => request.timeout(timeout),
@@ -183,6 +199,26 @@ impl DriveClient {
     let request = self.request(Method::GET, "/events").header(header::ACCEPT, "application/json");
 
     Self::read(Self::with_query(request, query)).await
+  }
+
+  /// `GET /owner`.
+  pub async fn owner(&self) -> Result<Owner, ClientFailure> {
+    Self::read(self.request(Method::GET, "/owner")).await
+  }
+
+  /// `GET /storage`.
+  pub async fn storage(&self) -> Result<Storage, ClientFailure> {
+    Self::read(self.request(Method::GET, "/storage")).await
+  }
+
+  /// `GET /quotas/{ownerKey}`.
+  pub async fn quota(&self, owner_key: &str) -> Result<Quota, ClientFailure> {
+    Self::read(self.request(Method::GET, &format!("/quotas/{}", segment(owner_key)))).await
+  }
+
+  /// `PUT /quotas/{ownerKey}`.
+  pub async fn set_quota(&self, owner_key: &str, quota: &QuotaRequest) -> Result<Quota, ClientFailure> {
+    Self::read(self.request(Method::PUT, &format!("/quotas/{}", segment(owner_key))).json(quota)).await
   }
 
   /// `GET /places`.

@@ -150,7 +150,7 @@
 import { useI18n } from "vue-i18n";
 import { refusalText } from "../../domain/refusals";
 import { countText } from "bmo-ui/app/domain/numbers";
-import { carryEntries, contentUrl, deleteEntries, endShare, makeFolder, makeShare, readListing, readNode, readPlaces, readShares, renameEntry as renameAt, sendFile } from "../../domain/drive";
+import { carryEntries, contentUrl, deleteEntries, endShare, makeFolder, makeShare, readListing, readNode, readPlaces, readShares, readSpace, renameEntry as renameAt, sendFile } from "../../domain/drive";
 import {
   DEFAULT_SORT,
   DEFAULT_VIEW,
@@ -619,7 +619,23 @@ function shareEntry(entry: FileEntry | null = shareable()): void {
 function merged(read: FilePlaces): FilePlaces {
   const before = new Map((places.value?.machines ?? []).map((one) => [one.key, one]));
 
-  return { machines: read.machines.map((one) => (one.local ? one : (before.get(one.key) ?? one))) };
+  return { ...read, machines: read.machines.map((one) => (one.local ? one : (before.get(one.key) ?? one))) };
+}
+
+// The owner's drive's usage and quota, read again after a change; where the reading fails the row keeps
+// what it showed.
+async function refreshSpace(): Promise<void> {
+  const space = places.value?.space;
+
+  if (space === null || space === undefined || space.error !== null) return;
+
+  try {
+    const read = await readSpace(space);
+
+    if (places.value !== null) places.value = { ...places.value, space: read };
+  } catch {
+    // The usage stays as it was last read.
+  }
 }
 
 async function loadPlaces(): Promise<void> {
@@ -864,6 +880,7 @@ async function change(work: () => Promise<void>): Promise<void> {
     island.say({ tone: "error", title: refusalText(t, error, t("drive.error.change_failed")) });
   } finally {
     changing.value = false;
+    void refreshSpace();
   }
 }
 

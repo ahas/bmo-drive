@@ -1,7 +1,8 @@
 //! The file viewer's changes (`docs/files.md`, 「Changing files」): making a folder, writing a file,
 //! renaming, moving, copying and deleting, on any place. A name already taken is settled here, for every
 //! place alike, before the place is asked to change anything; copying between two places streams each file
-//! from the one into the other. Every change made is an event of the service's stream.
+//! from the one into the other. Bytes arriving in a space with a quota are judged against it before
+//! anything is changed. Every change made is an event of the service's stream, the asking owner's.
 
 use std::collections::HashMap;
 use std::io;
@@ -11,11 +12,12 @@ use axum::response::{IntoResponse, Response};
 use futures_util::{StreamExt, TryStreamExt};
 
 use super::{
-  Kind, Pending, Place, Span, Upload, Within, entry_at, fair_name, forget_place_prefix, into_itself,
+  Entry, Kind, Pending, Place, Span, Upload, Within, entry_at, fair_name, forget_place_prefix, into_itself,
   not_found, path_entry, path_place, place_top, places_of,
 };
 use crate::events::Events;
 use crate::http::{Call, Refused, Route, answer};
+use crate::owner::Owner;
 use crate::wire::{self, Conflict, CopyRequest, EntryKey, EntryMove, EntryPage, FolderRequest, WriteQuery};
 
 /// What becomes of one arriving name.
@@ -105,6 +107,26 @@ fn entry_path(path: &str) -> Result<Within, Refused> {
   Ok(within)
 }
 
+/// The bytes of the files the entry at `source` of a place holds, as a copy into another place carries
+/// them: every file under a folder, read by the place's own readings.
+fn carried_bytes<'a>(place: &'a dyn Place, source: Within, kind: Kind) -> Pending<'a, u64> {
+  Box::pin(async move {
+    match kind {
+      Kind::File => Ok(entry_at(place, &source).await?.byte_count.unwrap_or(0)),
+      Kind::Folder => {
+        let mut bytes: u64 = 0;
+
+        for entry in place.read_folder(&source).await? {
+          bytes = bytes.saturating_add(carried_bytes(place, source.child(&entry.name), entry.kind).await?);
+        }
+
+        Ok(bytes)
+      }
+      Kind::Other => Ok(0),
+    }
+  })
+}
+
 /// The kind of the entry at `within`, read from its folder; a place's top is a folder.
 pub(super) async fn kind_of(place: &dyn Place, within: &Within) -> Result<Kind, Refused> {
   let Some((folder, name)) = within.split() else {
@@ -148,26 +170,27 @@ fn carry<'a>(
   })
 }
 
-/// The event of an entry gone from its path.
-async fn deleted(events: &Events, place_name: &str, within: &Within) {
+/// The event of an entry gone from its path, the owner's it was made for.
+async fn deleted(events: &Events, owner: &Owner, place_name: &str, within: &Within) {
   let key = EntryKey {
     place_name: place_name.to_owned(),
     path: within.joined(),
   };
 
-  events.publish("entry.deleted", key).await;
+  events.publish(&owner.key, "entry.deleted", key).await;
 }
 
-/// The entry now standing at `within`, told as an event of `kind`.
+/// The entry now standing at `within`, told as an event of `kind`, the owner's it was made for.
 async fn arrived(
   events: &Events,
+  owner: &Owner,
   place: &dyn Place,
   within: &Within,
   kind: &str,
 ) -> Result<wire::Entry, Refused> {
   let entry = entry_at(place, within).await?;
 
-  events.publish(kind, &entry).await;
+  events.publish(&owner.key, kind, &entry).await;
 
   Ok(entry)
 }
@@ -180,6 +203,7 @@ impl Route for EntryMoveRoute {
   const PATH: &'static str = "/places/{placeName}/entries/{entryPath}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let (id, within) = path_entry(&mut call).await?;
     let moved: EntryMove = call.body().await?;
     let conflict = moved.conflict.unwrap_or(Conflict::Refuse);
@@ -190,7 +214,7 @@ impl Route for EntryMoveRoute {
 
     let source = entry_path(&within.joined())?;
     let target = entry_path(&moved.path)?;
-    let places = places_of(&id, call.standing(), false).await?;
+    let places = places_of(&id, &owner, call.standing(), false).await?;
     let place = places.place(&id)?;
 
     // Moved onto itself, an entry stays as it is.
@@ -220,7 +244,7 @@ impl Route for EntryMoveRoute {
       Some(Landing::New(name)) => name,
       Some(Landing::Replacing(name, _)) => {
         place.remove(&to_folder.child(&name)).await?;
-        deleted(events, &id, &to_folder.child(&name)).await;
+        deleted(events, &owner, &id, &to_folder.child(&name)).await;
         name
       }
       Some(Landing::Skipped) | None => return Err(Refused::failed("the move landed nowhere")),
@@ -234,9 +258,9 @@ impl Route for EntryMoveRoute {
     }
 
     forget_place_prefix(&id);
-    deleted(events, &id, &source).await;
+    deleted(events, &owner, &id, &source).await;
 
-    Ok(answer(StatusCode::OK, arrived(events, place, &at, "entry.created").await?))
+    Ok(answer(StatusCode::OK, arrived(events, &owner, place, &at, "entry.created").await?))
   }
 }
 
@@ -250,13 +274,14 @@ impl Route for EntryDelete {
   const PATH: &'static str = "/places/{placeName}/entries/{entryPath}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let (id, within) = path_entry(&mut call).await?;
     let within = entry_path(&within.joined())?;
-    let places = places_of(&id, call.standing(), false).await?;
+    let places = places_of(&id, &owner, call.standing(), false).await?;
 
     places.place(&id)?.remove(&within).await?;
     forget_place_prefix(&id);
-    deleted(&call.standing().events, &id, &within).await;
+    deleted(&call.standing().events, &owner, &id, &within).await;
 
     Ok(StatusCode::NO_CONTENT.into_response())
   }
@@ -272,6 +297,7 @@ impl Route for ContentWrite {
   const PATH: &'static str = "/places/{placeName}/entries/{entryPath}/content";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let (id, within) = path_entry(&mut call).await?;
     let within = entry_path(&within.joined())?;
     let query: WriteQuery = call.query()?;
@@ -281,12 +307,31 @@ impl Route for ContentWrite {
       .and_then(|value| value.parse::<u64>().ok())
       .ok_or_else(|| Refused::bad_request("the file's bytes carry no Content-Length"))?;
     let (folder, name) = within.split().ok_or_else(place_top)?;
-    let places = places_of(&id, call.standing(), false).await?;
+    let places = places_of(&id, &owner, call.standing(), false).await?;
     let place = places.place(&id)?;
-    let landing = match settle(standing_in(place, &folder).await?, &[(name.to_owned(), false)], conflict) {
+    let standing: Vec<Entry> = place.read_folder(&folder).await?;
+    let names = standing.iter().map(|entry| (entry.name.clone(), entry.kind)).collect();
+    let landing = match settle(names, &[(name.to_owned(), false)], conflict) {
       Ok(landings) => landings.into_iter().next(),
       Err(names) => return Ok(conflict_answer(names)),
     };
+
+    if let Some(room) = places.room() {
+      // A file written over gives its bytes back as the new one takes its place.
+      let freeing = match &landing {
+        Some(Landing::Replacing(name, Kind::File)) => standing
+          .iter()
+          .find(|entry| entry.name == *name)
+          .and_then(|entry| entry.size)
+          .unwrap_or(0),
+        _ => 0,
+      };
+
+      if !matches!(landing, Some(Landing::Skipped) | None) {
+        room.take(length, freeing).await?;
+      }
+    }
+
     let (landed, made) = match landing {
       Some(Landing::New(name)) => (name, true),
       Some(Landing::Replacing(name, kind)) => {
@@ -315,7 +360,7 @@ impl Route for ContentWrite {
       (StatusCode::OK, "entry.changed")
     };
 
-    Ok(answer(status, arrived(&call.standing().events, place, &at, kind).await?))
+    Ok(answer(status, arrived(&call.standing().events, &owner, place, &at, kind).await?))
   }
 }
 
@@ -329,12 +374,13 @@ impl Route for FoldersCreate {
   const PATH: &'static str = "/places/{placeName}/folders";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let id = path_place(&mut call).await?;
     let asked: FolderRequest = call.body().await?;
     let within = entry_path(&asked.path)?;
     let conflict = asked.conflict.unwrap_or(Conflict::Refuse);
     let (folder, name) = within.split().ok_or_else(place_top)?;
-    let places = places_of(&id, call.standing(), false).await?;
+    let places = places_of(&id, &owner, call.standing(), false).await?;
     let place = places.place(&id)?;
     let landing = match settle(standing_in(place, &folder).await?, &[(name.to_owned(), true)], conflict) {
       Ok(landings) => landings.into_iter().next(),
@@ -345,7 +391,7 @@ impl Route for FoldersCreate {
       Some(Landing::New(name)) => name,
       Some(Landing::Replacing(name, _)) => {
         place.remove(&folder.child(&name)).await?;
-        deleted(events, &id, &folder.child(&name)).await;
+        deleted(events, &owner, &id, &folder.child(&name)).await;
         name
       }
       Some(Landing::Skipped) | None => return Ok(answer(StatusCode::OK, entry_at(place, &within).await?)),
@@ -355,7 +401,7 @@ impl Route for FoldersCreate {
     place.make_folder(&at).await?;
     forget_place_prefix(&id);
 
-    Ok(answer(StatusCode::CREATED, arrived(events, place, &at, "entry.created").await?))
+    Ok(answer(StatusCode::CREATED, arrived(events, &owner, place, &at, "entry.created").await?))
   }
 }
 
@@ -369,6 +415,7 @@ impl Route for CopiesCreate {
   const PATH: &'static str = "/places/{placeName}/copies";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let from_id = path_place(&mut call).await?;
     let asked: CopyRequest = call.body().await?;
     let to_id = asked.to_place_name.filter(|name| !name.is_empty()).unwrap_or_else(|| from_id.clone());
@@ -387,8 +434,8 @@ impl Route for CopiesCreate {
       sources.push(source);
     }
 
-    let from_places = places_of(&from_id, call.standing(), false).await?;
-    let to_places = places_of(&to_id, call.standing(), false).await?;
+    let from_places = places_of(&from_id, &owner, call.standing(), false).await?;
+    let to_places = places_of(&to_id, &owner, call.standing(), false).await?;
     let (from_place, to_place) = (from_places.place(&from_id)?, to_places.place(&to_id)?);
     let mut kinds = Vec::new();
 
@@ -405,6 +452,28 @@ impl Route for CopiesCreate {
       Ok(landings) => landings,
       Err(names) => return Ok(conflict_answer(names)),
     };
+
+    if let Some(room) = to_places.room() {
+      // A copy counts every file it carries and frees nothing it replaces.
+      let mut adding: u64 = 0;
+
+      for ((source, kind), landing) in sources.iter().zip(&kinds).zip(&landings) {
+        if *landing == Landing::Skipped {
+          continue;
+        }
+
+        let bytes = if same {
+          room.bytes_at(source).await?
+        } else {
+          carried_bytes(from_place, source.clone(), *kind).await?
+        };
+
+        adding = adding.saturating_add(bytes);
+      }
+
+      room.take(adding, 0).await?;
+    }
+
     let events = &call.standing().events;
     let mut landed = Vec::new();
 
@@ -414,7 +483,7 @@ impl Route for CopiesCreate {
         Landing::New(name) => name,
         Landing::Replacing(name, _) => {
           to_place.remove(&target.child(&name)).await?;
-          deleted(events, &to_id, &target.child(&name)).await;
+          deleted(events, &owner, &to_id, &target.child(&name)).await;
           name
         }
       };
@@ -434,7 +503,7 @@ impl Route for CopiesCreate {
     let mut items = Vec::new();
 
     for at in &landed {
-      items.push(arrived(events, to_place, at, "entry.created").await?);
+      items.push(arrived(events, &owner, to_place, at, "entry.created").await?);
     }
 
     let total_count = items.len() as u64;

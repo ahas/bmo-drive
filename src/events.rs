@@ -1,6 +1,6 @@
 //! The service's one event stream (`docs/api.md`, 「Events」): every change made through the service written
 //! to the store as it is made, the last of them kept, handed out live as server-sent events and, to a reader
-//! that polls, as pages.
+//! that polls, as pages. Each event is one owner's, and a reader reads its own owner's alone.
 
 use std::collections::{BTreeSet, VecDeque};
 use std::convert::Infallible;
@@ -44,11 +44,18 @@ pub fn now_ms() -> i64 {
     .unwrap_or_default()
 }
 
+/// One event as it goes to the live readers, with the owner it is of.
+#[derive(Clone, Debug)]
+struct Owned {
+  owner: String,
+  event: Event,
+}
+
 /// The event stream: its kept events in the store and its live readers.
 #[derive(Clone, Debug)]
 pub struct Events {
   store: Store,
-  live: broadcast::Sender<Event>,
+  live: broadcast::Sender<Owned>,
 }
 
 impl Events {
@@ -58,26 +65,29 @@ impl Events {
     Self { store, live }
   }
 
-  /// One event of `kind` about `data`, written and handed to every live reader. A change already made is
-  /// never refused for its event: an event that cannot be written is said in the log and left out.
-  pub async fn publish(&self, kind: &str, data: impl Serialize) {
-    if let Err(why) = self.write(kind, data).await {
+  /// One event of `kind` about `data`, the owner's of `owner`, written and handed to every live reader of
+  /// that owner. A change already made is never refused for its event: an event that cannot be written is
+  /// said in the log and left out.
+  pub async fn publish(&self, owner: &str, kind: &str, data: impl Serialize) {
+    if let Err(why) = self.write(owner, kind, data).await {
       eprintln!("bmo-drive: the {kind} event could not be kept: {why}");
     }
   }
 
-  async fn write(&self, kind: &str, data: impl Serialize) -> Result<(), String> {
+  async fn write(&self, owner: &str, kind: &str, data: impl Serialize) -> Result<(), String> {
     let data = serde_json::to_value(data).map_err(|why| why.to_string())?;
     let at = now_ms();
     let pool = self.store.pool();
-    let id: i64 = sqlx::query("INSERT INTO events (kind, at, data) VALUES ($1, $2, $3) RETURNING event_id")
-      .bind(kind)
-      .bind(at)
-      .bind(data.to_string())
-      .fetch_one(pool)
-      .await
-      .and_then(|row| row.try_get(0))
-      .map_err(|why| why.to_string())?;
+    let id: i64 =
+      sqlx::query("INSERT INTO events (owner, kind, at, data) VALUES ($1, $2, $3, $4) RETURNING event_id")
+        .bind(owner)
+        .bind(kind)
+        .bind(at)
+        .bind(data.to_string())
+        .fetch_one(pool)
+        .await
+        .and_then(|row| row.try_get(0))
+        .map_err(|why| why.to_string())?;
 
     sqlx::query("DELETE FROM events WHERE event_id <= $1")
       .bind(id - KEPT)
@@ -86,19 +96,28 @@ impl Events {
       .map_err(|why| why.to_string())?;
 
     // No live reader is no failure: the event is kept for whoever reads next.
-    let _ = self.live.send(Event {
-      id,
-      kind: kind.to_owned(),
-      at,
-      data,
+    let _ = self.live.send(Owned {
+      owner: owner.to_owned(),
+      event: Event {
+        id,
+        kind: kind.to_owned(),
+        at,
+        data,
+      },
     });
 
     Ok(())
   }
 
-  /// The kept events after `after` of the kinds asked, at most `limit`, and whether more stand past them.
-  /// A resume from before the kept events is refused `gone`.
-  async fn after(&self, after: i64, kinds: &Kinds, limit: u64) -> Result<(Vec<Event>, bool), Refused> {
+  /// The kept events of `owner` after `after` of the kinds asked, at most `limit`, and whether more stand
+  /// past them. A resume from before the kept events is refused `gone`.
+  async fn after(
+    &self,
+    after: i64,
+    owner: &str,
+    kinds: &Kinds,
+    limit: u64,
+  ) -> Result<(Vec<Event>, bool), Refused> {
     let pool = self.store.pool();
     let first: Option<i64> = sqlx::query("SELECT MIN(event_id) FROM events")
       .fetch_one(pool)
@@ -112,12 +131,14 @@ impl Events {
       ));
     }
 
-    let rows =
-      sqlx::query("SELECT event_id, kind, at, data FROM events WHERE event_id > $1 ORDER BY event_id")
-        .bind(after)
-        .fetch_all(pool)
-        .await
-        .map_err(Refused::failed)?;
+    let rows = sqlx::query(
+      "SELECT event_id, kind, at, data FROM events WHERE event_id > $1 AND owner = $2 ORDER BY event_id",
+    )
+    .bind(after)
+    .bind(owner)
+    .fetch_all(pool)
+    .await
+    .map_err(Refused::failed)?;
     let mut events = Vec::new();
     let mut more = false;
 
@@ -171,10 +192,11 @@ impl Kinds {
 /// What a live reader has still to be handed and where it stands.
 struct Reading {
   events: Events,
+  owner: String,
   kinds: Kinds,
   waiting: VecDeque<Event>,
   last: i64,
-  live: broadcast::Receiver<Event>,
+  live: broadcast::Receiver<Owned>,
 }
 
 impl Reading {
@@ -187,13 +209,15 @@ impl Reading {
       }
 
       match self.live.recv().await {
-        Ok(event) if event.id > self.last && self.kinds.wants(&event.kind) => {
+        Ok(Owned { owner, event })
+          if owner == self.owner && event.id > self.last && self.kinds.wants(&event.kind) =>
+        {
           self.last = event.id;
           return Some((event, self));
         }
         Ok(_) => {}
         Err(broadcast::error::RecvError::Lagged(_)) => {
-          let (behind, _) = self.events.after(self.last, &self.kinds, u64::MAX).await.ok()?;
+          let (behind, _) = self.events.after(self.last, &self.owner, &self.kinds, u64::MAX).await.ok()?;
 
           self.waiting.extend(behind);
         }
@@ -220,6 +244,7 @@ impl Route for EventStream {
   const PATH: &'static str = "/events";
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    let owner = call.owner()?;
     let query: EventsQuery = call.query()?;
     let resumed = call
       .header("last-event-id")
@@ -235,7 +260,7 @@ impl Route for EventStream {
 
     if call.accepts_json() {
       let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
-      let (items, more) = events.after(after, &kinds, limit).await?;
+      let (items, more) = events.after(after, &owner.key, &kinds, limit).await?;
 
       return Ok(answer(StatusCode::OK, EventPage { items, more }));
     }
@@ -243,9 +268,10 @@ impl Route for EventStream {
     // The live readers are joined before the kept events are read, so nothing written between the two
     // is missed; an event read both ways is handed out once, by its number.
     let live = events.live.subscribe();
-    let (waiting, _) = events.after(after, &kinds, u64::MAX).await?;
+    let (waiting, _) = events.after(after, &owner.key, &kinds, u64::MAX).await?;
     let reading = Reading {
       events,
+      owner: owner.key,
       kinds,
       waiting: waiting.into(),
       last: after,

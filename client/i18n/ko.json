@@ -21,6 +21,8 @@
       "share_folder": "폴더 · zip",
       "size": "크기",
       "size_exact": "{size} ({bytes}바이트)",
+      "space": "BMO 드라이브",
+      "space_usage": "{quota} 중 {used}",
       "span_1h": "1시간",
       "span_6h": "6시간",
       "span_24h": "24시간",
@@ -134,7 +136,10 @@
       "garage-config-unreadable": "Garage 설정 파일을 읽지 못했습니다.",
       "aws-config-unreadable": "AWS 설정을 읽지 못했습니다.",
       "garage-profile-missing": "AWS 프로필이 없습니다.",
-      "garage-profile-incomplete": "AWS 프로필에 필요한 값이 빠져 있습니다."
+      "garage-profile-incomplete": "AWS 프로필에 필요한 값이 빠져 있습니다.",
+      "quota-exceeded": "드라이브 용량 한도를 넘어 저장할 수 없습니다.",
+      "no-quota": "관리자 드라이브에는 용량 한도가 없습니다.",
+      "storage-unready": "드라이브 저장소를 열 수 없습니다."
     }
   }
 }
