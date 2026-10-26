@@ -159,6 +159,7 @@ async fn the_manifest_keeps_the_contract_as_bmo_ui_reads_it() {
   assert_eq!(manifest.screen_path, "/files");
   assert_eq!(manifest.service_name, "drive");
   assert!(!manifest.events && !manifest.websocket && manifest.push_kinds.is_empty());
+  assert_eq!(manifest.share_reads, ["/shares/{token}", "/shares/{token}/content"]);
   assert!(
     read_by_bmo_ui(&json!({ "name": "drive" })).is_err(),
     "the reading refuses a broken manifest"
@@ -195,7 +196,13 @@ async fn the_guard_refuses_without_the_credential_the_role_or_the_key() {
   assert_eq!(answered(asked("/console-manifest", None, None, None).await.expect("answered")), 401);
   assert_eq!(answered(asked("/console/words", None, None, None).await.expect("answered")), 401);
 
-  for path in [manifest.bundle.as_str(), manifest.stylesheet.as_str(), "/owner", "/places", "/nodes"] {
+  // A link's holder loads the module and the stylesheet with no sign-in, so they take the bearer token alone.
+  for path in [manifest.bundle.as_str(), manifest.stylesheet.as_str()] {
+    assert_eq!(answered(asked(path, None, None, None).await.expect("answered")), 401, "{path}");
+    assert_eq!(answered(asked(path, Some(TOKEN), None, None).await.expect("answered")), 200, "{path}");
+  }
+
+  for path in ["/owner", "/places", "/nodes"] {
     assert_eq!(
       answered(asked(path, None, Some("1"), Some("member")).await.expect("answered")),
       401,

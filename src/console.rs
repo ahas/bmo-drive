@@ -18,6 +18,10 @@ use crate::wire::{ConsoleManifest, ConsoleRole};
 /// The least role a reader holds to open the screen: the floor of every route the screen uses.
 pub const ROLE: ConsoleRole = ConsoleRole::Member;
 
+/// The reads a link's holder makes with no sign-in (`docs/api.md`, 「Share links」; bmo-ui's
+/// `docs/console-bundles.md`, 「Share pages」).
+pub const SHARE_READS: [&str; 2] = ["/shares/{token}", "/shares/{token}/content"];
+
 /// The route of the service's API the manifest is answered at, as the contract names it.
 pub const MANIFEST_PATH: &str = "/console-manifest";
 
@@ -124,6 +128,9 @@ impl Bundle {
       events: false,
       websocket: false,
       push_kinds: Vec::new(),
+      calls: Vec::new(),
+      relays: Vec::new(),
+      share_reads: SHARE_READS.iter().map(|path| (*path).to_owned()).collect(),
     }
   }
 
@@ -166,7 +173,8 @@ impl Route for WordsRead {
 
 crate::route!(WordsRead);
 
-/// The module or the stylesheet, guarded as every route of the screen is.
+/// The module or the stylesheet, to the console's own credential with no owner key and no role: a link's holder
+/// loads them with no sign-in to open the share page, and neither carries an owner's data.
 pub struct FileRead;
 
 impl Route for FileRead {
@@ -174,8 +182,6 @@ impl Route for FileRead {
   const PATH: &'static str = "/console/{file}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
-    call.owner()?;
-
     let name = call.path_param("file").await?;
     let served = call
       .standing()

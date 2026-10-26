@@ -369,6 +369,8 @@ export interface components {
             apiPrefix: string;
             /** @description The path the module is answered at. */
             bundle: string;
+            /** @description The other services the screens call through the console, by the names their manifests give them. */
+            calls: string[];
             /** @description Whether the screens read the service's event stream. */
             events: boolean;
             /** @description The icon drawn beside that name. */
@@ -379,11 +381,15 @@ export interface components {
             ownerKey: boolean;
             /** @description The event kinds a console may raise as a notice to a reader not on the screen. */
             pushKinds: string[];
+            /** @description The service's own routes outside the API prefix a console relays as well, each its method and path. */
+            relays: components["schemas"]["ConsoleRelay"][];
             role: components["schemas"]["ConsoleRole"];
             /** @description The path the bundle's screens stand under. */
             screenPath: string;
             /** @description The service's name, which a console relays it under. */
             serviceName: string;
+            /** @description The reads a share token alone permits, each a path pattern carrying `{token}`. */
+            shareReads: string[];
             /** @description The path the stylesheet is answered at. */
             stylesheet: string;
             /** @description The key, in the bundle's words, of the name a console's menu gives the screen. */
@@ -392,6 +398,11 @@ export interface components {
             websocket: boolean;
             /** @description The path the words are answered at. */
             words: string;
+        };
+        /** @description A route outside the API prefix a console relays: its method and its whole path. */
+        ConsoleRelay: {
+            method: string;
+            path: string;
         };
         /**
          * @description The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).

@@ -11,8 +11,8 @@ in the same commit and follows the version rule (「Versions」).
 
 - **Every route needs `Authorization: Bearer <token>`,** the token of the settings; a missing or wrong
   token is answered 401 `unauthorized`.
-- **Every route but `GET /health`, the console bundle's manifest and words (「The console bundle」),
-  `GET /shares/{token}` and `GET /shares/{token}/content` needs `Owner-Key: <key>` and `Owner-Role:
+- **Every route but `GET /health`, the console bundle's manifest, words, module and stylesheet (「The console
+  bundle」), `GET /shares/{token}` and `GET /shares/{token}/content` needs `Owner-Key: <key>` and `Owner-Role:
   <role>`:** the opaque key of the owner the caller acts for, and the role the reader holds (「Owners」). One
   of them asked without a role that allows `member`, or without the key or with an empty one, is refused
   403 `forbidden`; one asked with a key longer than 200 characters is refused 400 `bad-request`.
@@ -272,16 +272,18 @@ The service serves its Files screen as a console bundle by bmo-ui's console plug
 - **The manifest** is the contract's shape: `name` `drive`, `title` `drive.title`, `icon`
   `i-material-symbols-folder-open-outline`, `screenPath` `/files`, `serviceName` `drive`, `bundle` and
   `stylesheet` (the module's and the stylesheet's paths), `words` `/console/words`, `apiPrefix` `/`, `role`
-  `member`, `ownerKey` true, `events` false, `websocket` false and `pushKinds` empty. The screens call the
-  routes of this document alone, the node list among them (「Places」), and read no event stream.
+  `member`, `ownerKey` true, `events` false, `websocket` false, `pushKinds`, `calls` and `relays` empty, and `shareReads`
+  `/shares/{token}` and `/shares/{token}/content`, the two reads a link's holder makes with no sign-in
+  (「Share links」; bmo-ui's `docs/console-bundles.md`, 「Share pages」). The screens call the routes of this
+  document alone, the node list among them (「Places」), and read no event stream.
 - **The module and the stylesheet** stand at `/console/bundle-<digest>.js` and `/console/bundle-<digest>.css`,
   the digest the first sixteen hexadecimal digits of the SHA-256 of their bytes, so either path changes
   whenever its bytes do. The module is answered as `text/javascript`, the stylesheet as `text/css`, both
   with `cache-control: private, max-age=31536000, immutable`; any other file is refused 404 `not-found`.
 - **The words** are one JSON object, each locale's tree of the bundle's language pack under the locale's
   code (README.md, 「The console plugin bundle」).
-- **What each takes:** the manifest and the words take the bearer token alone; the module and the
-  stylesheet take `Owner-Key` and `Owner-Role` as every route of the screen does (「Conventions」).
+- **What each takes:** the bearer token alone, all four: a link's holder loads the module and the stylesheet
+  with no sign-in to open the share page, and neither carries an owner's data.
 - **What the service reads them from:** the bundle's built folder, the setting `console.folder`, read once
   at start. A folder that does not hold the module, the stylesheet and the words leaves the four routes
   refused 404 `not-found`, so a console finds no bundle here.

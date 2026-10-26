@@ -64,6 +64,13 @@
             "description": "The path the module is answered at.",
             "type": "string"
           },
+          "calls": {
+            "description": "The other services the screens call through the console, by the names their manifests give them.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "events": {
             "description": "Whether the screens read the service's event stream.",
             "type": "boolean"
@@ -87,6 +94,13 @@
             },
             "type": "array"
           },
+          "relays": {
+            "description": "The service's own routes outside the API prefix a console relays as well, each its method and path.",
+            "items": {
+              "$ref": "#/components/schemas/ConsoleRelay"
+            },
+            "type": "array"
+          },
           "role": {
             "$ref": "#/components/schemas/ConsoleRole"
           },
@@ -97,6 +111,13 @@
           "serviceName": {
             "description": "The service's name, which a console relays it under.",
             "type": "string"
+          },
+          "shareReads": {
+            "description": "The reads a share token alone permits, each a path pattern carrying `{token}`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "stylesheet": {
             "description": "The path the stylesheet is answered at.",
@@ -129,7 +150,26 @@
           "ownerKey",
           "events",
           "websocket",
-          "pushKinds"
+          "pushKinds",
+          "calls",
+          "relays",
+          "shareReads"
+        ],
+        "type": "object"
+      },
+      "ConsoleRelay": {
+        "description": "A route outside the API prefix a console relays: its method and its whole path.",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "path"
         ],
         "type": "object"
       },

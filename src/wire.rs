@@ -505,6 +505,13 @@ pub enum ConsoleRole {
   Member,
 }
 
+/// A route outside the API prefix a console relays: its method and its whole path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ConsoleRelay {
+  pub method: String,
+  pub path: String,
+}
+
 /// The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The
 /// console bundle」).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -537,4 +544,10 @@ pub struct ConsoleManifest {
   pub websocket: bool,
   /// The event kinds a console may raise as a notice to a reader not on the screen.
   pub push_kinds: Vec<String>,
+  /// The other services the screens call through the console, by the names their manifests give them.
+  pub calls: Vec<String>,
+  /// The service's own routes outside the API prefix a console relays as well, each its method and path.
+  pub relays: Vec<ConsoleRelay>,
+  /// The reads a share token alone permits, each a path pattern carrying `{token}`.
+  pub share_reads: Vec<String>,
 }
