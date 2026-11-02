@@ -24,7 +24,7 @@ test = false
 async_zip = { version = "0.0.19", default-features = false, features = ["tokio"] }
 # Garage, reached as any S3 client reaches it, through a profile of the account's AWS configuration.
 aws-runtime = "1.10.0"
-aws-sdk-s3 = "1.152.0"
+aws-sdk-s3 = { version = "1.152.0", default-features = false, features = ["default-https-client", "http-1x", "rt-tokio", "sigv4a"] }
 aws-types = "1.6.0"
 axum = { version = "0.8.9", features = ["macros", "multipart", "ws"] }
 # A jake hub's output chunks, a name handed to a Windows node's script, and a file's bytes in a tool answer.
