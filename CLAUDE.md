@@ -59,8 +59,9 @@ These hold every bmo repository, and every change here (archive document #301, i
 - `Cargo.toml` is the only manifest at the root, one crate split into its own modules, and no directory
   is named after its parent.
 - The console plugin bundle stands in `client/`, a project of its own.
-- Tests live in `tests/`; no test module stands in `src/`. The repository carries the personal-data check,
-  `tests/personal_data.rs`; the behaviour tests are deferred (README.md).
+- Tests live in `tests/`, one test target, `tests/main.rs`, each file of tests a module of it (bmo-chat's
+  `docs/conventions.md`, 「Rust builds」); no test module stands in `src/`. The repository carries the
+  personal-data check, `tests/personal_data.rs`, beside the behaviour tests standing so far (README.md).
 
 ## The stages of a change
 
@@ -68,5 +69,5 @@ These hold every bmo repository, and every change here (archive document #301, i
 2. **Review:** read the whole diff against the document governing it, then `cargo fmt --all --check`
    and `cargo clippy --all-targets -- -D warnings`.
 3. **Verification:** the tests touched, then the whole suite once, output written to a file and the
-   file read. The repository carries the personal-data check alone, so `cargo test --test personal_data`
-   is the whole suite until the behaviour tests stand.
+   file read. A module's tests run by its name filter, `cargo test --test main <module>::`; the whole suite
+   is `cargo test` with the bundle's check.
