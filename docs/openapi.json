@@ -1053,7 +1053,7 @@
   "info": {
     "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
     "title": "bmo-drive",
-    "version": "0.1.0-rev.4"
+    "version": "0.1.0-rev.5"
   },
   "openapi": "3.1.0",
   "paths": {

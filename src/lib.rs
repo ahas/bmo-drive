@@ -26,7 +26,8 @@ use crate::http::Standing;
 use crate::settings::Settings;
 use crate::store::Store;
 
-/// Opens the store, then answers the routes on the settings' address until the process is told to stop.
+/// Opens the store, then answers the routes on the settings' address until the process is told to stop, and
+/// then until every request still in hand has ended, the live event streams ended at once.
 pub async fn serve(settings: Settings) -> Result<(), String> {
   let store = Store::open(&settings.store.path).await.map_err(|why| why.to_string())?;
 
@@ -41,13 +42,17 @@ pub async fn serve(settings: Settings) -> Result<(), String> {
     eprintln!("bmo-drive: the console bundle is not served: {why}");
   }
 
+  let events = standing.events.clone();
   let router = http::router(standing).map_err(|faults| faults.join("; "))?;
   let listener = TcpListener::bind(listen)
     .await
     .map_err(|why| format!("{listen} could not be listened on: {why}"))?;
 
   axum::serve(listener, router)
-    .with_graceful_shutdown(stopped())
+    .with_graceful_shutdown(async move {
+      stopped().await;
+      events.stop();
+    })
     .await
     .map_err(|why: io::Error| why.to_string())
 }

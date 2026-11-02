@@ -6,12 +6,12 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 use aws_runtime::env_config::file::EnvConfigFiles;
 use aws_runtime::env_config::section::EnvConfigSections;
 use aws_runtime::env_config::source;
 use aws_sdk_s3::Client;
+use aws_sdk_s3::config::StalledStreamProtectionConfig;
 use aws_sdk_s3::config::timeout::TimeoutConfig;
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region, RequestChecksumCalculation};
 use aws_sdk_s3::error::{ProvideErrorMetadata, SdkError};
@@ -235,10 +235,6 @@ impl Garage {
     let reach = self.reach.as_ref().map_err(|fault| {
       Refused::rule("garage-closed", format!("Garage cannot be opened: {}", fault.message))
     })?;
-    let timeouts = TimeoutConfig::builder()
-      .connect_timeout(Duration::from_secs(3))
-      .operation_attempt_timeout(Duration::from_secs(20))
-      .build();
     let config = aws_sdk_s3::Config::builder()
       .behavior_version(BehaviorVersion::latest())
       .region(Region::new(reach.region.clone()))
@@ -247,7 +243,10 @@ impl Garage {
       .force_path_style(true)
       // A streamed upload carries no checksum trailer, which not every S3 server reads.
       .request_checksum_calculation(RequestChecksumCalculation::WhenRequired)
-      .timeout_config(timeouts)
+      // A call waits for Garage's answer however long it takes, a slow stream included: the SDK's own
+      // timeouts and its stalled-stream cut are turned off.
+      .timeout_config(TimeoutConfig::disabled())
+      .stalled_stream_protection(StalledStreamProtectionConfig::disabled())
       .build();
 
     Ok(self.client.get_or_init(|| Client::from_conf(config)))

@@ -2,8 +2,6 @@
 //! the types of `wire`, acting for the owner key it is given. The command and the MCP server reach the
 //! service through it, and so may any other Rust caller.
 
-use std::time::Duration;
-
 use axum::body::Bytes;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::{Method, RequestBuilder, Response, StatusCode, header};
@@ -32,7 +30,7 @@ fn segment(value: &str) -> String {
 /// Why a call reached no answer of the route's shape.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ClientFailure {
-  /// Nothing answered: the service is not where it was looked for, or did not answer in time.
+  /// Nothing answered: the service is not where it was looked for, or its connection broke.
   #[error("the service did not answer: {0}")]
   Unreached(String),
   /// The service refused, in its error shape where it answered in one.
@@ -111,7 +109,6 @@ pub struct DriveClient {
   /// The role sent as `Owner-Role` beside the key.
   role: ConsoleRole,
   http: reqwest::Client,
-  timeout: Option<Duration>,
 }
 
 impl DriveClient {
@@ -123,7 +120,6 @@ impl DriveClient {
       owner: String::new(),
       role: ConsoleRole::Member,
       http: reqwest::Client::new(),
-      timeout: None,
     }
   }
 
@@ -147,12 +143,6 @@ impl DriveClient {
     self
   }
 
-  /// The client giving up on any call that has not answered within `timeout`.
-  pub fn with_timeout(mut self, timeout: Duration) -> Self {
-    self.timeout = Some(timeout);
-    self
-  }
-
   fn request(&self, method: Method, path: &str) -> RequestBuilder {
     let mut request = self.http.request(method, format!("{}{path}", self.address)).bearer_auth(&self.token);
 
@@ -160,10 +150,7 @@ impl DriveClient {
       request = request.header(OWNER_KEY, &self.owner).header(OWNER_ROLE, self.role.name());
     }
 
-    match self.timeout {
-      Some(timeout) => request.timeout(timeout),
-      None => request,
-    }
+    request
   }
 
   /// A request sent, its answer refused where its status is no success.

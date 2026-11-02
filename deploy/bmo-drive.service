@@ -13,7 +13,9 @@ WorkingDirectory=%h/.local/share/bmo-drive/deploy
 ExecStart=%h/.local/share/bmo-drive/deploy/bin/bmo-drive serve
 Restart=always
 RestartSec=2
-TimeoutStopSec=30
+# A stop waits for the service to end on its SIGTERM, however long its requests still in hand take; it is
+# never escalated to a kill.
+TimeoutStopSec=infinity
 
 [Install]
 WantedBy=default.target

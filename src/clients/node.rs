@@ -3,15 +3,10 @@
 //! the service's refusal is an answer of 200 with `answered` false and a `refusal` carrying its `code` and
 //! `message`, and a request it could not answer at all is non-2xx with `code` and `error`.
 
-use std::time::Duration;
-
 use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-// How long one call may take: every one is a read of the node service's own store.
-const WAIT: Duration = Duration::from_secs(10);
 
 /// The node service at the address the settings name, with its token.
 #[derive(Clone, Debug)]
@@ -135,11 +130,7 @@ impl Node {
     body: Option<Value>,
   ) -> Result<T, NodeError> {
     let unreachable = |why: String| NodeError::Unreachable(why);
-    let mut request = self
-      .http
-      .request(method, format!("{}{path}", self.address))
-      .bearer_auth(&self.token)
-      .timeout(WAIT);
+    let mut request = self.http.request(method, format!("{}{path}", self.address)).bearer_auth(&self.token);
 
     if let Some(body) = body {
       request = request.json(&body);

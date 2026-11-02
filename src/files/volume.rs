@@ -8,7 +8,7 @@ use std::fs;
 use std::io;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use axum::body::Body;
 
@@ -21,10 +21,6 @@ use super::{
   Entry, Kind, Opened, Pending, Place, Refused, Span, Upload, Within, cut_short, into_itself, io_refusal,
   is_folder, looped, not_folder, outside, protected, scratch_name, taken,
 };
-
-// How long a reading of the disk may take. A share that stopped answering would otherwise hold the
-// request for as long as the share does.
-const READING: Duration = Duration::from_secs(10);
 
 impl Place for Volume {
   fn id(&self) -> &str {
@@ -268,15 +264,12 @@ fn real(mount: &Path, within: &Within) -> Result<PathBuf, Refused> {
   Ok(real)
 }
 
-/// Work on the disk, done off the answering threads and given up past its limit.
+/// Work on the disk, done off the answering threads and waited for until the disk answers: a share that
+/// stopped answering holds the request for as long as the share does.
 async fn blocking<T: Send + 'static>(
   work: impl FnOnce() -> Result<T, Refused> + Send + 'static,
 ) -> Result<T, Refused> {
-  match tokio::time::timeout(READING, tokio::task::spawn_blocking(work)).await {
-    Ok(Ok(done)) => done,
-    Ok(Err(why)) => Err(Refused::failed(why)),
-    Err(_) => Err(Refused::failed("the disk did not answer in time")),
-  }
+  tokio::task::spawn_blocking(work).await.unwrap_or_else(|why| Err(Refused::failed(why)))
 }
 
 async fn read_folder(mount: PathBuf, within: Within) -> Result<Vec<Entry>, Refused> {

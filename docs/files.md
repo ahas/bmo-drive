@@ -99,9 +99,10 @@ flowchart TD
     volumes, each volume walked from its letter's root.
 - **No credential leaves the service.** An ssh key is named by the login's arguments and a hub's token is
   read from its token file for the one request that needs it; neither goes into any answer.
-- **A failed login says why in one line:** the last line OpenSSH wrote, or that the login did not finish in
-  time.
-- **A file read from a jake node is cut off at five minutes,** the longest a hub lets one exec run.
+- **A failed login says why in one line:** the last line OpenSSH wrote, or that ssh was ended by a signal.
+- **A jake hub ends any one exec at five minutes,** a bound of the hub's own: a file read from a jake node
+  breaks off there. The service sets no bound of its own on a node's road; a reading, a listing or a file
+  ends when the node's script ends, the road breaks, or the caller goes away.
 
 ### Garage
 
@@ -113,6 +114,8 @@ flowchart TD
 - **It is reached as any S3 client reaches it,** through the AWS profile the settings name, in the
   account's own AWS configuration: its endpoint, region and keys. Buckets are addressed by path, so no
   bucket needs a host name of its own.
+- **A call to Garage waits for its answer,** however long it takes, a slow stream included: it ends with
+  Garage's answer or a refused or broken connection.
 - **No credential leaves the service.** The keys are read where the request is answered and go into no
   answer, no error and no log line; a failure names what failed and never the key it was signed with.
 - **A machine with no Garage configuration has no Garage place.** One whose configuration stands but whose
@@ -206,8 +209,9 @@ flowchart TD
 - **A link is listed as what it leads to,** a folder or a file, and carries its target as the link itself
   writes it, so a screen marks it as a link and says where it leads. Anything that is no link carries no
   target, and Garage holds no links.
-- **A reading that does not end is cut off:** a folder on a share that stopped answering, or a node that
-  stopped answering, is refused after some seconds rather than holding the request.
+- **A reading waits for its answer:** a folder on a share that stopped answering, or on a node that stopped
+  answering, holds its request until the share or the node answers, its connection breaks, or the caller
+  goes away. The drive listing and a volume's free space wait the same way.
 
 ## Reading a file
 
@@ -282,8 +286,8 @@ flowchart TD
 - **Garage has folders only as prefixes:** making one writes an empty object named for the prefix, and
   renaming, moving or deleting a prefix acts on every object under it. A folder made at Garage's top is a
   bucket, and a bucket is deleted only once it is empty.
-- **A change that takes long is not cut off** the way a reading is: a copy of a large folder runs until it
-  ends.
+- **A change that takes long runs until it ends,** as a reading does: a copy of a large folder is never cut
+  short.
 - **Each change answers** with the entries as they ended, and is an event of the service's stream
   (`docs/api.md`, 「Events」).
 
@@ -364,8 +368,8 @@ flowchart TD
   - A file is streamed as a download through the file reading (「Reading a file」), its byte range passed
     on, so a broken download resumes where it stopped and a large file is never held whole.
   - A folder is its zip (「Reading a file」), named after the folder, with no range to resume by.
-  - A file on a jake node is cut off at five minutes as every reading there is; a large one is finished by
-    resuming.
+  - A file on a jake node breaks off where its hub ends the exec (「A node's drives」); a large one is
+    finished by resuming.
 - **Nothing it answers is kept by a cache,** since a link runs out.
 
 ### Making and ending links

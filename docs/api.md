@@ -333,20 +333,22 @@ that document states them (`bad-request`, `unauthorized`, `forbidden`, `no-route
   not name.
 - **`conflict`** covers a name already taken (with `names`) and a bucket asked to be deleted that still
   holds objects.
-- **`upstream-failed`** covers the node service not answering, a node that could not be reached, whose
-  script failed or that did not answer in time, an upload that could not be put onto a node, and Garage not
-  answering as asked or refusing the profile's key; the sentence says which, with the login's or the
-  script's last line where there is one, and never a credential.
-- **`failed`** covers this machine's drives not listed, a disk that did not answer in time and the share
-  store not read or written.
+- **`upstream-failed`** covers the node service not answering, a node that could not be reached or whose
+  script failed, an upload that could not be put onto a node, and Garage not answering as asked or
+  refusing the profile's key; the sentence says which, with the login's or the script's last line where
+  there is one, and never a credential.
+- **`failed`** covers this machine's drives not listed, a disk read that failed and the share store not
+  read or written.
 
 ## The command
 
 `bmo-drive` is one binary, the service, its command and its harness plugin alike.
 
-- **`bmo-drive serve`** opens and migrates the store and answers the routes.
-- **`bmo-drive health`** asks the service the settings name, waiting at most five seconds, and ends 0
-  where it answers ready.
+- **`bmo-drive serve`** opens and migrates the store and answers the routes until it is told to stop (an
+  interrupt or a terminate): it then takes no new request and ends the live event streams, and ends once
+  every request still in hand has ended.
+- **`bmo-drive health`** asks the service the settings name and waits for its answer: it ends 0 where
+  the service answers ready, and 1 where it answers not ready or its connection is refused or breaks.
 - **`bmo-drive mcp [--address <url>] [--owner <key>]`** serves the harness tools over MCP on standard input
   and output (「The harness plugin」).
 - **`bmo-drive openapi`** prints the OpenAPI document the code generates, the one committed as

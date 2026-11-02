@@ -524,10 +524,7 @@ impl Machine {
   }
 }
 
-// How long a volume may take to say its free space: a share that stopped answering says none.
-const FREE_FOR: Duration = Duration::from_secs(2);
-
-/// The bytes free on the volume mounted at `mount`, where it says in time.
+/// The bytes free on the volume mounted at `mount`, where it says, waited for until it answers.
 async fn free_bytes(mount: &str) -> Option<u64> {
   let mount = mount.to_owned();
   let asked = tokio::task::spawn_blocking(move || {
@@ -536,7 +533,7 @@ async fn free_bytes(mount: &str) -> Option<u64> {
       .map(|stat| stat.f_bavail.saturating_mul(stat.f_frsize))
   });
 
-  tokio::time::timeout(FREE_FOR, asked).await.ok()?.ok()?
+  asked.await.ok()?
 }
 
 impl Places for Machine {

@@ -8,9 +8,13 @@ use std::time::Duration;
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 
-// How long a statement waits on another writer before it gives up: the service and the command may write
-// the one file at once.
-const BUSY: Duration = Duration::from_secs(5);
+// A statement waits for another writer to give the file back, since the service and the command may write
+// it at once. SQLite takes no wait without an end, so the longest it takes, about 24 days, stands for one.
+const BUSY: Duration = Duration::from_millis(i32::MAX as u64);
+
+// A request waits in line for a connection of the pool until one is given back; the pool takes no wait
+// without an end, so a span past any run stands for one.
+const IN_LINE: Duration = Duration::from_secs(u32::MAX as u64);
 
 /// The store, open.
 #[derive(Clone, Debug)]
@@ -31,7 +35,7 @@ impl Store {
       .create_if_missing(true)
       .journal_mode(SqliteJournalMode::Wal)
       .busy_timeout(BUSY);
-    let pool = SqlitePoolOptions::new().connect_with(options).await?;
+    let pool = SqlitePoolOptions::new().acquire_timeout(IN_LINE).connect_with(options).await?;
 
     sqlx::migrate!("./migrations").run(&pool).await?;
 

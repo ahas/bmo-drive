@@ -13,6 +13,7 @@ use futures_util::{StreamExt, stream};
 use serde::Serialize;
 use sqlx::Row;
 use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 
 use crate::http::{Call, Refused, Route, answer};
 use crate::store::Store;
@@ -56,13 +57,25 @@ struct Owned {
 pub struct Events {
   store: Store,
   live: broadcast::Sender<Owned>,
+  /// Cancelled once the service is told to stop, which ends every live stream.
+  stopping: CancellationToken,
 }
 
 impl Events {
   pub fn new(store: Store) -> Self {
     let (live, _) = broadcast::channel(LIVE_ROOM);
 
-    Self { store, live }
+    Self {
+      store,
+      live,
+      stopping: CancellationToken::new(),
+    }
+  }
+
+  /// Ends every live stream, the ones open now and any opened after: the service is stopping, and a live
+  /// stream would otherwise hold it open for as long as its reader stays.
+  pub fn stop(&self) {
+    self.stopping.cancel();
   }
 
   /// One event of `kind` about `data`, the owner's of `owner`, written and handed to every live reader of
@@ -257,6 +270,7 @@ impl Route for EventStream {
     let after = resumed.or(query.after).unwrap_or(0);
     let kinds = Kinds::read(query.kinds.as_deref());
     let events = call.standing().events.clone();
+    let stopping = events.stopping.clone();
 
     if call.accepts_json() {
       let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
@@ -277,7 +291,9 @@ impl Route for EventStream {
       last: after,
       live,
     };
-    let stream = stream::unfold(reading, Reading::next).map(|event| Ok::<_, Infallible>(sse_event(&event)));
+    let stream = stream::unfold(reading, Reading::next)
+      .map(|event| Ok::<_, Infallible>(sse_event(&event)))
+      .take_until(stopping.cancelled_owned());
     let mut response = Sse::new(stream).keep_alive(KeepAlive::new().interval(KEEP_OPEN)).into_response();
 
     response

@@ -29,9 +29,6 @@ use shell::{Op, Rooted, Shell, read_listing, refusal_of};
 // network, and a node's mounts change seldom.
 const NODE_FOR: Duration = Duration::from_secs(60);
 
-// How long a reading — the drives, a folder, a file's first line — may take on a node.
-const READING: Duration = Duration::from_secs(20);
-
 /// The prefix of a node's machine key and of every place on it.
 const NODE: &str = "node:";
 
@@ -238,7 +235,7 @@ async fn road(standing: &Standing, name: &str) -> Result<Result<Arc<dyn Road>, F
 
 async fn read_drives(name: &str, road: Arc<dyn Road>) -> Result<Vec<Drive<NodeVolume>>, Fault> {
   let shell = road.shell();
-  let printed = whole(name, road.run(shell.drives_script(), None), Some(READING)).await?;
+  let printed = whole(name, road.run(shell.drives_script(), None)).await?;
   let node: Arc<str> = Arc::from(name);
   let drives = shell
     .read_drives(&printed)
@@ -275,10 +272,6 @@ async fn read_drives(name: &str, road: Arc<dyn Road>) -> Result<Vec<Drive<NodeVo
   )
 }
 
-fn timed_out(node: &str) -> Refused {
-  Refused::upstream(format!("{node} did not answer in time"))
-}
-
 fn no_length(node: &str) -> Refused {
   Refused::upstream(format!("{node} did not say the file's length"))
 }
@@ -301,21 +294,13 @@ async fn ending(node: &str, ended: tokio::sync::oneshot::Receiver<Ended>) -> Res
   settled(node, ended.await.unwrap_or_else(|_| Ended::Failed("the run was lost".into())))
 }
 
-/// Everything a script printed once it has ended well, given up past `limit` where one is set.
-async fn whole(node: &str, mut running: Running, limit: Option<Duration>) -> Result<Vec<u8>, Refused> {
-  let gather = async {
-    let mut printed = Vec::new();
+/// Everything a script printed once it has ended well, waited for until it ends or its road breaks.
+async fn whole(node: &str, mut running: Running) -> Result<Vec<u8>, Refused> {
+  let mut printed = Vec::new();
 
-    while let Some(chunk) = running.output.recv().await {
-      printed.extend_from_slice(&chunk);
-    }
-
-    printed
-  };
-  let printed = match limit {
-    Some(limit) => tokio::time::timeout(limit, gather).await.map_err(|_| timed_out(node))?,
-    None => gather.await,
-  };
+  while let Some(chunk) = running.output.recv().await {
+    printed.extend_from_slice(&chunk);
+  }
 
   ending(node, running.ended).await?;
 
@@ -340,14 +325,14 @@ impl NodeVolume {
   }
 
   async fn change(&self, op: Op<'_>) -> Result<(), Refused> {
-    whole(&self.node, self.run(&op, None), None).await.map(|_| ())
+    whole(&self.node, self.run(&op, None)).await.map(|_| ())
   }
 
   async fn opened(&self, within: &Within, span: Span) -> Result<Opened, Refused> {
     let names = self.names(within)?;
     let mut running = self.run(&Op::Read(names, span), None);
     let mut first: Vec<u8> = Vec::new();
-    let line = tokio::time::timeout(READING, async {
+    let line = async {
       while let Some(chunk) = running.output.recv().await {
         first.extend_from_slice(&chunk);
 
@@ -361,9 +346,8 @@ impl NodeVolume {
       }
 
       None
-    })
-    .await
-    .map_err(|_| timed_out(&self.node))?;
+    }
+    .await;
     let Some(cut) = line else {
       ending(&self.node, running.ended).await?;
 
@@ -411,7 +395,7 @@ impl Place for NodeVolume {
     Box::pin(async move {
       let names = self.names(within)?;
 
-      Ok(read_listing(&whole(&self.node, self.run(&Op::List(names), None), Some(READING)).await?))
+      Ok(read_listing(&whole(&self.node, self.run(&Op::List(names), None)).await?))
     })
   }
 
@@ -429,9 +413,7 @@ impl Place for NodeVolume {
       let length = upload.length;
       let (source, input) = self.road.hand(upload).await?;
 
-      whole(&self.node, self.run(&Op::Write(names, &source, length), input), None)
-        .await
-        .map(|_| ())
+      whole(&self.node, self.run(&Op::Write(names, &source, length), input)).await.map(|_| ())
     })
   }
 

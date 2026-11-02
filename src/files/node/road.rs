@@ -240,8 +240,9 @@ async fn run_ssh(args: Vec<String>, input: Option<Upload>, output: mpsc::Sender<
   };
 
   match code {
+    // No exit code: ssh was ended by a signal.
+    None => Ended::Failed("ssh was ended by a signal".to_owned()),
     // OpenSSH's own failure: the login told by the last line it wrote.
-    None => Ended::Failed("the login did not finish in time".to_owned()),
     Some(255) => Ended::Failed(
       Some(last_line(&said))
         .filter(|line| !line.is_empty())

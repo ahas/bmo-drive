@@ -3,7 +3,6 @@
 //! it, and each volume is a place the viewer walks.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
@@ -37,10 +36,6 @@ const NOT_STORAGE: &[&str] = &[
 
 // The file systems that are a network share, each a drive of its own named by its source.
 const NETWORK: &[&str] = &["nfs", "nfs4", "cifs", "smb3", "fuse.rclone", "fuse.sshfs"];
-
-// How long either listing may take. Neither asks a mount for its sizes, so a share that stopped
-// answering does not hold them; the limit is for a machine too busy to answer at all.
-const LISTING: Duration = Duration::from_secs(5);
 
 /// One drive, named by its model, with the volumes of whichever machine it stands in.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -283,10 +278,8 @@ pub fn read_drives(blocks: &str, mounts: &str) -> Result<Vec<Drive>, String> {
 
 async fn listing(program: &str, args: &[&str]) -> Result<String, String> {
   let run = Command::new(program).args(args).kill_on_drop(true).output();
-  let output = tokio::time::timeout(LISTING, run)
-    .await
-    .map_err(|_| format!("{program} did not answer"))?
-    .map_err(|why| format!("{program}: {why}"))?;
+  // Neither listing asks a mount for its sizes, so a share that stopped answering does not hold them.
+  let output = run.await.map_err(|why| format!("{program}: {why}"))?;
 
   if !output.status.success() {
     return Err(format!("{program}: {}", String::from_utf8_lossy(&output.stderr).trim()));
