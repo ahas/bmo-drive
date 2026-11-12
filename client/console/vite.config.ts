@@ -12,8 +12,8 @@ import type { Plugin } from "vite";
 
 // The served bundle's build (README.md, "The console plugin bundle"): the pages' routes as one browser
 // module, the utility classes they use as one stylesheet, and the language pack as one words object, all
-// written into `dist/`, which the service answers under its manifest. The same sources stand as the Nuxt
-// layer the pack carries, so what a Nuxt build supplies without an import is imported here.
+// written into `dist/`, which the service answers under its manifest. The pages are written as for a Nuxt
+// build, so what such a build supplies without an import is imported here.
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 

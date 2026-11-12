@@ -11,16 +11,15 @@ unit is reached through its API, as `docs/api.md` lists.
 The repository carries the repository-wide personal-data check in `tests/personal_data.rs`
 (`PERSONAL-DATA.md`), the import of the old archive's share links in `tests/import.rs`, and the owners and
 their two branches in `tests/owners.rs`: each owner's drive its own alone, the quota judged before bytes
-arrive, the machines the administrator's alone, and share links opening in both branches; and the console
-bundle in `tests/console.rs`: the manifest read through bmo-ui's own reading of it, the guard's refusals,
-and the module's path following its bytes. That one runs bmo-ui's reading with Bun inside `client/`,
-installing the bundle's locked packages first where they are not installed; links on a volume in
+arrive, the machines the administrator's alone, and share links opening in both branches; the console
+bundle in `tests/console.rs`: the manifest read through bmo-ui's own reading of it, the credential and the
+guard's refusals, and the module's path following its bytes. That one runs bmo-ui's reading with Bun inside
+`client/`, installing the bundle's locked packages first where they are not installed; links on a volume in
 `tests/links.rs`: a path walking back into itself refused, a link to a folder beside walked once, each link's
 target listed and a folder's zip ending over links; and where the Files screen opens in `tests/screen.rs`, the
-screen's place memory run with Bun the same way. `cargo test` runs them all.
-The rest of the behaviour tests are deferred: they are written and run here once the minimal services stand
-on the new repositories, and until then the build check, `cargo check --all-targets`, and the bundle's
-typecheck stand beside them. `docs/inventory.md` lists the tests the old behaviour was held to.
+screen's place memory run with Bun the same way. `cargo test` runs them all, and the bundle's check,
+`bun install --frozen-lockfile && bun run typecheck` inside `client/`, stands beside them.
+`docs/inventory.md` lists the tests the old behaviour was held to.
 
 ## Layout
 
@@ -41,29 +40,21 @@ the local settings a deployment gives) and `LICENSE`.
 
 ## The console plugin bundle
 
-`client/` holds the Files screen and its file share page on top of bmo-ui, by bmo-ui's console plugin
-contract (bmo-ui's `docs/console-bundles.md`): the bundle `drive`, its screens under `/files`, calling the
-service `drive` alone, the node list among what it reads there. Its words stand in its own pack,
-`client/i18n/`, one file to a locale, under `drive.*`, with `drive.error.<code>` for each refusal code of
-`docs/api.md`. Its sources are one set, built two ways:
+`client/` holds the Files screen and its file share page on top of bmo-ui, a bundle of bmo-ui's console
+plugin contract (bmo-ui's `docs/console-bundles.md`); what this service chooses within it is
+`docs/api.md`, 「The console bundle」. Its words stand in its own pack, `client/i18n/`, one file to a locale,
+under `drive.*`, with `drive.error.<code>` for each refusal code of `docs/api.md`.
 
-- **The served bundle.** `bun run bundle` builds `client/dist/`: the module `bundle.js`, whose default
-  export holds the two pages' routes, the stylesheet `bundle.css`, the utility classes the screens use
-  built on the layer's tokens, and `words.json`, the language pack as one object keyed by locale. The
-  module leaves every import of `vue`, `vue-router`, `vue-i18n`, `nuxt/app`, `@nuxt/ui` and `bmo-ui`
-  unbundled, written as the package's own path, and carries the rest; the components and the Vue and Nuxt
-  functions the pages use without importing them are imported in the build. The build stands in
-  `client/console/`. The service answers the folder's files with its manifest (`docs/api.md`, 「The console
-  bundle」), and a deployment builds the folder in each release.
-- **The layer pack.** `bun pm pack` inside `client/` packs `bmo-drive-client`, the same pages as a Nuxt
-  layer, for a console that builds its bundles into itself; it finds the bundle by
-  `client/console-bundle.json` in the pack, which names it, its screen path, its service and its language
-  pack. Such a console extends it as it extends bmo-ui and relays the service `drive`.
-
-Either way the console owes the bundle bmo-ui at the version the bundle's peer names; a packed copy stands
-in `client/vendor/` for the bundle's own install, build and typecheck. The screen's types of the service's
-answers are generated from `docs/openapi.json` into `client/shared/openapi.ts` by `bun run api`. The
-bundle's check is `bun install --frozen-lockfile && bun run typecheck` inside `client/`.
+- **The build.** `bun run bundle` builds `client/dist/` from the screens' sources: the module `bundle.js`,
+  whose default export holds the two pages' routes, the stylesheet `bundle.css`, the utility classes the
+  screens use on the layer's tokens, and `words.json`, the language pack as one object keyed by locale.
+  The components and the Vue and Nuxt functions the pages use without importing them are imported in the
+  build, which stands in `client/console/`. A deployment builds the folder in each release, and the
+  service answers its files with its manifest.
+- **The layer.** `client/vendor/` holds the packed bmo-ui the bundle is installed, built and typechecked
+  against. The Nuxt configuration in `client/` serves the typecheck alone.
+- **The types.** The screen's types of the service's answers are generated from `docs/openapi.json` into
+  `client/shared/openapi.ts` by `bun run api`.
 
 ## Documents
 

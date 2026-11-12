@@ -35,6 +35,9 @@ administrator = ""
 
 # The console bundle the service serves (docs/api.md, 「The console bundle」).
 [console]
+# The console's token, which the console bundle's own routes take alone and every other route takes as well
+# as the service's. A deployment names its own, apart from the service's.
+token = ""
 # The bundle's built folder, which `bun run bundle` writes inside client/; a relative one is read from where
 # the process starts, a deployment's release.
 folder = "client/dist"

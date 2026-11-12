@@ -745,7 +745,7 @@ pub fn openapi() -> Value {
         "bearer": {
           "type": "http",
           "scheme": "bearer",
-          "description": "The token of the service's settings.",
+          "description": "The service's token or the console's, both of its settings; the console bundle's routes take the console's alone.",
         },
       },
     },

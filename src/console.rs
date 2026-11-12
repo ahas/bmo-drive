@@ -145,7 +145,7 @@ impl Bundle {
   }
 }
 
-/// The manifest, to the console's own credential with no owner key and no role.
+/// The manifest, to the console's token alone, with no owner key and no role.
 pub struct ManifestRead;
 
 impl Route for ManifestRead {
@@ -153,13 +153,15 @@ impl Route for ManifestRead {
   const PATH: &'static str = MANIFEST_PATH;
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    call.console_credential()?;
+
     Ok(answer(StatusCode::OK, call.standing().console()?.manifest()))
   }
 }
 
 crate::route!(ManifestRead);
 
-/// The words, to the console's own credential with no owner key and no role.
+/// The words, to the console's token alone, with no owner key and no role.
 pub struct WordsRead;
 
 impl Route for WordsRead {
@@ -167,13 +169,15 @@ impl Route for WordsRead {
   const PATH: &'static str = WORDS_PATH;
 
   async fn answer(&self, call: Call) -> Result<Response, Refused> {
+    call.console_credential()?;
+
     Ok(answer(StatusCode::OK, call.standing().console()?.words()))
   }
 }
 
 crate::route!(WordsRead);
 
-/// The module or the stylesheet, to the console's own credential with no owner key and no role: a link's holder
+/// The module or the stylesheet, to the console's token alone, with no owner key and no role: a link's holder
 /// loads them with no sign-in to open the share page, and neither carries an owner's data.
 pub struct FileRead;
 
@@ -182,6 +186,8 @@ impl Route for FileRead {
   const PATH: &'static str = "/console/{file}";
 
   async fn answer(&self, mut call: Call) -> Result<Response, Refused> {
+    call.console_credential()?;
+
     let name = call.path_param("file").await?;
     let served = call
       .standing()

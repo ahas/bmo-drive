@@ -1,6 +1,6 @@
 //! The console bundle (docs/api.md, 「The console bundle」, 「Owners」): the manifest as bmo-ui's own reading
-//! of it reads it, the guard's refusals on the bundle's files and on the screen's routes, and the module's
-//! path following its bytes. The service runs in this process on a loopback port over a bundle folder of the
+//! of it reads it, the console's token alone on the bundle's routes, the guard's refusals on the bundle's
+//! files and on the screen's routes, and the module's path following its bytes. The service runs in this process on a loopback port over a bundle folder of the
 //! test's own.
 
 use std::path::{Path, PathBuf};
@@ -14,6 +14,7 @@ use bmo_drive::wire::{ConsoleManifest, ConsoleRole};
 use serde_json::{Value, json};
 
 const TOKEN: &str = "drive-token";
+const CONSOLE_TOKEN: &str = "drive-console-token";
 const ADMINISTRATOR: &str = "qa-admin";
 
 /// A folder of its own for one test, on the disk the build stands on.
@@ -44,6 +45,11 @@ fn built(folder: &Path, module: &str) -> PathBuf {
 
 /// The service, its store and its spaces under `folder`, serving the bundle folder `bundle`; its address.
 async fn serve(folder: &Path, bundle: &Path) -> String {
+  serve_to(folder, bundle, CONSOLE_TOKEN).await
+}
+
+/// The service as `serve` stands it, with `console_token` as the console's token.
+async fn serve_to(folder: &Path, bundle: &Path, console_token: &str) -> String {
   let settings = format!(
     r#"
 [server]
@@ -60,6 +66,7 @@ address = "http://[::1]:9"
 administrator = "{ADMINISTRATOR}"
 
 [console]
+token = "{console_token}"
 folder = "{bundle}"
 
 [storage]
@@ -145,9 +152,12 @@ try {
 async fn the_manifest_keeps_the_contract_as_bmo_ui_reads_it() {
   let folder = scratch("manifest");
   let address = serve(&folder, &built(&folder, "export default { routes: [] };")).await;
-  let console = DriveClient::new(&address, TOKEN);
+  let console = DriveClient::new(&address, CONSOLE_TOKEN);
 
-  let manifest = console.console_manifest().await.expect("the manifest answers to the token alone");
+  let manifest = console
+    .console_manifest()
+    .await
+    .expect("the manifest answers to the console's token alone");
   let answered = serde_json::to_value(&manifest).expect("the manifest is JSON");
   let read =
     read_by_bmo_ui(&answered).unwrap_or_else(|fault| panic!("bmo-ui refuses the manifest: {fault}"));
@@ -165,7 +175,7 @@ async fn the_manifest_keeps_the_contract_as_bmo_ui_reads_it() {
     "the reading refuses a broken manifest"
   );
 
-  let words = console.console_words().await.expect("the words answer to the token alone");
+  let words = console.console_words().await.expect("the words answer to the console's token alone");
   assert_eq!(words["en"]["drive"]["title"], "Files");
 }
 
@@ -174,7 +184,8 @@ async fn the_guard_refuses_without_the_credential_the_role_or_the_key() {
   let folder = scratch("guard");
   let module = "export default { routes: [] }; // the guard's";
   let address = serve(&folder, &built(&folder, module)).await;
-  let manifest: ConsoleManifest = DriveClient::new(&address, TOKEN).console_manifest().await.expect("read");
+  let manifest: ConsoleManifest =
+    DriveClient::new(&address, CONSOLE_TOKEN).console_manifest().await.expect("read");
   let http = reqwest::Client::new();
   let asked = |path: &str, token: Option<&str>, key: Option<&str>, role: Option<&str>| {
     let mut request = http.get(format!("{address}{path}"));
@@ -193,13 +204,35 @@ async fn the_guard_refuses_without_the_credential_the_role_or_the_key() {
   };
   let answered = |response: reqwest::Response| response.status().as_u16();
 
-  assert_eq!(answered(asked("/console-manifest", None, None, None).await.expect("answered")), 401);
-  assert_eq!(answered(asked("/console/words", None, None, None).await.expect("answered")), 401);
-
-  // A link's holder loads the module and the stylesheet with no sign-in, so they take the bearer token alone.
-  for path in [manifest.bundle.as_str(), manifest.stylesheet.as_str()] {
+  // The bundle's routes take the console's token alone: the service's own is refused as no token is. A link's
+  // holder loads the module and the stylesheet with no sign-in, so none of them asks for a key or a role.
+  for path in [
+    "/console-manifest",
+    "/console/words",
+    manifest.bundle.as_str(),
+    manifest.stylesheet.as_str(),
+  ] {
     assert_eq!(answered(asked(path, None, None, None).await.expect("answered")), 401, "{path}");
-    assert_eq!(answered(asked(path, Some(TOKEN), None, None).await.expect("answered")), 200, "{path}");
+    let service = asked(path, Some(TOKEN), Some(ADMINISTRATOR), Some("administrator"))
+      .await
+      .expect("answered");
+    assert_eq!(service.status().as_u16(), 401, "{path}");
+    let body: Value = service.json().await.expect("a refusal in the error shape");
+    assert_eq!(body["code"], "unauthorized", "{path}");
+    assert_eq!(
+      answered(asked(path, Some(CONSOLE_TOKEN), None, None).await.expect("answered")),
+      200,
+      "{path}"
+    );
+  }
+
+  // Every other route takes the console's token as well as the service's, held to the key and the role alike.
+  for token in [TOKEN, CONSOLE_TOKEN] {
+    assert_eq!(
+      answered(asked("/owner", Some(token), Some("1"), Some("member")).await.expect("answered")),
+      200
+    );
+    assert_eq!(answered(asked("/owner", Some(token), Some("1"), None).await.expect("answered")), 403);
   }
 
   for path in ["/owner", "/places", "/nodes"] {
@@ -241,13 +274,15 @@ async fn the_guard_refuses_without_the_credential_the_role_or_the_key() {
   assert_eq!(body["code"], "forbidden");
 
   for role in ["member", "administrator"] {
-    let response = asked(&manifest.bundle, Some(TOKEN), Some("1"), Some(role)).await.expect("answered");
+    let response = asked(&manifest.bundle, Some(CONSOLE_TOKEN), Some("1"), Some(role))
+      .await
+      .expect("answered");
     assert_eq!(response.status().as_u16(), 200, "{role}");
     assert_eq!(response.headers()["content-type"], "text/javascript");
     assert_eq!(response.text().await.expect("the module"), module);
   }
 
-  let stylesheet = asked(&manifest.stylesheet, Some(TOKEN), Some("1"), Some("member"))
+  let stylesheet = asked(&manifest.stylesheet, Some(CONSOLE_TOKEN), Some("1"), Some("member"))
     .await
     .expect("answered");
   assert_eq!(stylesheet.status().as_u16(), 200);
@@ -274,7 +309,7 @@ async fn the_module_path_follows_its_bytes() {
   let second = serve(&other, &built(&other, "export default { routes: [] }; // other")).await;
   let third = serve(&same, &built(&same, "export default { routes: [] }; // one")).await;
   let manifest = |address: String| async move {
-    DriveClient::new(&address, TOKEN)
+    DriveClient::new(&address, CONSOLE_TOKEN)
       .console_manifest()
       .await
       .expect("the manifest answers")
@@ -287,7 +322,7 @@ async fn the_module_path_follows_its_bytes() {
   assert_eq!(first_manifest.stylesheet, second_manifest.stylesheet);
   assert!(first_manifest.bundle.starts_with("/console/bundle-") && first_manifest.bundle.ends_with(".js"));
 
-  let reader = DriveClient::new(&second, TOKEN).with_owner("1");
+  let reader = DriveClient::new(&second, CONSOLE_TOKEN).with_owner("1");
   let gone = reader.console_file(&first_manifest.bundle).await.err().expect("an old path is refused");
   assert_eq!(status(gone), (404, "not-found".into()));
   let module = reader.console_file(&second_manifest.bundle).await.expect("the module answers");
@@ -298,8 +333,28 @@ async fn the_module_path_follows_its_bytes() {
 async fn an_unbuilt_bundle_is_absent() {
   let folder = scratch("unbuilt");
   let address = serve(&folder, &folder.join("nowhere")).await;
-  let console = DriveClient::new(&address, TOKEN);
+  let console = DriveClient::new(&address, CONSOLE_TOKEN);
 
   assert_eq!(status(console.console_manifest().await.unwrap_err()), (404, "not-found".into()));
   assert_eq!(status(console.console_words().await.unwrap_err()), (404, "not-found".into()));
+}
+
+#[tokio::test]
+async fn an_empty_console_token_lets_no_console_in_and_a_shared_one_is_the_console_s() {
+  let folder = scratch("no-console");
+  let address = serve_to(&folder, &built(&folder, "export default { routes: [] };"), "").await;
+
+  assert_eq!(
+    status(DriveClient::new(&address, TOKEN).console_manifest().await.unwrap_err()),
+    (401, "unauthorized".into())
+  );
+  assert_eq!(status(DriveClient::new(&address, "").console_manifest().await.unwrap_err()).0, 401);
+
+  let folder = scratch("shared-console");
+  let address = serve_to(&folder, &built(&folder, "export default { routes: [] };"), TOKEN).await;
+  let shared = DriveClient::new(&address, TOKEN);
+
+  shared.console_manifest().await.expect("a shared token is the console's");
+  let owner = shared.with_owner("1").owner().await.expect("and every other route takes it");
+  assert_eq!(owner.owner_key, "1");
 }

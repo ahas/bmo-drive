@@ -238,6 +238,14 @@ impl Call {
     &self.standing
   }
 
+  /// Refuses a request let in with any token but the console's: 401 `unauthorized`.
+  pub fn console_credential(&self) -> Result<(), Refused> {
+    match self.request.extensions().get::<Credential>() {
+      Some(Credential::Console) => Ok(()),
+      _ => Err(unauthorized("the console's routes take the console's token alone")),
+    }
+  }
+
   /// The parameters the route's path names, by name, percent-decoded.
   pub async fn path_params(&mut self) -> Result<HashMap<String, String>, Refused> {
     let (mut parts, body) = std::mem::take(&mut self.request).into_parts();
@@ -306,18 +314,56 @@ pub fn answer(status: StatusCode, body: impl Serialize) -> Response {
   (status, Json(body)).into_response()
 }
 
-/// Every request is let in only with the settings' token as its bearer; an empty token lets nobody in.
-async fn require_token(State(standing): State<Arc<Standing>>, request: Request, next: Next) -> Response {
-  let expected = standing.settings.server.token.as_str();
-  let presented = request
+/// Which of the settings' tokens a request was let in with (`docs/api.md`, 「Conventions」).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Credential {
+  /// The service's own token, `server.token`: the harness's and the command's.
+  Service,
+  /// The console's token, `console.token`: the console's alone.
+  Console,
+}
+
+impl Credential {
+  /// The credential `presented` is, where it is one of the settings' tokens. An empty token is none, and a
+  /// console token equal to the service's is the console's, so the console keeps its routes while a
+  /// deployment gives the two apart.
+  fn of(presented: &str, settings: &Settings) -> Option<Self> {
+    let matches = |expected: &str| !expected.is_empty() && presented == expected;
+
+    if matches(&settings.console.token) {
+      Some(Self::Console)
+    } else if matches(&settings.server.token) {
+      Some(Self::Service)
+    } else {
+      None
+    }
+  }
+}
+
+/// A missing or wrong token: 401 `unauthorized`.
+fn unauthorized(error: &str) -> Refused {
+  Refused::new(StatusCode::UNAUTHORIZED, "unauthorized", error)
+}
+
+/// Every request is let in only with one of the settings' tokens as its bearer, carrying which one it was.
+async fn require_token(
+  State(standing): State<Arc<Standing>>,
+  mut request: Request,
+  next: Next,
+) -> Response {
+  let credential = request
     .headers()
     .get(header::AUTHORIZATION)
     .and_then(|value| value.to_str().ok())
-    .and_then(|value| value.strip_prefix("Bearer "));
+    .and_then(|value| value.strip_prefix("Bearer "))
+    .and_then(|presented| Credential::of(presented, &standing.settings));
 
-  match presented {
-    Some(token) if !expected.is_empty() && token == expected => next.run(request).await,
-    _ => Refused::new(StatusCode::UNAUTHORIZED, "unauthorized", "a missing or wrong token").into_response(),
+  match credential {
+    Some(credential) => {
+      request.extensions_mut().insert(credential);
+      next.run(request).await
+    }
+    None => unauthorized("a missing or wrong token").into_response(),
   }
 }
 

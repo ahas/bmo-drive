@@ -23,6 +23,9 @@ actor = "drive-command"
 [owners]
 administrator = "1"
 
+[console]
+token = "drive-console-token"
+
 [storage]
 kind = "local"
 root = "/srv/bmo-data/drive/spaces"

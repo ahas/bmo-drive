@@ -85,6 +85,8 @@ pub struct Owners {
 /// The console bundle the service serves (`docs/api.md`, 「The console bundle」).
 #[derive(Clone, Debug, Deserialize)]
 pub struct Console {
+  /// The console's token, the console's credential; an empty one lets no console in.
+  pub token: String,
   /// The bundle's built folder; a relative one is read from where the process starts.
   pub folder: PathBuf,
 }

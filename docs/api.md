@@ -9,8 +9,10 @@ in the same commit and follows the version rule (「Versions」).
 
 ## Conventions
 
-- **Every route needs `Authorization: Bearer <token>`,** the token of the settings; a missing or wrong
-  token is answered 401 `unauthorized`.
+- **Every route needs `Authorization: Bearer <token>`,** the service's token or the console's, both of the
+  settings (「Settings」); a missing or wrong token is answered 401 `unauthorized`. The console bundle's own
+  routes take the console's token alone, and answer the service's token 401 `unauthorized` (「The console
+  bundle」); every other route takes either.
 - **Every route but `GET /health`, the console bundle's manifest, words, module and stylesheet (「The console
   bundle」), `GET /shares/{token}` and `GET /shares/{token}/content` needs `Owner-Key: <key>` and `Owner-Role:
   <role>`:** the opaque key of the owner the caller acts for, and the role the reader holds (「Owners」). One
@@ -41,8 +43,9 @@ in the same commit and follows the version rule (「Versions」).
   `administrator` or `member`, and sets `Owner-Key` and `Owner-Role` on every request it hands on,
   replacing any the browser sent, so a browser never chooses its own key or role.
 - **The service checks its bearer token, and nothing of the person.** It takes the owner key as given: an
-  opaque string of 1 to 200 characters, compared exactly, never parsed. A caller holding the token may act
-  for any key, so the token is the console's and the harness's alone.
+  opaque string of 1 to 200 characters, compared exactly, never parsed. A caller holding either token may
+  act for any key, so the console's token is the console's alone and the service's token the harness's and
+  the command's.
 - **The role is the floor of every route that takes the key.** The console bundle's manifest names
   `member` as the least role that opens the Files screen (「The console bundle」), and an administrator
   holds every role a member holds, so `Owner-Role` is `administrator` or `member` and anything else is
@@ -260,8 +263,10 @@ starts; an entry that fails once the zip has started ends the answer as broken.
 
 ## The console bundle
 
-The service serves its Files screen as a console bundle by bmo-ui's console plugin contract (bmo-ui's
-`docs/console-bundles.md`): a manifest at a fixed route, and the module, stylesheet and words it names.
+The service serves its Files screen and its file share page as a console bundle of bmo-ui's console plugin
+contract, bmo-ui's `docs/console-bundles.md`, which is the one statement of what a bundle and its service
+answer and how the service guards them. This section names only what this service chooses within it: the
+manifest's values, its share page, its credential, and where its files come from.
 
 | Method and path | Sends | Answers |
 |---|---|---|
@@ -269,24 +274,38 @@ The service serves its Files screen as a console bundle by bmo-ui's console plug
 | `GET /console/words` | | 200, the words |
 | `GET /console/{file}` | | 200, the module or the stylesheet the manifest names |
 
-- **The manifest** is the contract's shape: `name` `drive`, `title` `drive.title`, `icon`
-  `i-material-symbols-folder-open-outline`, `screenPath` `/files`, `serviceName` `drive`, `bundle` and
-  `stylesheet` (the module's and the stylesheet's paths), `words` `/console/words`, `apiPrefix` `/`, `role`
-  `member`, `ownerKey` true, `events` false, `websocket` false, `pushKinds`, `calls` and `relays` empty, and `shareReads`
-  `/shares/{token}` and `/shares/{token}/content`, the two reads a link's holder makes with no sign-in
-  (「Share links」; bmo-ui's `docs/console-bundles.md`, 「Share pages」). The screens call the routes of this
-  document alone, the node list among them (「Places」), and read no event stream.
-- **The module and the stylesheet** stand at `/console/bundle-<digest>.js` and `/console/bundle-<digest>.css`,
-  the digest the first sixteen hexadecimal digits of the SHA-256 of their bytes, so either path changes
-  whenever its bytes do. The module is answered as `text/javascript`, the stylesheet as `text/css`, both
-  with `cache-control: private, max-age=31536000, immutable`; any other file is refused 404 `not-found`.
-- **The words** are one JSON object, each locale's tree of the bundle's language pack under the locale's
-  code (README.md, 「The console plugin bundle」).
-- **What each takes:** the bearer token alone, all four: a link's holder loads the module and the stylesheet
-  with no sign-in to open the share page, and neither carries an owner's data.
+The manifest's values:
+
+| Field | Value |
+|---|---|
+| `name` | `drive` |
+| `title` | `drive.title` |
+| `icon` | `i-material-symbols-folder-open-outline` |
+| `screenPath` | `/files` |
+| `serviceName` | `drive` |
+| `bundle`, `stylesheet` | `/console/bundle-<digest>.js` and `/console/bundle-<digest>.css`, the digest the first sixteen hexadecimal digits of the SHA-256 of the file's bytes |
+| `words` | `/console/words` |
+| `apiPrefix` | `/` |
+| `role` | `member` |
+| `ownerKey` | true |
+| `events`, `websocket` | false |
+| `pushKinds`, `calls`, `relays` | none: the screens call the routes of this document alone, the node list among them (「Places」), and read no event stream |
+| `shareReads` | `/shares/{token}` and `/shares/{token}/content`, the two reads a link's holder makes (「Share links」) |
+
+- **Its share page** is the contract's share page: a link's page under `/files/share/` and the token, reading
+  the link and its content through the two share reads.
+- **Its credential** is the console's token, the setting `console.token` (「Settings」), which the three
+  routes above take alone: the service's own token on one of them is 401 `unauthorized`, and an empty
+  console token lets no console in. A deployment gives the two tokens apart; a console token equal to the
+  service's is taken as the console's, so that one token opens every route. Every other route takes the
+  console's token as well as the service's, so the console relays the screens' calls with the one
+  credential it holds.
+- **The module and the stylesheet** are answered as `text/javascript` and `text/css`, each with
+  `cache-control: private, max-age=31536000, immutable`; any other file is refused 404 `not-found`.
 - **What the service reads them from:** the bundle's built folder, the setting `console.folder`, read once
-  at start. A folder that does not hold the module, the stylesheet and the words leaves the four routes
-  refused 404 `not-found`, so a console finds no bundle here.
+  at start, which the bundle's build writes (README.md, 「The console plugin bundle」). A folder that does not
+  hold the module, the stylesheet and the words leaves the three routes refused 404 `not-found`, so a console
+  finds no bundle here.
 
 ## Refusals
 
@@ -441,16 +460,17 @@ The settings are read at start in layers, each overriding the one before: the de
 repository's own `settings.toml` built into the binary; then `settings.toml` and `settings.local.toml`
 where they stand in the settings folder, the one `BMO_DRIVE_SETTINGS` names, else the folder above the one
 holding the binary (a deployment's root); then `BMO_DRIVE_<TABLE>__<KEY>` in the environment. An empty
-token lets no caller in.
+token lets no caller in with it.
 
 | Table | Key | What it is |
 |---|---|---|
 | `server` | `listen` | where the service answers, as `host:port` |
-| `server` | `token` | the bearer token every caller presents |
+| `server` | `token` | the service's token, which the harness and the command present; none where empty |
 | `store` | `path` | the SQLite file the share links and the kept events stand in |
 | `share` | `address` | the address a link's page stands under; a link's `url` is it, a `/` and the token |
 | `share` | `actor` | who the command records as a link's `actorName`; none where empty |
 | `owners` | `administrator` | the administrator's owner key (「Owners」); none where empty |
+| `console` | `token` | the console's token, the console's credential (「The console bundle」); none where empty, which lets no console in |
 | `console` | `folder` | the console bundle's built folder (「The console bundle」), `client/dist` where none is set; a relative one is read from where the process starts |
 | `storage` | `kind` | where the BMO drive stands: `local` where none is set, `node` or `s3` (`docs/files.md`, 「The BMO drive」) |
 | `storage` | `root` | the root folder of the spaces: on this machine for `local`, on the node for `node`; the key prefix in the bucket for `s3` |

@@ -4,7 +4,7 @@
 [package]
 name = "bmo-drive"
 description = "The file viewer over this machine's drives, Garage and the nodes' volumes and each owner's own drive, its share links, its client and its MCP server."
-version = "0.1.0-rev.5"
+version = "0.1.0-rev.6"
 edition = "2024"
 license = "MIT"
 publish = false
