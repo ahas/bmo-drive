@@ -38,6 +38,8 @@ enum Word {
   },
   /// Prints the OpenAPI document the code generates.
   Openapi,
+  /// Prints how a console reaches the service, as one JSON object, for a deployment's console probe.
+  ConsoleReach,
   /// The nouns this command carries, one a line.
   Nouns,
   /// Moves the old archive's share links from the item's export into this service's store (TODO #1923).
@@ -112,6 +114,10 @@ async fn main() -> ExitCode {
   let done = match command.word {
     Word::Serve => bmo_drive::serve(settings).await,
     Word::Health => bmo_drive::health::ask(&settings).await,
+    Word::ConsoleReach => {
+      println!("{}", bmo_drive::console::reach(&settings));
+      Ok(())
+    }
     Word::Mcp { address, owner } => {
       let client = match address {
         Some(address) => DriveClient::new(address, settings.server.token.clone())

@@ -1,0 +1,16 @@
+{
+  "name": "drive",
+  "title": "drive.title",
+  "icon": "i-material-symbols-folder-open-outline",
+  "screenPath": "/files",
+  "serviceName": "drive",
+  "apiPrefix": "/",
+  "role": "member",
+  "ownerKey": true,
+  "events": false,
+  "websocket": false,
+  "pushKinds": [],
+  "calls": [],
+  "relays": [],
+  "shareReads": ["/shares/{token}", "/shares/{token}/content"]
+}

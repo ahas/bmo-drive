@@ -497,57 +497,11 @@ pub struct EventsQuery {
   pub limit: Option<u64>,
 }
 
-/// The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).
+/// A reader's role, as the console relays it in `Owner-Role` (bmo-ui's console plugin contract, 「Roles and the
+/// owner key」).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ConsoleRole {
   Administrator,
   Member,
-}
-
-/// A route outside the API prefix a console relays: its method and its whole path.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ConsoleRelay {
-  pub method: String,
-  pub path: String,
-}
-
-/// The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The
-/// console bundle」).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ConsoleManifest {
-  /// The bundle's name, its words' namespace.
-  pub name: String,
-  /// The key, in the bundle's words, of the name a console's menu gives the screen.
-  pub title: String,
-  /// The icon drawn beside that name.
-  pub icon: String,
-  /// The path the bundle's screens stand under.
-  pub screen_path: String,
-  /// The service's name, which a console relays it under.
-  pub service_name: String,
-  /// The path the module is answered at.
-  pub bundle: String,
-  /// The path the stylesheet is answered at.
-  pub stylesheet: String,
-  /// The path the words are answered at.
-  pub words: String,
-  /// The path every call the screens make stands under.
-  pub api_prefix: String,
-  pub role: ConsoleRole,
-  /// Whether every call the screens make needs the reader's owner key.
-  pub owner_key: bool,
-  /// Whether the screens read the service's event stream.
-  pub events: bool,
-  /// Whether the screens open a WebSocket to the service.
-  pub websocket: bool,
-  /// The event kinds a console may raise as a notice to a reader not on the screen.
-  pub push_kinds: Vec<String>,
-  /// The other services the screens call through the console, by the names their manifests give them.
-  pub calls: Vec<String>,
-  /// The service's own routes outside the API prefix a console relays as well, each its method and path.
-  pub relays: Vec<ConsoleRelay>,
-  /// The reads a share token alone permits, each a path pattern carrying `{token}`.
-  pub share_reads: Vec<String>,
 }

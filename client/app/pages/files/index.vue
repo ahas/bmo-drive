@@ -10,19 +10,26 @@
 
     <template #body>
       <ToolBar :label="$t('drive.aria.toolbar')">
+        <!-- Each button stands in a cell of its own, the toolbar's small button centred in it. -->
         <template v-if="choosing">
           <ChooseAll :keys="entryNames" :selected="selected" @choose="chooseAll" />
-          <UTooltip :text="$t('common.action.close')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-close" :aria-label="$t('common.action.close')" @click="leaveChoosing" />
-          </UTooltip>
+          <div>
+            <UTooltip :text="$t('common.action.close')">
+              <UButton color="neutral" variant="ghost" icon="i-material-symbols-close" :aria-label="$t('common.action.close')" @click="leaveChoosing" />
+            </UTooltip>
+          </div>
         </template>
         <template v-else>
-          <UTooltip :text="treeTool.label">
-            <UButton color="neutral" variant="ghost" :icon="treeTool.icon" :aria-label="treeTool.label" :aria-pressed="treeTool.pressed" @click="treeTool.onSelect()" />
-          </UTooltip>
-          <UTooltip :text="$t('drive.action.back')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-arrow-back" :aria-label="$t('drive.action.back')" :disabled="visited.length < 2" @click="goBack" />
-          </UTooltip>
+          <div>
+            <UTooltip :text="treeTool.label">
+              <UButton color="neutral" variant="ghost" :icon="treeTool.icon" :aria-label="treeTool.label" :aria-pressed="treeTool.pressed" @click="treeTool.onSelect()" />
+            </UTooltip>
+          </div>
+          <div>
+            <UTooltip :text="$t('drive.action.back')">
+              <UButton color="neutral" variant="ghost" icon="i-material-symbols-arrow-back" :aria-label="$t('drive.action.back')" :disabled="visited.length < 2" @click="goBack" />
+            </UTooltip>
+          </div>
         </template>
 
         <!-- The bar runs right to left and its steps left to right, so a path longer than the bar
@@ -35,28 +42,38 @@
         </nav>
         <div v-else class="min-w-0 flex-1" />
 
-        <UTooltip :text="$t('drive.action.new_folder')">
-          <UButton color="neutral" variant="ghost" icon="i-material-symbols-create-new-folder-outline" :aria-label="$t('drive.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
-        </UTooltip>
-        <UDropdownMenu :items="uploadItems" :content="{ align: 'end' }">
-          <UTooltip :text="$t('drive.action.upload')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-upload" :aria-label="$t('drive.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
+        <div>
+          <UTooltip :text="$t('drive.action.new_folder')">
+            <UButton color="neutral" variant="ghost" icon="i-material-symbols-create-new-folder-outline" :aria-label="$t('drive.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
           </UTooltip>
-        </UDropdownMenu>
+        </div>
+        <div>
+          <UDropdownMenu :items="uploadItems" :content="{ align: 'end' }">
+            <UTooltip :text="$t('drive.action.upload')">
+              <UButton color="neutral" variant="ghost" icon="i-material-symbols-upload" :aria-label="$t('drive.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
+            </UTooltip>
+          </UDropdownMenu>
+        </div>
         <ActionGroup :actions="editActions" />
 
-        <UDropdownMenu :items="viewItems" :content="{ align: 'end' }">
-          <UTooltip :text="$t('drive.action.view')" :disabled="!narrow">
-            <UButton color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="narrow ? undefined : $t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('drive.action.view')" />
-          </UTooltip>
-        </UDropdownMenu>
+        <div>
+          <UDropdownMenu :items="viewItems" :content="{ align: 'end' }">
+            <UTooltip :text="$t('drive.action.view')" :disabled="!narrow">
+              <UButton color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="narrow ? undefined : $t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('drive.action.view')" />
+            </UTooltip>
+          </UDropdownMenu>
+        </div>
 
-        <UTooltip :text="$t('drive.action.refresh')">
-          <UButton color="neutral" variant="ghost" icon="i-material-symbols-refresh" :aria-label="$t('drive.action.refresh')" :loading="rereading" @click="reread" />
-        </UTooltip>
-        <UTooltip v-if="!narrow" :text="previewTool.label">
-          <UButton color="neutral" variant="ghost" :icon="previewTool.icon" :aria-label="previewTool.label" :aria-pressed="previewTool.pressed" @click="previewTool.onSelect()" />
-        </UTooltip>
+        <div>
+          <UTooltip :text="$t('drive.action.refresh')">
+            <UButton color="neutral" variant="ghost" icon="i-material-symbols-refresh" :aria-label="$t('drive.action.refresh')" :loading="rereading" @click="reread" />
+          </UTooltip>
+        </div>
+        <div v-if="!narrow">
+          <UTooltip :text="previewTool.label">
+            <UButton color="neutral" variant="ghost" :icon="previewTool.icon" :aria-label="previewTool.label" :aria-pressed="previewTool.pressed" @click="previewTool.onSelect()" />
+          </UTooltip>
+        </div>
       </ToolBar>
 
       <!-- On a phone the path wraps onto as many lines as it needs, rather than being cut. -->
@@ -184,6 +201,7 @@ import {
 } from "../../domain/files";
 import { OVERLAY_CLOSE_MS } from "bmo-ui/app/domain/closing";
 import { useIsland } from "bmo-ui/app/domain/island";
+import { askQuestion } from "bmo-ui/app/domain/question";
 import { useNarrow } from "bmo-ui/app/domain/screen";
 import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
 import { SHARE_SPANS, spanSeconds } from "../../../shared/config";
@@ -979,11 +997,10 @@ function deleteChosen(): void {
   if (at === null || names.length === 0) return;
 
   void change(async () => {
-    const sure = await island.ask({
+    const sure = await askQuestion({
       title: names.length === 1 ? t("drive.message.delete_confirm", { name: names[0] }) : t("drive.message.delete_confirm_many", { n: countText(names.length) }),
-      description: t("drive.message.delete_warning"),
-      confirm: t("drive.action.delete"),
-      tone: "error"
+      effect: t("drive.message.delete_warning"),
+      confirm: t("drive.action.delete")
     });
 
     if (!sure) return;

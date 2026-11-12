@@ -1,6 +1,6 @@
 {
   "name": "bmo-drive-client",
-  "version": "0.1.0-rev.6",
+  "version": "0.1.0-rev.7",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,7 @@
     "@nuxtjs/i18n": "^10.6.0",
     "@tailwindcss/vite": "4.3.3",
     "@vitejs/plugin-vue": "6.0.10",
-    "bmo-ui": "file:vendor/bmo-ui-0.1.0-rev.11.tgz",
+    "bmo-ui": "file:vendor/bmo-ui-0.1.0-rev.18.tgz",
     "nuxt": "^4.5.2",
     "openapi-typescript": "7.13.0",
     "tailwindcss": "4.3.3",

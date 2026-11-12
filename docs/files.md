@@ -25,7 +25,7 @@ flowchart TD
 
 ## Owners and the two branches
 
-- **Every request but a link's own reading and the console bundle's manifest and words acts for an
+- **Every request but a link's own reading and the console face's routes acts for an
   owner,** named by an opaque owner key the caller hands with it beside the role the reader holds
   (`docs/api.md`, 「Owners」). The console sets both from the person signed in; this service never learns
   who the person is, only the key, compared exactly, and the role, which opens the routes to a member and

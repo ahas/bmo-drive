@@ -4,7 +4,7 @@
 [package]
 name = "bmo-drive"
 description = "The file viewer over this machine's drives, Garage and the nodes' volumes and each owner's own drive, its share links, its client and its MCP server."
-version = "0.1.0-rev.6"
+version = "0.1.0-rev.7"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -27,6 +27,8 @@ aws-runtime = "1.10.0"
 aws-sdk-s3 = { version = "1.152.0", default-features = false, features = ["default-https-client", "http-1x", "rt-tokio", "sigv4a"] }
 aws-types = "1.6.0"
 axum = { version = "0.8.9", features = ["macros", "multipart", "ws"] }
+# The console face: the manifest, the bundle's files and their guard, by bmo-ui's console plugin contract.
+bmo-console-face = { path = "../../base/chat/console-face" }
 # A jake hub's output chunks, a name handed to a Windows node's script, and a file's bytes in a tool answer.
 base64 = "0.22.1"
 # A zip entry's time, as this machine's clock writes it.
@@ -60,8 +62,6 @@ rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"]
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-# The digest a console bundle's file is answered under, so its path follows its bytes.
-sha2 = "0.10.9"
 # A word of a POSIX node's script, quoted as the shell reads it back whole.
 shlex = "2.0.1"
 # A jake hub's answer, a stream of server-sent events.

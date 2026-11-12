@@ -4,57 +4,6 @@
  */
 
 export interface paths {
-    "/console-manifest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The console bundle's manifest, by bmo-ui's console plugin contract. */
-        get: operations["readConsoleManifest"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/words": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The console bundle's words: each locale's tree under the locale's code. */
-        get: operations["readConsoleWords"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/{file}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The console bundle's module or stylesheet, at the path the manifest names. */
-        get: operations["readConsoleFile"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/events": {
         parameters: {
             query?: never;
@@ -360,55 +309,6 @@ export interface components {
         };
         /** @description How a name already taken where an entry lands is settled. */
         Conflict: "refuse" | "replace" | "rename" | "skip";
-        /**
-         * @description The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The
-         *     console bundle」).
-         */
-        ConsoleManifest: {
-            /** @description The path every call the screens make stands under. */
-            apiPrefix: string;
-            /** @description The path the module is answered at. */
-            bundle: string;
-            /** @description The other services the screens call through the console, by the names their manifests give them. */
-            calls: string[];
-            /** @description Whether the screens read the service's event stream. */
-            events: boolean;
-            /** @description The icon drawn beside that name. */
-            icon: string;
-            /** @description The bundle's name, its words' namespace. */
-            name: string;
-            /** @description Whether every call the screens make needs the reader's owner key. */
-            ownerKey: boolean;
-            /** @description The event kinds a console may raise as a notice to a reader not on the screen. */
-            pushKinds: string[];
-            /** @description The service's own routes outside the API prefix a console relays as well, each its method and path. */
-            relays: components["schemas"]["ConsoleRelay"][];
-            role: components["schemas"]["ConsoleRole"];
-            /** @description The path the bundle's screens stand under. */
-            screenPath: string;
-            /** @description The service's name, which a console relays it under. */
-            serviceName: string;
-            /** @description The reads a share token alone permits, each a path pattern carrying `{token}`. */
-            shareReads: string[];
-            /** @description The path the stylesheet is answered at. */
-            stylesheet: string;
-            /** @description The key, in the bundle's words, of the name a console's menu gives the screen. */
-            title: string;
-            /** @description Whether the screens open a WebSocket to the service. */
-            websocket: boolean;
-            /** @description The path the words are answered at. */
-            words: string;
-        };
-        /** @description A route outside the API prefix a console relays: its method and its whole path. */
-        ConsoleRelay: {
-            method: string;
-            path: string;
-        };
-        /**
-         * @description The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).
-         * @enum {string}
-         */
-        ConsoleRole: "administrator" | "member";
         /** @description Entries to be copied into a folder of this place or another. */
         CopyRequest: {
             /** @description How a name already taken there is settled; refused where none is asked. */
@@ -729,78 +629,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    readConsoleManifest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The console bundle's manifest, by bmo-ui's console plugin contract. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsoleManifest"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    readConsoleWords: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The console bundle's words: each locale's tree under the locale's code. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    readConsoleFile: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
-                "Owner-Key": string;
-                /** @description The role the reader holds; either allows the console bundle's role, member. */
-                "Owner-Role": "administrator" | "member";
-            };
-            path: {
-                /** @description The file's name, as the manifest's path ends. */
-                file: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The console bundle's module or stylesheet, at the path the manifest names. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/css": string;
-                    "text/javascript": string;
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
     listEvents: {
         parameters: {
             query?: {

@@ -8,13 +8,12 @@ use reqwest::{Method, RequestBuilder, Response, StatusCode, header};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::console::{MANIFEST_PATH, WORDS_PATH};
 use crate::owner::{OWNER_KEY, OWNER_ROLE};
 use crate::settings::Settings;
 use crate::wire::{
-  ArchiveRequest, ConsoleManifest, ConsoleRole, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove,
-  EntryPage, EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery,
-  Owner, PlacePage, PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage,
+  ArchiveRequest, ConsoleRole, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage,
+  EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery, Owner,
+  PlacePage, PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage,
   WireError, WriteQuery,
 };
 
@@ -233,21 +232,6 @@ impl DriveClient {
   /// `GET /nodes`.
   pub async fn nodes(&self, query: &NodesQuery) -> Result<NodePage, ClientFailure> {
     Self::read(Self::with_query(self.request(Method::GET, "/nodes"), query)).await
-  }
-
-  /// `GET /console-manifest`.
-  pub async fn console_manifest(&self) -> Result<ConsoleManifest, ClientFailure> {
-    Self::read(self.request(Method::GET, MANIFEST_PATH)).await
-  }
-
-  /// `GET /console/words`.
-  pub async fn console_words(&self) -> Result<serde_json::Value, ClientFailure> {
-    Self::read(self.request(Method::GET, WORDS_PATH)).await
-  }
-
-  /// `GET /console/{file}`: the module or the stylesheet at the path the manifest names.
-  pub async fn console_file(&self, path: &str) -> Result<Content, ClientFailure> {
-    Self::content_of(self.request(Method::GET, path), None).await
   }
 
   /// `GET /places/{placeName}/entries`.

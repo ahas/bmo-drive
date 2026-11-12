@@ -33,7 +33,7 @@ These hold every bmo repository, and every change here (archive document #301, i
 - **A client of another service is one module named for that service** under `src/clients/`, holding
   only the calls this repository makes, so it can be swapped for that service's own client.
 - **Dependencies:** crates from the registry pinned in `Cargo.toml`, and among other repositories only
-  the base libraries `bmo-chat`, `bmo-chat-client` and `bmo-ui`.
+  the base libraries `bmo-chat`, `bmo-chat-client`, `bmo-console-face` and `bmo-ui`.
 - **The plumbing knows no route.** A route registers itself beside its own answer; adding one changes no
   file but its own.
 - **No lookup table standing in for polymorphism.** A value that differs per place or per kind of

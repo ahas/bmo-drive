@@ -12,9 +12,9 @@ The repository carries the repository-wide personal-data check in `tests/persona
 (`PERSONAL-DATA.md`), the import of the old archive's share links in `tests/import.rs`, and the owners and
 their two branches in `tests/owners.rs`: each owner's drive its own alone, the quota judged before bytes
 arrive, the machines the administrator's alone, and share links opening in both branches; the console
-bundle in `tests/console.rs`: the manifest read through bmo-ui's own reading of it, the credential and the
-guard's refusals, and the module's path following its bytes. That one runs bmo-ui's reading with Bun inside
-`client/`, installing the bundle's locked packages first where they are not installed; links on a volume in
+face in `tests/console.rs`: the manifest the service serves read through bmo-ui's own reading on the release
+`client/vendor/` holds, run with Bun by bmo-console-face, the face wired to the console's credential, and
+the drive's own guard of every other route; links on a volume in
 `tests/links.rs`: a path walking back into itself refused, a link to a folder beside walked once, each link's
 target listed and a folder's zip ending over links; and where the Files screen opens in `tests/screen.rs`, the
 screen's place memory run with Bun the same way. `cargo test` runs them all, and the bundle's check,
@@ -42,17 +42,19 @@ the local settings a deployment gives) and `LICENSE`.
 
 `client/` holds the Files screen and its file share page on top of bmo-ui, a bundle of bmo-ui's console
 plugin contract (bmo-ui's `docs/console-bundles.md`); what this service chooses within it is
-`docs/api.md`, 「The console bundle」. Its words stand in its own pack, `client/i18n/`, one file to a locale,
+`docs/api.md`, 「The console face」. Its words stand in its own pack, `client/i18n/`, one file to a locale,
 under `drive.*`, with `drive.error.<code>` for each refusal code of `docs/api.md`.
 
-- **The build.** `bun run bundle` builds `client/dist/` from the screens' sources: the module `bundle.js`,
-  whose default export holds the two pages' routes, the stylesheet `bundle.css`, the utility classes the
-  screens use on the layer's tokens, and `words.json`, the language pack as one object keyed by locale.
-  The components and the Vue and Nuxt functions the pages use without importing them are imported in the
-  build, which stands in `client/console/`. A deployment builds the folder in each release, and the
-  service answers its files with its manifest.
-- **The layer.** `client/vendor/` holds the packed bmo-ui the bundle is installed, built and typechecked
-  against. The Nuxt configuration in `client/` serves the typecheck alone.
+- **The build.** `bun run bundle` builds `client/dist/` from the screens' sources on bmo-ui's bundle build,
+  which leaves the libraries a console shares unbundled and writes the layer the bundle is built on: the
+  module `bundle.js`, whose default export holds the two pages' routes, the stylesheet `bundle.css`, the
+  utility classes the screens use on the layer's tokens, `words.json`, the language pack as one object keyed
+  by locale, and `layer.json`. The components and the Vue and Nuxt functions the pages use without importing
+  them are imported in the build, which stands in `client/console/`. A deployment builds the folder in each
+  release, and the service answers its files with its manifest.
+- **The layer.** `client/vendor/` holds bmo-ui's release file as bmo-ui's release verb wrote it, the one
+  bmo-chat's `shared-versions.toml` pins; the bundle is installed, built and typechecked against it. The
+  Nuxt configuration in `client/` serves the typecheck alone.
 - **The types.** The screen's types of the service's answers are generated from `docs/openapi.json` into
   `client/shared/openapi.ts` by `bun run api`.
 

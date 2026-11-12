@@ -7,14 +7,13 @@ use schemars::JsonSchema;
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use serde_json::{Map, Value, json};
 
-use crate::console::{MANIFEST_PATH, WORDS_PATH};
 use crate::events::KINDS;
 use crate::mcp::tools;
 use crate::wire::{
-  ArchiveRequest, ConsoleManifest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage,
-  EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery, Owner,
-  PlacePage, PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage,
-  WireError, WriteQuery,
+  ArchiveRequest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage, EventPage,
+  EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery, Owner, PlacePage,
+  PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage, WireError,
+  WriteQuery,
 };
 
 /// Where the schemas the routes refer to stand in the document.
@@ -636,48 +635,6 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       ],
       codes: &["unauthorized", "not-found", "gone", "upstream-failed", "failed"],
     },
-    Operation {
-      method: "get",
-      path: MANIFEST_PATH,
-      id: "readConsoleManifest",
-      owned: false,
-      tag: "console",
-      summary: "The console bundle's manifest, by bmo-ui's console plugin contract.",
-      parameters: Vec::new(),
-      body: None,
-      answers: vec![(200, json_answer::<ConsoleManifest>(generator))],
-      codes: &["unauthorized", "not-found"],
-    },
-    Operation {
-      method: "get",
-      path: WORDS_PATH,
-      id: "readConsoleWords",
-      owned: false,
-      tag: "console",
-      summary: "The console bundle's words: each locale's tree under the locale's code.",
-      parameters: Vec::new(),
-      body: None,
-      answers: vec![(200, Some(json!({ "application/json": { "schema": { "type": "object" } } })))],
-      codes: &["unauthorized", "not-found"],
-    },
-    Operation {
-      method: "get",
-      path: "/console/{file}",
-      id: "readConsoleFile",
-      owned: true,
-      tag: "console",
-      summary: "The console bundle's module or stylesheet, at the path the manifest names.",
-      parameters: vec![segment("file", "The file's name, as the manifest's path ends.")],
-      body: None,
-      answers: vec![(
-        200,
-        Some(json!({
-          "text/javascript": { "schema": { "type": "string" } },
-          "text/css": { "schema": { "type": "string" } },
-        })),
-      )],
-      codes: &["unauthorized", "bad-request", "not-found"],
-    },
   ]
 }
 
@@ -745,7 +702,7 @@ pub fn openapi() -> Value {
         "bearer": {
           "type": "http",
           "scheme": "bearer",
-          "description": "The service's token or the console's, both of its settings; the console bundle's routes take the console's alone.",
+          "description": "The service's token or the console's, both of its settings; the console face's routes, which bmo-ui's console plugin contract states, take the console's alone.",
         },
       },
     },

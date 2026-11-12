@@ -38,8 +38,8 @@ pub async fn serve(settings: Settings) -> Result<(), String> {
   let listen = settings.server.listen;
   let standing = Standing::new(settings, store);
 
-  if let Err(why) = &standing.console {
-    eprintln!("bmo-drive: the console bundle is not served: {why}");
+  if let Err(why) = &standing.face {
+    eprintln!("bmo-drive: the console face is not served: {why}");
   }
 
   let events = standing.events.clone();

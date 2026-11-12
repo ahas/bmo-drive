@@ -53,134 +53,6 @@
           }
         ]
       },
-      "ConsoleManifest": {
-        "description": "The console bundle's manifest, in the shape of bmo-ui's console plugin contract (`docs/api.md`, 「The\nconsole bundle」).",
-        "properties": {
-          "apiPrefix": {
-            "description": "The path every call the screens make stands under.",
-            "type": "string"
-          },
-          "bundle": {
-            "description": "The path the module is answered at.",
-            "type": "string"
-          },
-          "calls": {
-            "description": "The other services the screens call through the console, by the names their manifests give them.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "events": {
-            "description": "Whether the screens read the service's event stream.",
-            "type": "boolean"
-          },
-          "icon": {
-            "description": "The icon drawn beside that name.",
-            "type": "string"
-          },
-          "name": {
-            "description": "The bundle's name, its words' namespace.",
-            "type": "string"
-          },
-          "ownerKey": {
-            "description": "Whether every call the screens make needs the reader's owner key.",
-            "type": "boolean"
-          },
-          "pushKinds": {
-            "description": "The event kinds a console may raise as a notice to a reader not on the screen.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "relays": {
-            "description": "The service's own routes outside the API prefix a console relays as well, each its method and path.",
-            "items": {
-              "$ref": "#/components/schemas/ConsoleRelay"
-            },
-            "type": "array"
-          },
-          "role": {
-            "$ref": "#/components/schemas/ConsoleRole"
-          },
-          "screenPath": {
-            "description": "The path the bundle's screens stand under.",
-            "type": "string"
-          },
-          "serviceName": {
-            "description": "The service's name, which a console relays it under.",
-            "type": "string"
-          },
-          "shareReads": {
-            "description": "The reads a share token alone permits, each a path pattern carrying `{token}`.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "stylesheet": {
-            "description": "The path the stylesheet is answered at.",
-            "type": "string"
-          },
-          "title": {
-            "description": "The key, in the bundle's words, of the name a console's menu gives the screen.",
-            "type": "string"
-          },
-          "websocket": {
-            "description": "Whether the screens open a WebSocket to the service.",
-            "type": "boolean"
-          },
-          "words": {
-            "description": "The path the words are answered at.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "title",
-          "icon",
-          "screenPath",
-          "serviceName",
-          "bundle",
-          "stylesheet",
-          "words",
-          "apiPrefix",
-          "role",
-          "ownerKey",
-          "events",
-          "websocket",
-          "pushKinds",
-          "calls",
-          "relays",
-          "shareReads"
-        ],
-        "type": "object"
-      },
-      "ConsoleRelay": {
-        "description": "A route outside the API prefix a console relays: its method and its whole path.",
-        "properties": {
-          "method": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "method",
-          "path"
-        ],
-        "type": "object"
-      },
-      "ConsoleRole": {
-        "description": "The least role a reader holds to open the console bundle's screen (bmo-ui's console plugin contract).",
-        "enum": [
-          "administrator",
-          "member"
-        ],
-        "type": "string"
-      },
       "CopyRequest": {
         "description": "Entries to be copied into a folder of this place or another.",
         "properties": {
@@ -1044,7 +916,7 @@
     },
     "securitySchemes": {
       "bearer": {
-        "description": "The service's token or the console's, both of its settings; the console bundle's routes take the console's alone.",
+        "description": "The service's token or the console's, both of its settings; the console face's routes, which bmo-ui's console plugin contract states, take the console's alone.",
         "scheme": "bearer",
         "type": "http"
       }
@@ -1053,136 +925,10 @@
   "info": {
     "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
     "title": "bmo-drive",
-    "version": "0.1.0-rev.6"
+    "version": "0.1.0-rev.7"
   },
   "openapi": "3.1.0",
   "paths": {
-    "/console-manifest": {
-      "get": {
-        "operationId": "readConsoleManifest",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsoleManifest"
-                }
-              }
-            },
-            "description": "The console bundle's manifest, by bmo-ui's console plugin contract."
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "summary": "The console bundle's manifest, by bmo-ui's console plugin contract.",
-        "tags": [
-          "console"
-        ],
-        "x-codes": [
-          "unauthorized",
-          "not-found"
-        ]
-      }
-    },
-    "/console/words": {
-      "get": {
-        "operationId": "readConsoleWords",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            },
-            "description": "The console bundle's words: each locale's tree under the locale's code."
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "summary": "The console bundle's words: each locale's tree under the locale's code.",
-        "tags": [
-          "console"
-        ],
-        "x-codes": [
-          "unauthorized",
-          "not-found"
-        ]
-      }
-    },
-    "/console/{file}": {
-      "get": {
-        "operationId": "readConsoleFile",
-        "parameters": [
-          {
-            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
-            "in": "header",
-            "name": "Owner-Key",
-            "required": true,
-            "schema": {
-              "maxLength": 200,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          {
-            "description": "The role the reader holds; either allows the console bundle's role, member.",
-            "in": "header",
-            "name": "Owner-Role",
-            "required": true,
-            "schema": {
-              "enum": [
-                "administrator",
-                "member"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "description": "The file's name, as the manifest's path ends.",
-            "in": "path",
-            "name": "file",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/css": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "text/javascript": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The console bundle's module or stylesheet, at the path the manifest names."
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "summary": "The console bundle's module or stylesheet, at the path the manifest names.",
-        "tags": [
-          "console"
-        ],
-        "x-codes": [
-          "unauthorized",
-          "forbidden",
-          "bad-request",
-          "not-found"
-        ]
-      }
-    },
     "/events": {
       "get": {
         "operationId": "listEvents",
@@ -3135,9 +2881,6 @@
     },
     {
       "name": "shares"
-    },
-    {
-      "name": "console"
     }
   ],
   "x-calls": [

@@ -12,12 +12,13 @@ use axum::http::{Method, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{MethodFilter, MethodRouter};
+use bmo_console_face::ConsoleFace;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
 
 use crate::clients::node::Node;
-use crate::console::Bundle;
+use crate::console;
 use crate::events::Events;
 use crate::owner::{OWNER_KEY, OWNER_ROLE, Owner};
 use crate::settings::Settings;
@@ -181,7 +182,7 @@ impl IntoResponse for Refused {
 }
 
 /// What the service stands on, which every call carries.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Standing {
   pub settings: Arc<Settings>,
   /// The share links' and the events' store, open and migrated.
@@ -190,31 +191,24 @@ pub struct Standing {
   pub node: Node,
   /// The service's event stream.
   pub events: Events,
-  /// The console bundle, read from its built folder, or why it could not be.
-  pub console: Result<Arc<Bundle>, String>,
+  /// The console face, built from the declaration, the bundle's folder and the console credential, or why none
+  /// stands.
+  pub face: Result<ConsoleFace, String>,
 }
 
 impl Standing {
   pub fn new(settings: Settings, store: Store) -> Self {
     let node = Node::new(&settings.node.address, &settings.node.token);
     let events = Events::new(store.clone());
-    let console = Bundle::read(&settings.console.folder).map(Arc::new);
+    let face = console::face_of(&settings);
 
     Self {
       settings: Arc::new(settings),
       store,
       node,
       events,
-      console,
+      face,
     }
-  }
-
-  /// The console bundle, refused where its folder could not be read.
-  pub fn console(&self) -> Result<&Bundle, Refused> {
-    self
-      .console
-      .as_deref()
-      .map_err(|why| Refused::not_found(format!("the console bundle is not built: {why}")))
   }
 }
 
@@ -236,14 +230,6 @@ impl Call {
   /// What the service stands on.
   pub fn standing(&self) -> &Standing {
     &self.standing
-  }
-
-  /// Refuses a request let in with any token but the console's: 401 `unauthorized`.
-  pub fn console_credential(&self) -> Result<(), Refused> {
-    match self.request.extensions().get::<Credential>() {
-      Some(Credential::Console) => Ok(()),
-      _ => Err(unauthorized("the console's routes take the console's token alone")),
-    }
   }
 
   /// The parameters the route's path names, by name, percent-decoded.
@@ -314,30 +300,12 @@ pub fn answer(status: StatusCode, body: impl Serialize) -> Response {
   (status, Json(body)).into_response()
 }
 
-/// Which of the settings' tokens a request was let in with (`docs/api.md`, 「Conventions」).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Credential {
-  /// The service's own token, `server.token`: the harness's and the command's.
-  Service,
-  /// The console's token, `console.token`: the console's alone.
-  Console,
-}
-
-impl Credential {
-  /// The credential `presented` is, where it is one of the settings' tokens. An empty token is none, and a
-  /// console token equal to the service's is the console's, so the console keeps its routes while a
-  /// deployment gives the two apart.
-  fn of(presented: &str, settings: &Settings) -> Option<Self> {
-    let matches = |expected: &str| !expected.is_empty() && presented == expected;
-
-    if matches(&settings.console.token) {
-      Some(Self::Console)
-    } else if matches(&settings.server.token) {
-      Some(Self::Service)
-    } else {
-      None
-    }
-  }
+/// Whether `presented` is one of the settings' tokens, the service's own or the console's (`docs/api.md`,
+/// 「Conventions」); an empty token is none.
+fn accepted(presented: &str, settings: &Settings) -> bool {
+  [&settings.server.token, &settings.console.token]
+    .into_iter()
+    .any(|expected| !expected.is_empty() && presented == expected)
 }
 
 /// A missing or wrong token: 401 `unauthorized`.
@@ -345,25 +313,19 @@ fn unauthorized(error: &str) -> Refused {
   Refused::new(StatusCode::UNAUTHORIZED, "unauthorized", error)
 }
 
-/// Every request is let in only with one of the settings' tokens as its bearer, carrying which one it was.
-async fn require_token(
-  State(standing): State<Arc<Standing>>,
-  mut request: Request,
-  next: Next,
-) -> Response {
-  let credential = request
+/// Every registered route is let in only with one of the settings' tokens as its bearer.
+async fn require_token(State(standing): State<Arc<Standing>>, request: Request, next: Next) -> Response {
+  let let_in = request
     .headers()
     .get(header::AUTHORIZATION)
     .and_then(|value| value.to_str().ok())
     .and_then(|value| value.strip_prefix("Bearer "))
-    .and_then(|presented| Credential::of(presented, &standing.settings));
+    .is_some_and(|presented| accepted(presented, &standing.settings));
 
-  match credential {
-    Some(credential) => {
-      request.extensions_mut().insert(credential);
-      next.run(request).await
-    }
-    None => unauthorized("a missing or wrong token").into_response(),
+  if let_in {
+    next.run(request).await
+  } else {
+    unauthorized("a missing or wrong token").into_response()
   }
 }
 
@@ -376,7 +338,8 @@ async fn no_route(request: Request) -> Response {
   .into_response()
 }
 
-/// The router answering every registered route behind the token, or what is wrong with the routes linked in.
+/// The router answering every registered route behind the token, and the console face's routes behind the face's
+/// own guard where a face stands; or what is wrong with the routes linked in.
 pub fn router(standing: Standing) -> Result<Router, Vec<String>> {
   let faults = route_faults();
 
@@ -407,6 +370,7 @@ pub fn router(standing: Standing) -> Result<Router, Vec<String>> {
     return Err(faults);
   }
 
+  let face = standing.face.as_ref().ok().map(ConsoleFace::router);
   let standing = Arc::new(standing);
   let router = by_path
     .into_iter()
@@ -414,5 +378,10 @@ pub fn router(standing: Standing) -> Result<Router, Vec<String>> {
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(standing.clone(), require_token));
 
-  Ok(router.with_state(standing))
+  let router = router.with_state(standing);
+
+  Ok(match face {
+    Some(face) => router.merge(face),
+    None => router,
+  })
 }
