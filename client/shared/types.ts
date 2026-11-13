@@ -63,6 +63,8 @@ export interface FilePlaces {
   // under it, so each viewer has their own.
   viewer: string;
   space: FileSpace | null;
+  // What is shared with the signed-in owner, the newest first; null where the service could not answer it.
+  shared: FileSharedWithMe[] | null;
   machines: FileMachine[];
 }
 
@@ -134,4 +136,15 @@ export interface SharedFileView {
   name: string;
   kind: FileShareKind;
   expiresAt: number | null;
+}
+
+// One entry another owner shares with the signed-in owner to read (docs/files.md, "Sharing with members"):
+// the member share's number, which every reading of it names, and the key of the owner who shared it.
+export interface FileSharedWithMe {
+  id: number;
+  ownerKey: string;
+  name: string;
+  kind: FileShareKind;
+  // Epoch milliseconds.
+  sharedAt: number;
 }

@@ -9,7 +9,7 @@
     :data-entry="props.parent ? undefined : props.entry.name"
     :data-parent="props.parent ? '' : undefined"
     :data-folder="props.entry.kind === 'folder' ? '' : undefined"
-    :draggable="!props.parent && !props.renaming"
+    :draggable="!props.parent && !props.renaming && !props.readOnly"
     tabindex="-1"
     :title="linkText ?? undefined"
     class="group relative flex min-w-0 cursor-default rounded-md transition-colors select-none focus-inset"
@@ -27,7 +27,7 @@
     <span class="relative flex shrink-0 items-center justify-center" :style="{ width: `${mark}px`, height: `${mark}px` }">
       <img
         v-if="!props.parent && props.at !== null && showsThumbnail(props.entry, mark)"
-        :src="contentUrl({ ...props.at, name: props.entry.name })"
+        :src="props.road.content({ ...props.at, name: props.entry.name })"
         :alt="props.entry.name"
         loading="lazy"
         draggable="false"
@@ -62,16 +62,18 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { contentUrl } from "../domain/drive";
 import { VIEW_MARK, entryIcon, listSize, showsThumbnail, typeLabel } from "../domain/files";
 import { formatDateClock } from "bmo-ui/app/domain/time";
 
 import type { FileEntry } from "../../shared/types";
+import type { PlaceRoad } from "../domain/drive";
 import type { FilesView, FolderAt } from "../domain/files";
 
 interface Props {
   entry: FileEntry;
   at: FolderAt | null;
+  // How the folder's files are read.
+  road: PlaceRoad;
   view: Exclude<FilesView, "details">;
   // Whether this is the `..` heading the list, which goes to the folder above.
   parent?: boolean;
@@ -83,10 +85,12 @@ interface Props {
   // Whether the list is choosing, where every entry carries its mark.
   choosing?: boolean;
   renaming?: boolean;
+  // Whether nothing of the folder is dragged anywhere.
+  readOnly?: boolean;
 }
 
 const { t } = useI18n();
-const props = withDefaults(defineProps<Props>(), { parent: false, selected: false, cut: false, dropping: false, choosing: false, renaming: false });
+const props = withDefaults(defineProps<Props>(), { parent: false, selected: false, cut: false, dropping: false, choosing: false, renaming: false, readOnly: false });
 const emit = defineEmits<{ rename: [name: string]; "rename-cancel": [] }>();
 
 const PARENT_ICON = "i-material-symbols-drive-folder-upload-outline";

@@ -14,21 +14,15 @@
         <template v-if="choosing">
           <ChooseAll :keys="entryNames" :selected="selected" @choose="chooseAll" />
           <div>
-            <UTooltip :text="$t('common.action.close')">
-              <UButton color="neutral" variant="ghost" icon="i-material-symbols-close" :aria-label="$t('common.action.close')" @click="leaveChoosing" />
-            </UTooltip>
+            <IconButton icon="i-material-symbols-close" :label="$t('common.action.close')" @click="leaveChoosing" />
           </div>
         </template>
         <template v-else>
           <div>
-            <UTooltip :text="treeTool.label">
-              <UButton color="neutral" variant="ghost" :icon="treeTool.icon" :aria-label="treeTool.label" :aria-pressed="treeTool.pressed" @click="treeTool.onSelect()" />
-            </UTooltip>
+            <IconButton :icon="treeTool.icon" :label="treeTool.label" :aria-pressed="treeTool.pressed" @click="treeTool.onSelect()" />
           </div>
           <div>
-            <UTooltip :text="$t('drive.action.back')">
-              <UButton color="neutral" variant="ghost" icon="i-material-symbols-arrow-back" :aria-label="$t('drive.action.back')" :disabled="visited.length < 2" @click="goBack" />
-            </UTooltip>
+            <IconButton icon="i-material-symbols-arrow-back" :label="$t('drive.action.back')" :disabled="visited.length < 2" @click="goBack" />
           </div>
         </template>
 
@@ -42,37 +36,37 @@
         </nav>
         <div v-else class="min-w-0 flex-1" />
 
-        <div>
-          <UTooltip :text="$t('drive.action.new_folder')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-create-new-folder-outline" :aria-label="$t('drive.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
-          </UTooltip>
+        <!-- A share is read-only: its mark stands where the actions that change a folder stand elsewhere,
+             and names who shared it. -->
+        <div v-if="readOnly">
+          <HintTip :text="sharerText" :disabled="sharedBy === null">
+            <UBadge color="neutral" variant="subtle" icon="i-material-symbols-lock-outline" :label="$t('drive.label.read_only')" data-read-only />
+          </HintTip>
         </div>
-        <div>
-          <UDropdownMenu :items="uploadItems" :content="{ align: 'end' }">
-            <UTooltip :text="$t('drive.action.upload')">
-              <UButton color="neutral" variant="ghost" icon="i-material-symbols-upload" :aria-label="$t('drive.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
-            </UTooltip>
-          </UDropdownMenu>
-        </div>
+        <template v-else>
+          <div>
+            <IconButton icon="i-material-symbols-create-new-folder-outline" :label="$t('drive.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
+          </div>
+          <div>
+            <UDropdownMenu :items="uploadItems" :content="{ align: 'end' }">
+              <IconButton icon="i-material-symbols-upload" :label="$t('drive.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
+            </UDropdownMenu>
+          </div>
+        </template>
         <ActionGroup :actions="editActions" />
 
         <div>
           <UDropdownMenu :items="viewItems" :content="{ align: 'end' }">
-            <UTooltip :text="$t('drive.action.view')" :disabled="!narrow">
-              <UButton color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="narrow ? undefined : $t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('drive.action.view')" />
-            </UTooltip>
+            <IconButton v-if="narrow" :icon="VIEW_ICONS[view]" :label="$t('drive.action.view')" trailing-icon="i-material-symbols-arrow-drop-down" />
+            <UButton v-else color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="$t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('drive.action.view')" />
           </UDropdownMenu>
         </div>
 
         <div>
-          <UTooltip :text="$t('drive.action.refresh')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-refresh" :aria-label="$t('drive.action.refresh')" :loading="rereading" @click="reread" />
-          </UTooltip>
+          <IconButton icon="i-material-symbols-refresh" :label="$t('drive.action.refresh')" :loading="rereading" @click="reread" />
         </div>
         <div v-if="!narrow">
-          <UTooltip :text="previewTool.label">
-            <UButton color="neutral" variant="ghost" :icon="previewTool.icon" :aria-label="previewTool.label" :aria-pressed="previewTool.pressed" @click="previewTool.onSelect()" />
-          </UTooltip>
+          <IconButton :icon="previewTool.icon" :label="previewTool.label" :aria-pressed="previewTool.pressed" @click="previewTool.onSelect()" />
         </div>
       </ToolBar>
 
@@ -167,7 +161,7 @@
 import { useI18n } from "vue-i18n";
 import { refusalText } from "../../domain/refusals";
 import { countText } from "bmo-ui/app/domain/numbers";
-import { carryEntries, changeMember, contentUrl, deleteEntries, endMember, endShare, makeFolder, makeShare, readListing, readMembers, readNode, readPlaces, readShares, readSpace, renameEntry as renameAt, sendFile, shareMembers } from "../../domain/drive";
+import { carryEntries, changeMember, deleteEntries, endMember, endShare, makeFolder, makeShare, readMembers, readNode, readPlaces, readShared, readShares, readSpace, renameEntry as renameAt, roadTo, sendFile, shareMembers } from "../../domain/drive";
 import { CONSOLE_PEOPLE, personOf } from "../../domain/people";
 import {
   DEFAULT_SORT,
@@ -175,6 +169,7 @@ import {
   ENTRIES_DRAG,
   FILES_VIEWS,
   PAGE,
+  SHARED_ROW,
   SORT_LABELS,
   TREE_PAGE,
   VIEW_LABELS,
@@ -197,6 +192,7 @@ import {
   previewKind,
   readSort,
   readView,
+  sharedOf,
   shownPath,
   withMachine
 } from "../../domain/files";
@@ -208,7 +204,7 @@ import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
 import { SHARE_SPANS, spanSeconds } from "../../../shared/config";
 import { browserStore, forgetPlace, rememberPlace, rememberedPlace, startingPlace } from "../../domain/place-memory";
 
-import type { FileConflict, FileEntry, FileMachine, FileMemberView, FilePlaces, FileShareView, FileSortKey } from "../../../shared/types";
+import type { FileConflict, FileEntry, FileMachine, FileMemberView, FilePlaces, FileSharedWithMe, FileShareView, FileSortKey } from "../../../shared/types";
 import type { ConsolePeople } from "../../domain/people";
 import type { ShareRoad, ShareSpan } from "bmo-ui/app/domain/share-links";
 import type { ShareMemberRoad } from "bmo-ui/app/domain/share-members";
@@ -220,7 +216,8 @@ import type { BreadcrumbItem, ContextMenuItem, DropdownMenuItem, SplitterItem } 
 
 // The Files screen (docs/files.md). The place, the folder, the chosen
 // file, the view and the sort live in the address; how wide the parts are, and the folder each viewer
-// last opened, belong to this browser.
+// last opened, belong to this browser. Each place is read by its own road, and a share's is read-only:
+// nothing that would change it, carry from it or share it is offered there.
 
 const { t } = useI18n();
 const route = useRoute();
@@ -247,7 +244,7 @@ const loadingMore = ref(false);
 const rereading = ref(false);
 // What the tree knows of each folder's own folders, by the folder's key.
 const known = ref(new Map<string, FolderChildren>());
-const expanded = ref<string[]>([machineRowKey("local")]);
+const expanded = ref<string[]>([SHARED_ROW, machineRowKey("local")]);
 // The folders opened on this visit, the open one last: what the back button steps back through.
 const visited = ref<FolderAt[]>([]);
 const treeOpen = ref(true);
@@ -281,7 +278,38 @@ const open = computed<FolderAt | null>(() => {
 const chosenName = computed(() => queryText(route.query.file));
 const sort = computed<FilesSort>(() => readSort(route.query.sort, route.query.order));
 const view = computed<FilesView>(() => readView(route.query.view));
-const canChange = computed(() => open.value !== null && !changing.value);
+// How the open folder is read, and whether it is a share's, where nothing is changed.
+const road = computed(() => roadTo(places.value, open.value?.place ?? ""));
+const readOnly = computed(() => open.value !== null && road.value.readOnly);
+const canChange = computed(() => open.value !== null && !readOnly.value && !changing.value);
+
+/** Whether a place takes changes: none of a share's does. */
+function writable(place: string): boolean {
+  return !roadTo(places.value, place).readOnly;
+}
+
+// The name of each sharer, by their key, as the console's people directory answers it (docs/files.md, "The
+// Files screen"); a key it answers no person for, or every key where it offers none, stands as the key.
+const sharers = ref(new Map<string, string>());
+
+async function nameSharers(shared: readonly FileSharedWithMe[] | null): Promise<void> {
+  const keys = [...new Set((shared ?? []).map((one) => one.ownerKey))].filter((key) => !sharers.value.has(key));
+  const directory = people;
+
+  if (keys.length === 0) return;
+
+  const named = await Promise.all(keys.map(async (key): Promise<[string, string]> => [key, directory === null ? key : (await personOf(directory, key)).name]));
+
+  sharers.value = new Map([...sharers.value, ...named]);
+}
+
+// Who shared the open place, where it is a share.
+const sharedBy = computed(() => {
+  const share = open.value === null ? null : sharedOf(places.value, open.value.place);
+
+  return share === null ? null : (sharers.value.get(share.ownerKey) ?? share.ownerKey);
+});
+const sharerText = computed(() => t("drive.label.shared_by_named", { name: sharedBy.value ?? "" }));
 
 const placeName = computed(() => (open.value === null ? "" : placeLabel(t, places.value, open.value.place)));
 const chosenEntry = computed(() => entries.value?.find((one) => one.name === chosenName.value) ?? null);
@@ -296,6 +324,8 @@ function pathOf(at: FolderAt, name: string): string {
 
 const listProps = computed(() => ({
   at: open.value,
+  road: road.value,
+  readOnly: readOnly.value,
   entries: entries.value,
   total: total.value,
   loading: loading.value,
@@ -325,13 +355,15 @@ const listEvents = {
   drop: onListDrop
 };
 
-const treeItems = computed(() => (places.value === null ? null : filesTree(t, places.value, known.value)));
+const treeItems = computed(() => (places.value === null ? null : filesTree(t, places.value, known.value, sharers.value)));
 const treeProps = computed(() => ({ items: treeItems.value, loading: placesLoading.value, open: open.value, menu: treeMenu.value }));
 
 const previewProps = computed(() => ({
   chosen: chosen.value,
   placeName: placeName.value,
-  shownPath: chosen.value === null ? "" : pathOf(chosen.value, chosen.value.entry.name)
+  shownPath: chosen.value === null ? "" : pathOf(chosen.value, chosen.value.entry.name),
+  road: road.value,
+  sharedBy: sharedBy.value
 }));
 
 // The path bar: the place, then each folder down to the open one, each a link to its folder.
@@ -513,7 +545,7 @@ function openEntry(entry: FileEntry): void {
     pictureName.value = entry.name;
     pictureOpen.value = true;
   } else if (entry.kind === "file") {
-    window.open(contentUrl({ ...at, name: entry.name }), "_blank", "noopener");
+    window.open(road.value.content({ ...at, name: entry.name }), "_blank", "noopener");
   }
 }
 
@@ -533,7 +565,7 @@ const pictureName = ref<string | null>(null);
 const pictures = computed(() => (entries.value ?? []).filter((one) => one.kind === "file" && previewKind(one.name) === "image"));
 const pictureAt = computed(() => pictures.value.findIndex((one) => one.name === pictureName.value));
 const pictureEntry = computed(() => pictures.value[pictureAt.value] ?? null);
-const pictureSrc = computed(() => (open.value === null || pictureName.value === null ? "" : contentUrl({ ...open.value, name: pictureName.value })));
+const pictureSrc = computed(() => (open.value === null || pictureName.value === null ? "" : road.value.content({ ...open.value, name: pictureName.value })));
 
 function openPicture(): void {
   if (chosenEntry.value === null) return;
@@ -560,13 +592,13 @@ const pictureActions = computed<BarAction[]>(() => {
   if (at === null || name === null) return [];
 
   return [
-    { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(contentUrl({ ...at, name }, { download: true }), "_self") },
-    { id: "open", label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(contentUrl({ ...at, name }), "_blank", "noopener") }
+    { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(road.value.content({ ...at, name }, { download: true }), "_self") },
+    { id: "open", label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(road.value.content({ ...at, name }), "_blank", "noopener") }
   ];
 });
 
 const pictureProperties = computed<BarProperty[]>(() =>
-  open.value === null || pictureEntry.value === null ? [] : entryProperties(t, placeName.value, pathOf(open.value, pictureEntry.value.name), pictureEntry.value)
+  open.value === null || pictureEntry.value === null ? [] : entryProperties(t, placeName.value, pathOf(open.value, pictureEntry.value.name), pictureEntry.value, sharedBy.value)
 );
 
 // Pictures either side are fetched ahead, so going to one shows it at once.
@@ -574,7 +606,7 @@ watch(pictureAt, (at) => {
   if (!import.meta.client || open.value === null) return;
 
   for (const near of [pictures.value[at - 1], pictures.value[at + 1]]) {
-    if (near !== undefined) new Image().src = contentUrl({ ...open.value, name: near.name });
+    if (near !== undefined) new Image().src = road.value.content({ ...open.value, name: near.name });
   }
 });
 
@@ -583,7 +615,7 @@ watch(pictureAt, (at) => {
 const propertiesOpen = ref(false);
 const propertiesEntry = ref<FileEntry | null>(null);
 const propertiesRows = computed<BarProperty[]>(() =>
-  open.value === null || propertiesEntry.value === null ? [] : entryProperties(t, placeName.value, pathOf(open.value, propertiesEntry.value.name), propertiesEntry.value)
+  open.value === null || propertiesEntry.value === null ? [] : entryProperties(t, placeName.value, pathOf(open.value, propertiesEntry.value.name), propertiesEntry.value, sharedBy.value)
 );
 
 // ---- Share links ---------------------------------------------------------------------------------------
@@ -680,7 +712,7 @@ function shareable(): FileEntry | null {
 function shareEntry(entry: FileEntry | null = shareable()): void {
   const at = open.value;
 
-  if (at === null || entry === null || entry.kind === "other") return;
+  if (at === null || entry === null || entry.kind === "other" || !writable(at.place)) return;
 
   shareTarget.value = { place: at.place, path: joinPath(at.path, entry.name), name: entry.name };
   shareOpen.value = true;
@@ -717,6 +749,7 @@ async function loadPlaces(): Promise<void> {
 
   try {
     places.value = merged(await readPlaces());
+    void nameSharers(places.value.shared);
 
     if (open.value === null) {
       const remembered = rememberedPlace(browserStore(), places.value.viewer);
@@ -731,6 +764,19 @@ async function loadPlaces(): Promise<void> {
     placesFailure.value = refusalText(t, error, t("drive.error.places_failed"));
   } finally {
     placesLoading.value = false;
+  }
+}
+
+// What is shared with the owner, read again: a share its owner ended is gone from the tree. A reading that
+// fails leaves the branch as it stood.
+async function loadShared(): Promise<void> {
+  try {
+    const shared = await readShared();
+
+    if (places.value !== null) places.value = { ...places.value, shared };
+    void nameSharers(shared);
+  } catch {
+    // The branch stays as it was last read.
   }
 }
 
@@ -792,7 +838,7 @@ async function loadListing(fresh = false): Promise<void> {
   loading.value = true;
 
   try {
-    const page = await readListing(at, { sort: sort.value.by, order: sort.value.order, after: 0, limit: PAGE, fresh });
+    const page = await roadTo(places.value, at.place).listing(at, { sort: sort.value.by, order: sort.value.order, after: 0, limit: PAGE, fresh });
 
     if (mine !== listAsked) return;
 
@@ -815,6 +861,7 @@ async function loadListing(fresh = false): Promise<void> {
     entries.value = null;
     listFailure.value = refusalText(t, error, t("drive.error.list_failed"));
     forgetUnlisted(at);
+    if (!writable(at.place) && (error as { statusCode?: unknown } | null)?.statusCode === 404) void loadShared();
   } finally {
     if (mine === listAsked) loading.value = false;
   }
@@ -830,7 +877,7 @@ async function loadMore(): Promise<void> {
   loadingMore.value = true;
 
   try {
-    const page = await readListing(at, { sort: sort.value.by, order: sort.value.order, after: shown.length, limit: PAGE });
+    const page = await roadTo(places.value, at.place).listing(at, { sort: sort.value.by, order: sort.value.order, after: shown.length, limit: PAGE });
 
     if (mine === listAsked && entries.value === shown) {
       entries.value = [...shown, ...page.entries];
@@ -854,7 +901,7 @@ async function loadFolders(at: FolderAt, fresh = false): Promise<void> {
   let children: FolderChildren;
 
   try {
-    const page = await readListing(at, { folders: true, limit: TREE_PAGE, fresh });
+    const page = await roadTo(places.value, at.place).listing(at, { folders: true, limit: TREE_PAGE, fresh });
 
     children = { state: "read", names: page.entries.map((one) => one.name), more: page.total - page.entries.length };
   } catch (error) {
@@ -989,7 +1036,7 @@ function targets(): string[] {
 }
 
 function newFolder(into: FolderAt | null = open.value): void {
-  if (into === null) return;
+  if (into === null || !writable(into.place)) return;
 
   void change(async () => {
     const made = await makeFolder(into.place, joinPath(into.path, t("drive.action.new_folder")), "rename");
@@ -1008,7 +1055,7 @@ function newFolder(into: FolderAt | null = open.value): void {
 function startRename(): void {
   const [only] = targets();
 
-  if (only === undefined || targets().length !== 1) return;
+  if (readOnly.value || only === undefined || targets().length !== 1) return;
 
   void menusGone().then(() => {
     if (selected.value.size === 1 && selected.value.has(only)) renaming.value = only;
@@ -1047,7 +1094,7 @@ function deleteChosen(): void {
   const at = open.value;
   const names = targets();
 
-  if (at === null || names.length === 0) return;
+  if (at === null || names.length === 0 || !writable(at.place)) return;
 
   void change(async () => {
     const sure = await askQuestion({
@@ -1068,7 +1115,7 @@ function toClip(mode: FilesClip["mode"]): void {
   const at = open.value;
   const names = targets();
 
-  if (at !== null && names.length > 0) clip.value = { mode, place: at.place, paths: names.map((name) => joinPath(at.path, name)) };
+  if (at !== null && names.length > 0 && writable(at.place)) clip.value = { mode, place: at.place, paths: names.map((name) => joinPath(at.path, name)) };
 }
 
 /** Entries of one place carried into a folder, copied or moved, with any collision asked about. */
@@ -1086,7 +1133,7 @@ async function carry(from: { place: string; paths: string[] }, into: FolderAt, m
 function paste(into: FolderAt | null = open.value): void {
   const held = clip.value;
 
-  if (into === null || held === null) return;
+  if (into === null || held === null || !writable(into.place)) return;
 
   void change(async () => {
     // A copy pasted where it came from keeps both, as a file explorer makes it.
@@ -1176,7 +1223,7 @@ function onPicked(event: Event): void {
 
   input.value = "";
 
-  if (at === null || picked.length === 0) return;
+  if (at === null || picked.length === 0 || !writable(at.place)) return;
 
   const folders = new Set<string>();
 
@@ -1199,7 +1246,7 @@ function onPicked(event: Event): void {
 function onListDrag(entry: FileEntry, event: DragEvent): void {
   const at = open.value;
 
-  if (at === null || event.dataTransfer === null) return;
+  if (at === null || event.dataTransfer === null || !writable(at.place)) return;
 
   if (!selected.value.has(entry.name)) selected.value = new Set([entry.name]);
 
@@ -1209,6 +1256,8 @@ function onListDrag(entry: FileEntry, event: DragEvent): void {
 
 /** Something dropped on a folder: files from the desktop uploaded, entries of the list moved — or copied, with Ctrl, or between places. */
 async function dropInto(into: FolderAt, transfer: DataTransfer, copy: boolean): Promise<void> {
+  if (!writable(into.place)) return;
+
   if (carriesFiles(transfer)) {
     upload(into, await droppedItems(transfer));
 
@@ -1240,6 +1289,9 @@ function onTreeDrop(into: FolderAt, transfer: DataTransfer, copy: boolean): void
 
 const editActions = computed<BarAction[]>(() => {
   const some = selected.value.size > 0 && !changing.value;
+  const links: BarAction = { id: "share-links", label: t("drive.action.share_links"), icon: "i-material-symbols-link", onSelect: () => (shareListOpen.value = true) };
+
+  if (readOnly.value) return [links];
 
   return [
     { id: "cut", label: t("drive.action.cut"), icon: "i-material-symbols-content-cut", disabled: !some, onSelect: () => toClip("cut") },
@@ -1248,7 +1300,7 @@ const editActions = computed<BarAction[]>(() => {
     { id: "rename", label: t("drive.action.rename"), icon: "i-material-symbols-drive-file-rename-outline", disabled: selected.value.size !== 1 || changing.value, onSelect: startRename },
     { id: "delete", label: t("drive.action.delete"), icon: "i-material-symbols-delete-outline", disabled: !some, onSelect: deleteChosen },
     { id: "share", label: t("drive.action.share"), icon: "i-material-symbols-share-outline", disabled: shareable() === null, onSelect: () => shareEntry() },
-    { id: "share-links", label: t("drive.action.share_links"), icon: "i-material-symbols-link", onSelect: () => (shareListOpen.value = true) }
+    links
   ];
 });
 
@@ -1285,6 +1337,19 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
     onSelect: () => sortBy(by)
   }));
 
+  const looks: ContextMenuItem[] = [
+    { label: t("drive.action.view"), icon: VIEW_ICONS[view.value], children: viewItems.value },
+    { label: t("drive.action.sort"), icon: "i-material-symbols-sort", children: sortItems },
+    { label: t("drive.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void reread() }
+  ];
+
+  const whole: ContextMenuItem[] = [
+    { label: t("common.action.choose_all"), icon: "i-material-symbols-select-all", kbds: SHORTCUT.all, onSelect: () => chooseAll(true) },
+    { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }
+  ];
+
+  if (entry === null && readOnly.value) return [looks, whole];
+
   if (entry === null) {
     return [
       [
@@ -1292,15 +1357,8 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
         { label: t("drive.action.upload"), icon: "i-material-symbols-upload", disabled: !canChange.value, children: uploadItems.value },
         { label: t("drive.action.paste"), icon: "i-material-symbols-content-paste", kbds: SHORTCUT.paste, disabled: clip.value === null || !canChange.value, onSelect: () => paste() }
       ],
-      [
-        { label: t("drive.action.view"), icon: VIEW_ICONS[view.value], children: viewItems.value },
-        { label: t("drive.action.sort"), icon: "i-material-symbols-sort", children: sortItems },
-        { label: t("drive.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void reread() }
-      ],
-      [
-        { label: t("common.action.choose_all"), icon: "i-material-symbols-select-all", kbds: SHORTCUT.all, onSelect: () => chooseAll(true) },
-        { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }
-      ]
+      looks,
+      whole
     ];
   }
 
@@ -1308,18 +1366,25 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
   const folder = entry.kind === "folder";
   const file = entry.kind === "file";
   const inside: FolderAt = { place: at.place, path: joinPath(at.path, entry.name) };
+  const reading: ContextMenuItem[] = [
+    ...(many ? [] : [{ label: t("drive.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openEntry(entry) }]),
+    ...(file && !many
+      ? [
+          { label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(road.value.content({ ...at, name: entry.name }), "_blank", "noopener") },
+          { label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(road.value.content({ ...at, name: entry.name }, { download: true }), "_self") }
+        ]
+      : [])
+  ];
+  const about: ContextMenuItem[] = [
+    { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths(targets().map((name) => pathOf(at, name))) },
+    ...(narrow.value && !choosing.value ? [{ label: t("drive.action.choose"), icon: "i-material-symbols-check-box-outline", onSelect: () => (choosing.value = true) }] : []),
+    ...(many ? [] : [{ label: t("common.label.properties"), icon: "i-material-symbols-info-outline-rounded", onSelect: () => showProperties(entry) }])
+  ];
+
+  if (readOnly.value) return [reading, about].filter((group) => group.length > 0);
 
   return [
-    [
-      ...(many ? [] : [{ label: t("drive.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openEntry(entry) }]),
-      ...(file && !many
-        ? [
-            { label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(contentUrl({ ...at, name: entry.name }), "_blank", "noopener") },
-            { label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(contentUrl({ ...at, name: entry.name }, { download: true }), "_self") }
-          ]
-        : []),
-      ...((file || folder) && !many ? [{ label: t("drive.action.share"), icon: "i-material-symbols-share-outline", onSelect: () => shareEntry(entry) }] : [])
-    ],
+    [...reading, ...((file || folder) && !many ? [{ label: t("drive.action.share"), icon: "i-material-symbols-share-outline", onSelect: () => shareEntry(entry) }] : [])],
     [
       { label: t("drive.action.cut"), icon: "i-material-symbols-content-cut", kbds: SHORTCUT.cut, onSelect: () => toClip("cut") },
       { label: t("drive.action.copy"), icon: "i-material-symbols-content-copy", kbds: SHORTCUT.copy, onSelect: () => toClip("copy") },
@@ -1329,11 +1394,7 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
       ...(many ? [] : [{ label: t("drive.action.rename"), icon: "i-material-symbols-drive-file-rename-outline", kbds: SHORTCUT.rename, disabled: changing.value, onSelect: startRename }]),
       { label: t("drive.action.delete"), icon: "i-material-symbols-delete-outline", color: "error" as const, kbds: SHORTCUT.delete, disabled: changing.value, onSelect: deleteChosen }
     ],
-    [
-      { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths(targets().map((name) => pathOf(at, name))) },
-      ...(narrow.value && !choosing.value ? [{ label: t("drive.action.choose"), icon: "i-material-symbols-check-box-outline", onSelect: () => (choosing.value = true) }] : []),
-      ...(many ? [] : [{ label: t("common.label.properties"), icon: "i-material-symbols-info-outline-rounded", onSelect: () => showProperties(entry) }])
-    ]
+    about
   ].filter((group) => group.length > 0);
 });
 
@@ -1358,9 +1419,15 @@ const treeMenu = computed<ContextMenuItem[][]>(() => {
     return [[{ label: t("drive.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void readMachine(key) }]];
   }
 
+  if (item?.value === SHARED_ROW) return [[{ label: t("drive.action.refresh"), icon: "i-material-symbols-refresh", onSelect: () => void loadShared() }]];
+
   const at = item?.folder;
 
   if (at === undefined) return [];
+
+  const copyPath: ContextMenuItem = { label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) };
+
+  if (!writable(at.place)) return [[{ label: t("drive.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openFromTree(at) }], [copyPath]];
 
   return [
     [{ label: t("drive.action.open"), icon: "i-material-symbols-folder-open-outline", onSelect: () => openFromTree(at) }],
@@ -1368,7 +1435,7 @@ const treeMenu = computed<ContextMenuItem[][]>(() => {
       { label: t("drive.action.new_folder"), icon: "i-material-symbols-create-new-folder-outline", disabled: changing.value, onSelect: () => newFolder(at) },
       { label: t("drive.action.paste"), icon: "i-material-symbols-content-paste", disabled: clip.value === null || changing.value, onSelect: () => paste(at) }
     ],
-    [{ label: t("drive.action.copy_path"), icon: "i-material-symbols-content-copy", onSelect: () => void copyPaths([shownPath(places.value, at.place, at.path)]) }]
+    [copyPath]
   ];
 });
 

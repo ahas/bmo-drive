@@ -77,12 +77,12 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { refusalText } from "../domain/refusals";
-import { contentUrl } from "../domain/drive";
 import { TEXT_HEAD_BYTES, entryIcon, entryProperties, isJson, laidOutJson, listSize, previewKind, textOf, typeLabel as typeOf } from "../domain/files";
 
 import type { FileEntry } from "../../shared/types";
 import type { FolderAt } from "../domain/files";
 import type { BarAction, BarProperty } from "bmo-ui/app/domain/tabs";
+import type { PlaceRoad } from "../domain/drive";
 
 interface Props {
   // The entry chosen, with the folder it stands in; null where nothing is chosen.
@@ -90,6 +90,10 @@ interface Props {
   // The name of the place the folder is of, and the entry's path as it is copied out.
   placeName: string;
   shownPath: string;
+  // How the folder's files are read.
+  road: PlaceRoad;
+  // The name of who shared the place, where it is a share.
+  sharedBy: string | null;
 }
 
 const { t } = useI18n();
@@ -105,8 +109,8 @@ const video = ref<VideoState>({ state: "loading" });
 
 const at = computed(() => (props.chosen === null ? null : { place: props.chosen.place, path: props.chosen.path, name: props.chosen.entry.name }));
 const kind = computed(() => (props.chosen === null ? "none" : previewKind(props.chosen.entry.name)));
-const shownUrl = computed(() => (at.value === null ? "" : contentUrl(at.value)));
-const downloadUrl = computed(() => (at.value === null ? "" : contentUrl(at.value, { download: true })));
+const shownUrl = computed(() => (at.value === null ? "" : props.road.content(at.value)));
+const downloadUrl = computed(() => (at.value === null ? "" : props.road.content(at.value, { download: true })));
 
 const actions = computed<BarAction[]>(() =>
   props.chosen?.entry.kind !== "file"
@@ -119,7 +123,7 @@ const actions = computed<BarAction[]>(() =>
 
 const typeLabel = computed(() => (props.chosen === null ? "" : typeOf(t, props.chosen.entry)));
 
-const properties = computed<BarProperty[]>(() => (props.chosen === null ? [] : entryProperties(t, props.placeName, props.shownPath, props.chosen.entry)));
+const properties = computed<BarProperty[]>(() => (props.chosen === null ? [] : entryProperties(t, props.placeName, props.shownPath, props.chosen.entry, props.sharedBy)));
 
 let asked = 0;
 
@@ -136,7 +140,7 @@ async function readText(): Promise<void> {
   text.value = { state: "loading" };
 
   try {
-    const response = await fetch(contentUrl(at.value, { head: TEXT_HEAD_BYTES }));
+    const response = await fetch(props.road.content(at.value, { head: TEXT_HEAD_BYTES }));
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { code?: unknown } | null;
@@ -182,7 +186,7 @@ async function videoFailed(event: Event): Promise<void> {
     return;
   }
 
-  const response = await fetch(contentUrl(at.value, { head: 1 })).catch(() => null);
+  const response = await fetch(props.road.content(at.value, { head: 1 })).catch(() => null);
   const body = response === null || response.ok ? null : ((await response.json().catch(() => null)) as { code?: unknown } | null);
 
   if (mine !== asked) return;

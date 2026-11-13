@@ -452,6 +452,23 @@ flowchart TD
 - **The machines stand below it only where the service answers that they are the owner's:** this machine
   with its drives and Garage, then each node of the node list. The screen reads no name and no node list to
   decide it; for any other owner it reads neither the machines nor the node list.
+- **What is shared with the signed-in owner stands below the drive,** as one branch of the tree, before the
+  machines, for every owner alike (「Sharing with members」):
+  - **it lists the shares the service answers for the owner,** the newest first, each by its entry's name with
+    the name of the person who shared it beside it; that name is the one the console's people directory
+    answers for the sharer's key, and a key it answers no person for, or every key under a console that
+    offers no directory, stands as the key itself;
+  - **each share opens as a place of its own:** a shared folder is walked as any folder is, its listing and
+    its folders in the tree read through the member's own readings of the share; a shared file opens as a
+    folder holding that one file;
+  - **its files are previewed, opened and downloaded as any file is,** read through the member's own reading
+    of the share's content;
+  - **such a place is read-only, and says so:** a mark beside the path names it read-only and, on hover or
+    focus, names who shared it; no action that would change it, carry from it or share it stands in the
+    toolbar, a menu or a key, and nothing is dragged out of it or dropped into it;
+  - **a share the owner ended is gone** the next time the branch is read: on a refresh, and as soon as a
+    reading of it is answered as not found. A branch the service cannot read says so in its place, and
+    the rest of the tree stands.
 - **The share dialog offers the members of the reader's company under the link** (「Sharing with members」),
   found through the console's people directory and drawn by the name it answers for each key, a key it
   answers no person for standing as the key. Who an entry is shared with, and each share and removal, are
@@ -464,7 +481,8 @@ flowchart TD
   the folders walked and a reload opens the same folder.
 - **The last folder each viewer opened is remembered in the browser,** under the viewer's owner key as the
   service answers it, as a convenience: the screen opened with an address that names no place opens at
-  that folder, where the place is still one the viewer reaches. A remembered folder that can no longer be
+  that folder, where the place is still one the viewer reaches, a share still standing among those shared
+  with them included. A remembered folder that can no longer be
   listed is forgotten and the screen opens where it would with nothing remembered. Storage the browser
   refuses or clears leaves nothing remembered and changes nothing else.
 - **A link is marked as one** in the open folder's list, with the target it names, and a link refused for

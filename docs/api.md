@@ -334,8 +334,10 @@ them as the contract names. This section names only what the drive hands the cra
 
 - **Its Files screen** uses the contract's people directory and its sharing with members: the share dialog's
   member road searches and names people through the directory the console provides, and reads, grants,
-  changes and takes back members through 「Member shares」. These are the bundle's own service, so `calls`
-  stays empty.
+  changes and takes back members through 「Member shares」; the tree's branch of what is shared with the
+  signed-in owner lists `GET /shared`, opens each share's folders through `GET /shared/{id}/entries` and its
+  files through `GET /shared/{id}/content`, and names each sharer by the directory's `person`. These are the
+  bundle's own service, so `calls` stays empty.
 - **Its share page** is the contract's share page: a link's page under `/files/share/` and the token, reading
   the link and its content through the two share reads. Since the manifest names share reads, the module and
   the stylesheet are answered with no role and no owner key.

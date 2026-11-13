@@ -4,13 +4,14 @@ import { formatStamp } from "bmo-ui/app/domain/time";
 import { faultText } from "./refusals";
 import { fileSizeText } from "./sizes";
 
-import type { FileDrive, FileDriveKind, FileEntry, FileGarage, FileMachine, FilePlaces, FileSortKey, FileSpace, FileVolume } from "../../shared/types";
+import type { FileDrive, FileDriveKind, FileEntry, FileGarage, FileMachine, FilePlaces, FileSharedWithMe, FileSortKey, FileSpace, FileVolume } from "../../shared/types";
 import type { BarProperty } from "bmo-ui/app/domain/tabs";
 import type { Translate } from "bmo-ui/shared/wording";
 
 // The Files screen's own reckoning: where a folder stands, how its list is ordered, paged and laid
 // out, what a file can be previewed as, what the clipboard holds, and the tree's roots — the owner's
-// drive, then the machines, each with its drives — out of the places the service reads (docs/files.md).
+// drive, then what is shared with the owner, then the machines, each with its drives — out of the places
+// the service reads (docs/files.md).
 
 /** How many entries a page of the list carries; the tree asks for its folders a larger page at once. */
 export const PAGE = 200;
@@ -224,10 +225,14 @@ export function typeLabel(t: Translate, entry: FileEntry): string {
   return dot > 0 ? t("drive.label.file_type", { end: entry.name.slice(dot + 1).toUpperCase() }) : t("drive.label.plain_file");
 }
 
-/** An entry's details as the properties viewer lists them: where it is, what it is, how large, when changed. */
-export function entryProperties(t: Translate, placeName: string, path: string, entry: FileEntry): BarProperty[] {
+/**
+ * An entry's details as the properties viewer lists them: where it is, who shared it where it stands in a
+ * share, what it is, how large, when changed.
+ */
+export function entryProperties(t: Translate, placeName: string, path: string, entry: FileEntry, sharedBy: string | null = null): BarProperty[] {
   return [
     { label: t("drive.label.place"), value: placeName },
+    ...(sharedBy === null ? [] : [{ label: t("drive.label.shared_by"), value: sharedBy }]),
     { label: t("drive.label.path"), value: path, mono: true },
     { label: t("drive.label.type"), value: typeLabel(t, entry) },
     ...(entry.size === null ? [] : [{ label: t("drive.label.size"), value: t("drive.label.size_exact", { size: fileSizeText(entry.size), bytes: countText(entry.size) }) }]),
@@ -259,6 +264,8 @@ const DRIVE_ICONS: Record<FileDriveKind, string> = {
 export const GARAGE_ICON = "i-material-symbols-inventory-2-outline";
 
 export const SPACE_ICON = "i-material-symbols-folder-special-outline";
+
+export const SHARED_ICON = "i-material-symbols-folder-shared-outline";
 
 /** Whether a place is the signed-in owner's drive. */
 export function isSpace(places: FilePlaces | null, place: string): boolean {
@@ -296,6 +303,30 @@ export function machineKeyOf(place: string): string {
   return `${NODE_PREFIX}${cut < 0 ? rest : rest.slice(0, cut)}`;
 }
 
+// How the service names the place a share opens as: the member share's number after a prefix
+// (docs/api.md, "Member shares").
+const SHARED_PREFIX = "shared:";
+
+/** The place a share shared with the owner opens as. */
+export function sharedPlace(id: number): string {
+  return `${SHARED_PREFIX}${id}`;
+}
+
+/** The number of the share a place opens. */
+export function sharedId(place: string): number {
+  return Number(place.slice(SHARED_PREFIX.length));
+}
+
+/** Whether a place is a share opened, whether or not it still stands among those read. */
+export function isSharedPlace(place: string): boolean {
+  return place.startsWith(SHARED_PREFIX);
+}
+
+/** The share a place opens, among those shared with the owner as last read. */
+export function sharedOf(places: FilePlaces | null, place: string): FileSharedWithMe | null {
+  return isSharedPlace(place) ? (places?.shared?.find((one) => sharedPlace(one.id) === place) ?? null) : null;
+}
+
 /** Where a place stands among the machines read so far: its machine, and its drive and volume. */
 export interface PlaceFound {
   machine: FileMachine;
@@ -324,6 +355,7 @@ export function findPlace(places: FilePlaces | null, place: string): PlaceFound 
  */
 export function placeLabel(t: Translate, places: FilePlaces | null, place: string): string {
   if (isSpace(places, place)) return t("drive.label.space");
+  if (isSharedPlace(place)) return sharedOf(places, place)?.name ?? place;
 
   const found = findPlace(places, place);
 
@@ -385,12 +417,17 @@ export interface FilesTreeItem {
   disabled?: boolean;
   // A row standing in for what is still being read.
   loading?: boolean;
+  // A row of a place nothing is changed in or dropped into: a share.
+  readOnly?: boolean;
   children?: FilesTreeItem[];
 }
 
 export function folderKey(at: FolderAt): string {
   return `${at.place}\n${at.path}`;
 }
+
+/** The row of what is shared with the owner. */
+export const SHARED_ROW = "shared";
 
 export function machineRowKey(key: string): string {
   return `machine:${key}`;
@@ -408,6 +445,8 @@ export type FolderChildren = { state: "loading" } | { state: "failed"; reason: s
 interface TreeContext {
   known: ReadonlyMap<string, FolderChildren>;
   more: (count: number) => string;
+  // Whether the rows drawn stand in a share.
+  readOnly?: boolean;
 }
 
 function loadingRow(key: string): FilesTreeItem {
@@ -421,7 +460,7 @@ function failedRow(key: string, reason: string): FilesTreeItem {
 function folderItem(at: FolderAt, label: string, icon: string, context: TreeContext, note?: string): FilesTreeItem {
   const key = folderKey(at);
   const children = context.known.get(key);
-  const item: FilesTreeItem = { value: key, label, icon, folder: at, ...(note === undefined ? {} : { note }) };
+  const item: FilesTreeItem = { value: key, label, icon, folder: at, ...(note === undefined ? {} : { note }), ...(context.readOnly === true ? { readOnly: true } : {}) };
 
   if (children === undefined || children.state === "loading") {
     // A folder not read yet still opens: its row carries the place its folders will stand in.
@@ -488,12 +527,39 @@ function spaceItem(t: Translate, space: FileSpace, context: TreeContext): FilesT
   return folderItem(at, t("drive.label.space"), SPACE_ICON, context, spaceUsage(t, space));
 }
 
-/** The tree: the owner's drive, then each machine — this one first — opening onto its drives and their volumes, and Garage. */
-export function filesTree(t: Translate, places: FilePlaces, known: ReadonlyMap<string, FolderChildren>): FilesTreeItem[] {
+/**
+ * What is shared with the owner, as one branch: each share by its name with its sharer's name beside it,
+ * a folder opening onto its own folders and a file standing alone. A sharer not yet named stands with
+ * nothing beside it until it is.
+ */
+function sharedItem(t: Translate, shared: readonly FileSharedWithMe[] | null, sharers: ReadonlyMap<string, string>, context: TreeContext): FilesTreeItem {
+  const item: FilesTreeItem = { value: SHARED_ROW, label: t("drive.label.shared"), icon: SHARED_ICON };
+
+  if (shared === null) return { ...item, children: [failedRow(SHARED_ROW, t("drive.error.shared_failed"))] };
+  if (shared.length === 0) return { ...item, note: t("drive.label.none") };
+
+  const inside: TreeContext = { ...context, readOnly: true };
+  const children = shared.map((share): FilesTreeItem => {
+    const at = { place: sharedPlace(share.id), path: "" };
+    const sharer = sharers.get(share.ownerKey);
+
+    if (share.kind === "folder") return folderItem(at, share.name, "", inside, sharer);
+
+    return { value: folderKey(at), label: share.name, icon: fileIcon(share.name), folder: at, readOnly: true, ...(sharer === undefined ? {} : { note: sharer }) };
+  });
+
+  return { ...item, children };
+}
+
+/**
+ * The tree: the owner's drive, then what is shared with the owner, then each machine — this one first —
+ * opening onto its drives and their volumes, and Garage. `sharers` names each sharer's key.
+ */
+export function filesTree(t: Translate, places: FilePlaces, known: ReadonlyMap<string, FolderChildren>, sharers: ReadonlyMap<string, string>): FilesTreeItem[] {
   const context: TreeContext = { known, more: (count) => t("drive.label.more_folders", { n: countText(count) }) };
   const space = places.space === null ? [] : [spaceItem(t, places.space, context)];
 
-  return [...space, ...machineItems(t, places, context)];
+  return [...space, sharedItem(t, places.shared, sharers, context), ...machineItems(t, places, context)];
 }
 
 function machineItems(t: Translate, places: FilePlaces, context: TreeContext): FilesTreeItem[] {
@@ -512,7 +578,7 @@ function machineItems(t: Translate, places: FilePlaces, context: TreeContext): F
   });
 }
 
-/** Every row key from a machine, or from the owner's drive, down to a folder, which the tree unfolds to show it. */
+/** Every row key from a machine, the owner's drive or the shared branch down to a folder, which the tree unfolds to show it. */
 export function keysTo(places: FilePlaces, at: FolderAt): string[] {
   const found = findPlace(places, at.place);
   const machine = found?.machine.key ?? machineKeyOf(at.place);
@@ -520,12 +586,15 @@ export function keysTo(places: FilePlaces, at: FolderAt): string[] {
   const own = names.slice(0, -1).map((_, depth) => folderKey({ place: at.place, path: names.slice(0, depth + 1).join("/") }));
   const drive = found?.drive;
 
-  if (isSpace(places, at.place)) return [...(at.path === "" ? [] : [folderKey({ place: at.place, path: "" })]), ...own];
+  const top = at.path === "" ? [] : [folderKey({ place: at.place, path: "" })];
+
+  if (isSpace(places, at.place)) return [...top, ...own];
+  if (isSharedPlace(at.place)) return [SHARED_ROW, ...top, ...own];
 
   return [
     machineRowKey(machine),
     ...(drive !== null && drive !== undefined && drive.volumes.length > 1 ? [driveRowKey(machine, drive.key)] : []),
-    ...(at.path === "" ? [] : [folderKey({ place: at.place, path: "" })]),
+    ...top,
     ...own
   ];
 }
@@ -551,6 +620,8 @@ export function pastesBeside(clip: FilesClip, into: FolderAt): boolean {
 
 /** The path a place's entry is copied out as: the machine and mount it stands on, then the path. */
 export function shownPath(places: FilePlaces | null, place: string, path: string): string {
+  if (isSharedPlace(place)) return joinPath(sharedOf(places, place)?.name ?? place, path);
+
   const found = findPlace(places, place);
   const mount = found?.volume?.mount ?? "";
   const windows = /^[A-Za-z]:$/.test(mount);

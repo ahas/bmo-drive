@@ -1,14 +1,15 @@
 import { relayAddress } from "bmo-ui/app/domain/relay";
-import { joinPath, lastName, parentPath } from "./files";
+import { isSharedPlace, joinPath, lastName, parentPath, sharedId, sharedOf } from "./files";
 
 import type { components } from "../../shared/openapi";
-import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FileMemberView, FilePlaces, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
+import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FileMemberView, FilePlaces, FileSharedWithMe, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
 import type { FolderAt } from "./files";
 
 // The Files screen's calls to the drive service, each through the console's relay at the path the
 // service's own API writes it (docs/api.md), and what each answer becomes in the screen's own view of the
-// owner's drive, machines, folders and links. The node list is read from the drive service too, and only
-// where it answers that the machines are the signed-in owner's.
+// owner's drive, machines, folders, links and what is shared with the owner. The node list is read from the
+// drive service too, and only where it answers that the machines are the signed-in owner's. A place is read
+// by its road: the owner's own places through the places routes, a share through the member's readings of it.
 
 type Wire = components["schemas"];
 
@@ -62,15 +63,42 @@ function spaceOf(owner: Wire["Owner"], places: readonly Wire["Place"][]): FileSp
     : { place: drive.name, usedBytes: owner.usedBytes ?? null, quotaBytes: owner.quotaBytes ?? null, error: drive.reason ?? null, errorCode: drive.reasonCode ?? null };
 }
 
+function sharedWithMe(shared: Wire["Shared"]): FileSharedWithMe {
+  return { id: shared.id, ownerKey: shared.ownerKey, name: shared.name, kind: shared.kind, sharedAt: shared.sharedAt };
+}
+
+/** Everything shared with the signed-in owner, the newest first, read page by page. */
+export async function readShared(): Promise<FileSharedWithMe[]> {
+  const all: FileSharedWithMe[] = [];
+
+  for (let after: number | null = null; ; ) {
+    const query: Record<string, string> = { limit: "1000", ...(after === null ? {} : { after: String(after) }) };
+    const page = await $fetch<Wire["SharedPage"]>(drivePath("/shared"), { query });
+
+    all.push(...page.items.map(sharedWithMe));
+
+    const last = page.items.at(-1);
+
+    if (!page.more || last === undefined) return all;
+
+    after = last.id;
+  }
+}
+
 /**
- * The signed-in owner's drive, then, where the service answers that the machines are the owner's, this
- * machine read now with its drives and Garage and each node of the node list with its drives unread.
+ * The signed-in owner's drive and what is shared with the owner, then, where the service answers that the
+ * machines are the owner's, this machine read now with its drives and Garage and each node of the node list
+ * with its drives unread. What is shared that cannot be read leaves the rest standing.
  */
 export async function readPlaces(): Promise<FilePlaces> {
-  const [owner, places] = await Promise.all([$fetch<Wire["Owner"]>(drivePath("/owner")), $fetch<Wire["PlacePage"]>(drivePath("/places"))]);
+  const [owner, places, shared] = await Promise.all([
+    $fetch<Wire["Owner"]>(drivePath("/owner")),
+    $fetch<Wire["PlacePage"]>(drivePath("/places")),
+    readShared().catch(() => null)
+  ]);
   const space = spaceOf(owner, places.items);
 
-  if (!owner.administrator) return { administrator: false, viewer: owner.ownerKey, space, machines: [] };
+  if (!owner.administrator) return { administrator: false, viewer: owner.ownerKey, space, shared, machines: [] };
 
   const [machine, nodes] = await Promise.all([
     $fetch<Wire["Machine"]>(drivePath("/machine")),
@@ -80,7 +108,7 @@ export async function readPlaces(): Promise<FilePlaces> {
   const local: FileMachine = { key: "local", name: machine.name, local: true, disks: drivesOf(machine), garage: garageOf(places.items), error: null, errorCode: null };
   const others = nodes.items.map((node): FileMachine => ({ key: nodeMachineKey(node.name), name: node.label, local: false, disks: null, garage: null, error: null, errorCode: null }));
 
-  return { administrator: true, viewer: owner.ownerKey, space, machines: [local, ...others] };
+  return { administrator: true, viewer: owner.ownerKey, space, shared, machines: [local, ...others] };
 }
 
 /** The owner's drive with its usage and quota read again, after a change in it. */
@@ -113,18 +141,99 @@ export interface ListingAsked {
   fresh?: boolean;
 }
 
-/** One page of a folder, cut from one order over the whole of it. */
-export async function readListing(at: FolderAt, asked: ListingAsked): Promise<FileListing> {
+/** How a file's content is asked for: shown in the browser, saved, or only its head. */
+export interface ContentAsked {
+  download?: boolean;
+  head?: number;
+}
+
+/** How one place is read, and whether anything in it is changed at all. */
+export interface PlaceRoad {
+  readOnly: boolean;
+  /** One page of a folder, cut from one order over the whole of it. */
+  listing: (at: FolderAt, asked: ListingAsked) => Promise<FileListing>;
+  /** The address a file of a folder is read at. */
+  content: (at: FolderAt & { name: string }, how?: ContentAsked) => string;
+}
+
+// What a folder's page asks of the service, the same for every road.
+function listingQuery(at: FolderAt, asked: ListingAsked): Record<string, string> {
   const query: Record<string, string> = { path: at.path, after: String(asked.after ?? 0), limit: String(asked.limit) };
 
   if (asked.sort !== undefined) query.sort = SORT_FIELDS[asked.sort];
   if (asked.order !== undefined) query.order = asked.order;
   if (asked.folders === true) query.folders = "true";
-  if (asked.fresh === true) query.fresh = "true";
 
-  const page = await $fetch<Wire["EntryPage"]>(drivePath(`/places/${segment(at.place)}/entries`), { query });
+  return query;
+}
+
+async function listingAt(route: string, at: FolderAt, asked: ListingAsked, query: Record<string, string>): Promise<FileListing> {
+  const page = await $fetch<Wire["EntryPage"]>(drivePath(route), { query });
 
   return { place: at.place, path: at.path, total: page.totalCount, offset: asked.after ?? 0, entries: page.items.map(entryOf) };
+}
+
+function contentQuery(how: ContentAsked, query = new URLSearchParams()): string {
+  if (how.download === true) query.set("download", "true");
+  if (how.head !== undefined) query.set("head", String(how.head));
+
+  const asked = query.toString();
+
+  return asked === "" ? "" : `?${asked}`;
+}
+
+function readListing(at: FolderAt, asked: ListingAsked): Promise<FileListing> {
+  const query = listingQuery(at, asked);
+
+  if (asked.fresh === true) query.fresh = "true";
+
+  return listingAt(`/places/${segment(at.place)}/entries`, at, asked, query);
+}
+
+/** The road of the owner's own places, where everything the screen offers is done. */
+export const OWN_ROAD: PlaceRoad = {
+  readOnly: false,
+  listing: readListing,
+  content: (at, how = {}) => drivePath(`${entryRoute(at.place, joinPath(at.path, at.name))}/content${contentQuery(how)}`)
+};
+
+/**
+ * The road of one share, read through the member's own readings of it (docs/api.md, "Member shares"), with
+ * nothing changed. A shared folder is listed as any folder is; a shared file stands as a folder holding it
+ * alone, its content the share's own, at the empty path.
+ */
+export function sharedRoad(share: Pick<FileSharedWithMe, "id" | "name" | "kind">): PlaceRoad {
+  const route = `/shared/${share.id}`;
+  const file = share.kind === "file";
+  const listing: PlaceRoad["listing"] = file
+    ? async (at, asked) => {
+        const alone = asked.folders === true ? [] : [{ name: share.name, kind: "file" as const, size: null, modified: null, link: null }];
+
+        return { place: at.place, path: at.path, total: alone.length, offset: asked.after ?? 0, entries: (asked.after ?? 0) === 0 ? alone : [] };
+      }
+    : (at, asked) => listingAt(`${route}/entries`, at, asked, listingQuery(at, asked));
+
+  return {
+    readOnly: true,
+    listing,
+    content: (at, how = {}) => {
+      const path = file ? "" : joinPath(at.path, at.name);
+
+      return drivePath(`${route}/content${contentQuery(how, new URLSearchParams(path === "" ? {} : { path }))}`);
+    }
+  };
+}
+
+/**
+ * The road a place is read by: a share's where the place is one, read as a folder where it no longer stands
+ * among those shared, so its reading says it is gone; the owner's own otherwise.
+ */
+export function roadTo(places: FilePlaces | null, place: string): PlaceRoad {
+  if (!isSharedPlace(place)) return OWN_ROAD;
+
+  const share = sharedOf(places, place);
+
+  return sharedRoad(share ?? { id: sharedId(place), name: "", kind: "folder" });
 }
 
 /** Every name standing in a folder, read page by page. */
@@ -133,24 +242,12 @@ async function namesIn(at: FolderAt): Promise<Set<string>> {
   const limit = 1000;
 
   for (let after = 0; ; after += limit) {
-    const page = await readListing(at, { after, limit, fresh: true });
+    const page = await OWN_ROAD.listing(at, { after, limit, fresh: true });
 
     page.entries.forEach((entry) => names.add(entry.name));
 
     if (after + page.entries.length >= page.total || page.entries.length === 0) return names;
   }
-}
-
-/** The address a file is read at: shown in the browser, saved, or only its head. */
-export function contentUrl(at: FolderAt & { name: string }, how: { download?: boolean; head?: number } = {}): string {
-  const query = new URLSearchParams();
-
-  if (how.download === true) query.set("download", "true");
-  if (how.head !== undefined) query.set("head", String(how.head));
-
-  const asked = query.toString();
-
-  return drivePath(`${entryRoute(at.place, joinPath(at.path, at.name))}/content${asked === "" ? "" : `?${asked}`}`);
 }
 
 // ---- Changes ------------------------------------------------------------------------------------

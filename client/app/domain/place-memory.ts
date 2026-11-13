@@ -1,3 +1,5 @@
+import { isSharedPlace, sharedOf } from "./files";
+
 import type { FilePlaces } from "../../shared/types";
 import type { FolderAt } from "./files";
 
@@ -64,9 +66,12 @@ export function forgetPlace(store: PlaceStore | null, viewer: string): void {
   }
 }
 
-/** Whether the viewer still reaches a place: their own drive, or any place where the machines are theirs. */
+/**
+ * Whether the viewer still reaches a place: their own drive, a share still shared with them, or any other
+ * place where the machines are theirs.
+ */
 function reaches(places: FilePlaces, place: string): boolean {
-  return places.administrator || place === places.space?.place;
+  return place === places.space?.place || sharedOf(places, place) !== null || (places.administrator && !isSharedPlace(place));
 }
 
 /**

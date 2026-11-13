@@ -1,9 +1,10 @@
 <template>
-  <!-- The Files screen's folder tree (docs/files.md): each machine, opening onto its
-       drives and Garage, each folder opening onto its own folders as it is unfolded. A name is never
+  <!-- The Files screen's folder tree (docs/files.md): the owner's drive, what is shared with the
+       owner, and each machine, opening onto its drives and Garage, each folder opening onto its own
+       folders as it is unfolded. A name is never
        cut: the tree is as wide as its widest row and scrolls sideways inside its panel. A folder is
        offered its actions on a right press or a held finger, and takes entries and files dropped on
-       it. It reaches its panel's edges and scrolls on its own. -->
+       it, but for a folder of a share. It reaches its panel's edges and scrolls on its own. -->
   <div class="flex min-h-0 flex-col">
     <ContentSkeleton v-if="props.items === null && props.loading" :rows="4" list-class="flex flex-col px-1 py-2" :label="$t('drive.status.tree_loading')">
       <template #default="{ index }">
@@ -154,7 +155,7 @@ function onDragOver(event: DragEvent): void {
   const transfer = event.dataTransfer;
   const row = rowUnder(event.target);
 
-  if (transfer === null || (!carriesFiles(transfer) && ![...transfer.types].includes(ENTRIES_DRAG)) || row?.folder === undefined) {
+  if (transfer === null || (!carriesFiles(transfer) && ![...transfer.types].includes(ENTRIES_DRAG)) || row?.folder === undefined || row.readOnly === true) {
     dropOn.value = null;
 
     return;

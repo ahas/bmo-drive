@@ -3,7 +3,8 @@
        view the entries laid out as that view lays them, with `..` at the head of the list below a
        place's top. Entries are chosen, opened, dragged onto a folder, renamed in place and offered
        their actions on a right press or a held finger; files dropped from the desktop land in the
-       folder they are dropped on, or in the open one. A line at the foot says how many entries the
+       folder they are dropped on, or in the open one; a folder of a share neither gives nor takes
+       anything dragged. A line at the foot says how many entries the
        folder holds and how many are chosen, and a page more is asked for as the list nears its end. -->
   <UContextMenu :items="props.menu" :disabled="choosing" @update:open="onMenuOpen">
     <div
@@ -62,7 +63,7 @@
               :data-entry="isParent(row.original) ? undefined : row.original.name"
               :data-parent="isParent(row.original) ? '' : undefined"
               :data-folder="row.original.kind === 'folder' ? '' : undefined"
-              :draggable="!isParent(row.original) && props.renaming !== row.original.name"
+              :draggable="!props.readOnly && !isParent(row.original) && props.renaming !== row.original.name"
             >
               <!-- The box stands on the line of the toolbar's choice of all, which its cell's own room puts a step further out. -->
               <UCheckbox v-if="choosing && !isParent(row.original)" :model-value="selected.has(row.original.name)" tabindex="-1" class="pointer-events-none -ms-1 shrink-0" :aria-label="row.original.name" />
@@ -125,6 +126,8 @@
               v-else
               :entry="entry"
               :at="props.at"
+              :road="props.road"
+              :read-only="props.readOnly"
               :view="props.view"
               :parent="isParent(entry)"
               :selected="!isParent(entry) && selected.has(entry.name)"
@@ -178,12 +181,17 @@ import { countText } from "bmo-ui/app/domain/numbers";
 import { formatDateClock } from "bmo-ui/app/domain/time";
 
 import type { FileEntry, FileSortKey } from "../../shared/types";
+import type { PlaceRoad } from "../domain/drive";
 import type { FilesClip, FilesSort, FilesView, FolderAt } from "../domain/files";
 import type { ContextMenuItem, TableColumn } from "@nuxt/ui";
 
 interface Props {
   // The folder the entries are of.
   at: FolderAt | null;
+  // How the folder's files are read.
+  road: PlaceRoad;
+  // Whether the folder takes nothing dropped and gives nothing dragged.
+  readOnly: boolean;
   // The entries read so far; null before the first page.
   entries: FileEntry[] | null;
   total: number;
@@ -545,7 +553,7 @@ let dragDepth = 0;
 function onDragStart(event: DragEvent): void {
   const entry = entryAt(event.target);
 
-  if (entry === null || isParent(entry) || event.dataTransfer === null) {
+  if (props.readOnly || entry === null || isParent(entry) || event.dataTransfer === null) {
     event.preventDefault();
 
     return;
@@ -565,6 +573,7 @@ function folderUnder(event: DragEvent): string | null {
 }
 
 function onDragEnter(event: DragEvent): void {
+  if (props.readOnly) return;
   if (!carriesFiles(event.dataTransfer) && !carriesEntries(event.dataTransfer)) return;
 
   dragDepth += 1;
@@ -574,7 +583,7 @@ function onDragEnter(event: DragEvent): void {
 function onDragOver(event: DragEvent): void {
   const files = carriesFiles(event.dataTransfer);
 
-  if (!files && !carriesEntries(event.dataTransfer)) return;
+  if (props.readOnly || (!files && !carriesEntries(event.dataTransfer))) return;
 
   event.preventDefault();
 
