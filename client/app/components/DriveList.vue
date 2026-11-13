@@ -33,7 +33,7 @@
         @dragstart="onDragStart"
         @pointerdown="onMarqueeStart"
       >
-        <DataTable :data="rows" :columns="columns" layout="dense" class="flex-1" selectable :row-class="rowClass" @select="(row) => onRowPress(row)">
+        <DataTable :data="rows" :columns="columns" layout="dense" class="flex-1" :class="END_ROOM" selectable :row-class="rowClass" @select="(row) => onRowPress(row)">
           <template v-for="column in SORTED" :key="column" #[`${column}-header`]>
             <button
               type="button"
@@ -115,7 +115,7 @@
         @dragstart="onDragStart"
         @pointerdown="onMarqueeStart"
       >
-        <div :class="GRIDS[props.view]">
+        <div :class="[GRIDS[props.view], END_ROOM]">
           <template v-for="(entry, at) in rows" :key="isPending(entry) ? `pending-${at}` : isParent(entry) ? '..' : entry.name">
             <SkeletonStatus v-if="isPending(entry)" as="div" :class="SKELETONS[props.view].box" :label="$t('drive.status.list_loading')">
               <SkeletonBar class="shrink-0 rounded-md" :style="{ width: `${skeletonMark}px`, height: `${skeletonMark}px` }" />
@@ -255,6 +255,10 @@ const SKELETONS: Record<Exclude<FilesView, "details">, { box: string }> = {
 };
 
 const skeletonMark = computed(() => VIEW_MARK[props.view]);
+
+// The room the screen's create button takes from the list's scrolling end where it floats over the list on a
+// phone, so the last entry scrolls clear of it; the layer's token is nought on a wide screen.
+const END_ROOM = "pb-(--bmo-create-room)";
 
 // A row standing for an entry still being read.
 interface Pending {

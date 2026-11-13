@@ -458,6 +458,12 @@ flowchart TD
   calls to this service. A permission the service refuses, or a member share it cannot store, is said inside
   the dialog in the screen's own words. Under a console that offers no people directory, the dialog shares
   by link alone.
+- **A new folder and an upload start from the screen's one create button,** bmo-ui's `CreateButton`
+  (bmo-ui's `docs/components.md`, 「Creating」), named for a new folder or an upload. It opens a menu of a new
+  folder, uploading files and uploading a folder, and its key is `n`. On a wide screen it stands as the last
+  cell of the toolbar; on a phone it floats at the screen's bottom right, and the open folder's list keeps
+  room at its scrolling end so its last entry stands clear of it. The context menu over the open folder
+  offers the same new folder and uploads, and the one over a folder in the tree offers a new folder inside it.
 - **The usage is read again after every change** the screen makes, and a write refused over the quota is
   said in the screen's own words.
 - **The address names the place, the folder and the chosen file,** so the browser's history steps through

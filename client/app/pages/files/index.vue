@@ -42,18 +42,6 @@
         </nav>
         <div v-else class="min-w-0 flex-1" />
 
-        <div>
-          <UTooltip :text="$t('drive.action.new_folder')">
-            <UButton color="neutral" variant="ghost" icon="i-material-symbols-create-new-folder-outline" :aria-label="$t('drive.action.new_folder')" :disabled="!canChange" @click="newFolder()" />
-          </UTooltip>
-        </div>
-        <div>
-          <UDropdownMenu :items="uploadItems" :content="{ align: 'end' }">
-            <UTooltip :text="$t('drive.action.upload')">
-              <UButton color="neutral" variant="ghost" icon="i-material-symbols-upload" :aria-label="$t('drive.action.upload')" :disabled="!canChange" :loading="uploading !== null" />
-            </UTooltip>
-          </UDropdownMenu>
-        </div>
         <ActionGroup :actions="editActions" />
 
         <div>
@@ -74,6 +62,12 @@
             <UButton color="neutral" variant="ghost" :icon="previewTool.icon" :aria-label="previewTool.label" :aria-pressed="previewTool.pressed" @click="previewTool.onSelect()" />
           </UTooltip>
         </div>
+
+        <!-- The screen's one create button, the toolbar's last cell on a wide screen and floating on a
+             phone, opening the menu of what a folder takes in. -->
+        <UDropdownMenu :items="createItems" :content="createMenu">
+          <CreateButton ref="create" :label="$t('drive.action.create')" :disabled="!canChange" />
+        </UDropdownMenu>
       </ToolBar>
 
       <!-- On a phone the path wraps onto as many lines as it needs, rather than being cut. -->
@@ -201,6 +195,7 @@ import {
   withMachine
 } from "../../domain/files";
 import { OVERLAY_CLOSE_MS } from "bmo-ui/app/domain/closing";
+import { isBackEscape } from "bmo-ui/app/domain/overlays";
 import { useIsland } from "bmo-ui/app/domain/island";
 import { askQuestion } from "bmo-ui/app/domain/question";
 import { useNarrow } from "bmo-ui/app/domain/screen";
@@ -1168,6 +1163,24 @@ const uploadItems = computed<DropdownMenuItem[]>(() => [
   { label: t("drive.action.upload_folder"), icon: "i-material-symbols-drive-folder-upload-outline", onSelect: () => folderInput.value?.click() }
 ]);
 
+// What the create button opens: a new folder, then the two uploads.
+const createItems = computed<DropdownMenuItem[][]>(() => [
+  [{ label: t("drive.action.new_folder"), icon: "i-material-symbols-create-new-folder-outline", onSelect: () => newFolder() }],
+  uploadItems.value
+]);
+
+// The menu stands against the button itself. On a phone the button floats in the page's body, away from
+// the toolbar the menu is written in, so the place the menu would find of its own accord is not the
+// button's; there it opens upwards, above the button. The button is read as the menu is placed, since a
+// screen crossing the phone's width draws it anew.
+const create = useTemplateRef<{ element: () => HTMLElement | null }>("create");
+const createAnchor = { getBoundingClientRect: () => create.value?.element()?.getBoundingClientRect() ?? new DOMRect() };
+const createMenu = computed(() => ({
+  side: narrow.value ? ("top" as const) : ("bottom" as const),
+  align: "end" as const,
+  reference: createAnchor
+}));
+
 // Files picked from the browser's own chooser: a folder's arrive with their paths inside it.
 function onPicked(event: Event): void {
   const input = event.target as HTMLInputElement;
@@ -1374,9 +1387,12 @@ const treeMenu = computed<ContextMenuItem[][]>(() => {
 
 // ---- The keyboard -------------------------------------------------------------------------------------------
 
-// A file explorer's keys, wherever on the screen the keyboard is but a field or something open over it.
+// A file explorer's keys, wherever on the screen the keyboard is but a field or something open over it. The
+// Esc the back gesture sends to close a layer is the layer's alone, so it never also leaves choosing.
 function onKey(event: KeyboardEvent): void {
-  const target = event.target as HTMLElement | null;
+  if (isBackEscape()) return;
+
+  const target = event.target instanceof Element ? event.target : null;
 
   if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], [role='menu']") || renaming.value !== null || pictureOpen.value) return;
 
