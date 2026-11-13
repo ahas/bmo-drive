@@ -20,6 +20,7 @@
       "place": "위치",
       "plain_file": "파일",
       "share_folder": "폴더 · zip",
+      "share_links": "공유 링크",
       "size": "크기",
       "size_exact": "{size} ({bytes}바이트)",
       "space": "BMO 드라이브",

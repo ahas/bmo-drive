@@ -20,6 +20,7 @@
       "place": "Location",
       "plain_file": "File",
       "share_folder": "Folder · zip",
+      "share_links": "Share links",
       "size": "Size",
       "size_exact": "{size} ({bytes} bytes)",
       "space": "BMO drive",

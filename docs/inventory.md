@@ -145,14 +145,14 @@ or left where bmo-ui now serves it; what is carried stands under this repository
 | `app/domain/copy.ts` | `copyText`, in `app/domain/copy.ts` |
 | `app/domain/attachments.ts` | `fileSizeText`, in `app/domain/sizes.ts` |
 | `app/domain/share-links.ts` | not kept: bmo-ui's own share link module stands in for it |
-| `app/components/ShareLinkDialog.vue` | not kept: bmo-ui's own share link dialog stands in for it |
+| `app/components/ShareLinkDialog.vue` | not kept: bmo-ui's own share dialog, `ShareDialog`, stands in for it |
 | `shared/config.ts` | `SHARE_SPANS` and `ShareSpanKey`, each span with the seconds it lives, in `shared/config.ts` |
 | `shared/types.ts` | the file viewer's types: `FileDriveKind`, `FileVolume`, `FileDrive`, `FileGarage`, `FileMachine`, `FilePlaces`, `FileConflict`, `FileConflictRefusal`, `FileEntryKind`, `FileEntry`, `FileListing`, `FileSortKey`, `FileShareKind`, `FileShareView`, `SharedFileView`, in `shared/types.ts` |
 | `shared/share-head.ts` | `SHARE_ROBOTS`, in `shared/share-head.ts` |
 
 ### Already in bmo-ui: 5 components
 
-`FilesNameField`, `FilesConflictDialog`, `FilesProgress`, `FilesText` and `ShareLinkDialog` stand in
+`FilesNameField`, `FilesConflictDialog`, `FilesProgress`, `FilesText` and `ShareDialog` stand in
 bmo-ui, which the bundle takes as a peer. So do the modules the screen reads time, numbers, share links,
 the relay, drag selection, the hold menu, the bars, failures, file icons, the island, side parts and the
 screen width from.

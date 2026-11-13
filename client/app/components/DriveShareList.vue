@@ -1,7 +1,7 @@
 <template>
   <!-- Every live share link of the file viewer's entries: what each hands out, where it stands, how
        long it stands, and the two things done to a link from here — copying it and ending it. -->
-  <SettingsDialog v-model:open="open" :title="$t('common.title.share_link')" wide>
+  <SettingsDialog v-model:open="open" :title="$t('drive.label.share_links')" wide>
     <ContentSkeleton v-if="shares === null && failed === ''" listClass="flex flex-col gap-1" :label="$t('common.status.share_loading')">
       <div v-for="row in 3" :key="row" class="flex items-center gap-3 px-2 py-2">
         <SkeletonBar class="size-6 shrink-0 rounded-md" />
@@ -17,7 +17,7 @@
 
     <p v-else-if="shares !== null && shares.length === 0" class="py-4 text-center text-sm text-muted">{{ $t("drive.status.no_shares") }}</p>
 
-    <ul v-else-if="shares !== null" class="flex flex-col gap-1" :aria-label="$t('common.title.share_link')">
+    <ul v-else-if="shares !== null" class="flex flex-col gap-1" :aria-label="$t('drive.label.share_links')">
       <li v-for="share in shares" :key="share.token" class="flex items-center gap-3 px-2 py-2">
         <UIcon :name="iconOf(share)" class="size-6 shrink-0" />
         <div class="flex min-w-0 flex-1 flex-col">

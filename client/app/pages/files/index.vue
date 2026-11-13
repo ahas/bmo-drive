@@ -137,7 +137,7 @@
 
       <FilesConflictDialog v-model:open="conflictOpen" :names="conflictNames" @answer="onConflictAnswer" />
 
-      <ShareLinkDialog v-model:open="shareOpen" :road="shareRoad" :spans="shareSpans" span="7d" :subject="shareTarget?.name" />
+      <ShareDialog v-model:open="shareOpen" :road="shareRoad" :spans="shareSpans" span="7d" :subject="shareTarget?.name" />
       <DriveShareList v-model:open="shareListOpen" :places="places" />
 
       <UModal v-model:open="propertiesOpen" :title="propertiesEntry?.name ?? ''">
