@@ -393,6 +393,117 @@ pub struct ShareRequest {
   pub actor_name: Option<String>,
 }
 
+/// What a member share lets its member do (`docs/files.md`, 「What a member share is」): the service keeps and
+/// serves `read` alone, and refuses `edit`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SharePermission {
+  Read,
+  Edit,
+}
+
+/// One member an entry is shared with, as its owner is told of it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberShare {
+  /// Its number.
+  pub id: i64,
+  /// The member's owner key.
+  pub user: String,
+  pub permission: SharePermission,
+  /// When it was made, in epoch milliseconds.
+  pub shared_at: i64,
+}
+
+/// A page of member shares.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberSharePage {
+  pub items: Vec<MemberShare>,
+  pub more: bool,
+}
+
+/// An entry asked to be shared with members.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberShareRequest {
+  pub place_name: String,
+  pub path: String,
+  /// The members' owner keys.
+  pub users: Vec<String>,
+  pub permission: SharePermission,
+}
+
+/// A member share's permission asked to change.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberShareChange {
+  pub permission: SharePermission,
+}
+
+/// The query of an entry's member shares.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberSharesQuery {
+  pub place_name: String,
+  pub path: String,
+  /// An `id`: the member shares after it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub after: Option<i64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub limit: Option<u64>,
+}
+
+/// One entry shared with the asking owner, as its member is told of it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Shared {
+  /// The member share's number, which its readings name.
+  pub id: i64,
+  /// The owner key it is shared by.
+  pub owner_key: String,
+  /// The name its entry is handed out under.
+  pub name: String,
+  pub kind: ShareKind,
+  pub permission: SharePermission,
+  /// When it was shared, in epoch milliseconds.
+  pub shared_at: i64,
+}
+
+/// A page of what is shared with the asking owner.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedPage {
+  pub items: Vec<Shared>,
+  pub more: bool,
+}
+
+/// The query of what is shared with the asking owner.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedQuery {
+  /// An `id`: the shares made before it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub after: Option<i64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub limit: Option<u64>,
+}
+
+/// The query of a file's reading through a member share.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedContentQuery {
+  /// The file from the shared entry, the entry itself where none is named.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub path: Option<String>,
+  /// Handed over to be saved rather than shown.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub download: Option<bool>,
+  /// The first so many bytes alone.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub head: Option<u64>,
+}
+
 /// The query of `GET /places`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

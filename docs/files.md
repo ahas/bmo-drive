@@ -2,15 +2,18 @@
 
 - **What this says:** what a caller of this service may read and change on this machine and on the nodes
   of the node list, and in each owner's own BMO drive with its quota; how this service finds it, fences
-  it, hands it over and changes it; and the share links that hand one entry to someone who holds no token.
-  The routes, the command, the harness plugin and the settings are `docs/api.md`.
+  it, hands it over and changes it; the share links that hand one entry to someone who holds no token; and
+  the sharing that lets members of the reader's company read one entry. The routes, the command, the harness
+  plugin and the settings are `docs/api.md`.
 - **It does what a file explorer does,** on every place alike: reading, and making a folder, uploading,
   renaming, copying, moving and deleting (「Changing files」). The locations the deployment and the machines
   stand on are never changed (「Protected locations」).
 - **It is for whoever holds the token, acting for an owner.** The token opens every route, and each request
   names the owner it acts for (「Owners and the two branches」): the machines are the administrator's alone,
-  and the BMO drive is every owner's own space. The one road out to anyone else is a share link, which hands
-  one file or folder to whoever holds it as a download and nothing else (「Share links」).
+  and the BMO drive is every owner's own space. Two roads lead out to anyone else: a share link, which hands
+  one file or folder to whoever holds it as a download and nothing else (「Share links」), and sharing with
+  members, which lets each owner key it names read one file or folder, and nothing beside it (「Sharing with
+  members」).
 
 ```mermaid
 flowchart TD
@@ -377,7 +380,8 @@ flowchart TD
 - **Each owner lists and takes away its own links;** another owner's link is answered as if it did not
   stand. A link's holder needs no owner (「What the holder sees」).
 - **On the Files screen** of this repository's console plugin bundle, a file or folder is shared from its
-  context menu and from the toolbar's menu, and the screen lists the owner's live links.
+  context menu and from the toolbar's menu through bmo-ui's one share dialog, and the screen lists the
+  owner's live links.
 - **From a shell, `bmo-drive file share`,** acting for the administrator (`docs/api.md`, 「The command」):
   - `bmo-drive file share <path> [--days <n> | --forever]`: a link for a file or folder on this machine, the
     path read as it stands on this machine and given to the volume it lies on, the deepest mount point that
@@ -391,6 +395,53 @@ flowchart TD
   before any row is written, and whether it is a file or a folder is judged there, never taken from the
   caller.
 
+## Sharing with members
+
+- **An owner shares one file or folder with members of the reader's company,** each named by their owner
+  key, the account key the console writes for them. Who the members of the company are is the console's
+  (bmo-ui's `docs/console-bundles.md`, 「The people directory」); this service never learns who a key
+  belongs to, and keeps the keys it is given.
+- **This service keeps who an entry is shared with:** it alone reads and writes the member share rows in its
+  own store, and judges every reading a member asks for against them.
+
+### What a member share is
+
+- **A row of the member share table,** naming the entry by its place and its path, the owner key it is
+  shared by, whether it is a file or a folder, the member's owner key, and when it was made. Each member of
+  an entry is a row of their own, so one is taken off without touching the others.
+- **It works in both branches,** as a link does: a member share of a machine place is the administrator's,
+  and one of `drive` opens the space of the owner who shared it.
+- **The permission is read.** A member reads what is shared with them and changes nothing of it; a share
+  asked at any other permission is refused, and nothing is stored.
+- **An owner shares with others alone:** a share naming the owner's own key is refused.
+- **One row per member of an entry of an owner:** sharing again with a member who already stands keeps the
+  row as it is.
+- **It follows the path, not the file,** as a link does: an entry renamed, moved or deleted leaves its member
+  shares opening nothing, and a new entry of the same kind at the same path is what they then open.
+- **It has no end of its own.** It stands until the owner takes the member off, which deletes the row and
+  stops the member's reading at once.
+
+### Who shares and who reads
+
+- **Only the entry's owner shares, lists and takes members off,** acting on the entry as it reads it in its
+  own places; the entry is read before any row is written, and whether it is a file or a folder is judged
+  there. Another owner's member share is answered as if it did not stand.
+- **A member reads a share by its number alone,** the owner, the place and the path coming from the row, and
+  only where the key the request acts for is the row's member. To any other key, the owner's own among them,
+  the share is answered as if it did not stand.
+- **A member reads what the owner reads, and nothing beside it:**
+  - a file shared: that file, streamed as a file is read (「Reading a file」), shown or saved, its head or a
+    byte range;
+  - a folder shared: the folder walked as a place of its own, cut down to it, as a zip walks one (「Reading a
+    file」): its listings, in the order and pages of any listing (「Listing a folder」), and each file under
+    it. The fence stands at the folder, so a link leading out of it opens nothing.
+  - Every listing of a shared folder is read now; nothing a member is answered is kept for the pages after
+    it.
+- **A member changes nothing.** No route writes through a member share, and every route that changes files
+  acts for the asking owner's own places, exactly as before.
+- **Everything else answers as it does without member shares:** every route over `places` reads the asking
+  owner's own places, and the share links are untouched.
+
 ## The Files screen
 
 - **The console plugin bundle's Files screen** (README.md, 「The console plugin bundle」) walks the places
@@ -401,6 +452,12 @@ flowchart TD
 - **The machines stand below it only where the service answers that they are the owner's:** this machine
   with its drives and Garage, then each node of the node list. The screen reads no name and no node list to
   decide it; for any other owner it reads neither the machines nor the node list.
+- **The share dialog offers the members of the reader's company under the link** (「Sharing with members」),
+  found through the console's people directory and drawn by the name it answers for each key, a key it
+  answers no person for standing as the key. Who an entry is shared with, and each share and removal, are
+  calls to this service. A permission the service refuses, or a member share it cannot store, is said inside
+  the dialog in the screen's own words. Under a console that offers no people directory, the dialog shares
+  by link alone.
 - **The usage is read again after every change** the screen makes, and a write refused over the quota is
   said in the screen's own words.
 - **The address names the place, the folder and the chosen file,** so the browser's history steps through

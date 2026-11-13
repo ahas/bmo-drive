@@ -29,14 +29,14 @@ const TOKEN_BYTES: usize = 32;
 const PAGE: u64 = 100;
 const PAGE_MOST: u64 = 1000;
 
-fn kind_text(kind: ShareKind) -> &'static str {
+pub(super) fn kind_text(kind: ShareKind) -> &'static str {
   match kind {
     ShareKind::File => "file",
     ShareKind::Folder => "folder",
   }
 }
 
-fn kind_read(text: &str) -> Option<ShareKind> {
+pub(super) fn kind_read(text: &str) -> Option<ShareKind> {
   match text {
     "file" => Some(ShareKind::File),
     "folder" => Some(ShareKind::Folder),
@@ -228,7 +228,7 @@ async fn opened(store: &SqlitePool, token: String) -> Result<Link, Refused> {
 
 /// What the entry at `within` is now: a file or a folder. Anything else, or nothing there, is refused as
 /// the file routes refuse it.
-async fn standing_entry(place: &dyn Place, within: &Within) -> Result<ShareKind, Refused> {
+pub(super) async fn standing_entry(place: &dyn Place, within: &Within) -> Result<ShareKind, Refused> {
   match kind_of(place, within).await? {
     Kind::File => {
       place.open(within, Span::head(0)).await?;

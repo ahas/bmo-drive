@@ -121,6 +121,14 @@ export interface FileShareView {
   expiresAt: number | null;
 }
 
+// One member an entry is shared with: the member share's number, which its change and removal name, and
+// the member's owner key (docs/files.md, "Sharing with members").
+export interface FileMemberView {
+  id: number;
+  user: string;
+  permission: "read" | "edit";
+}
+
 // What the holder of a link is shown: the entry's name and kind, and when the link ends.
 export interface SharedFileView {
   name: string;

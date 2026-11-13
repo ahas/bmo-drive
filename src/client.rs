@@ -12,9 +12,10 @@ use crate::owner::{OWNER_KEY, OWNER_ROLE};
 use crate::settings::Settings;
 use crate::wire::{
   ArchiveRequest, ConsoleRole, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage,
-  EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery, Owner,
-  PlacePage, PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage,
-  WireError, WriteQuery,
+  EventPage, EventsQuery, FolderRequest, Health, Machine, MachineQuery, MemberShare, MemberShareChange,
+  MemberSharePage, MemberShareRequest, MemberSharesQuery, NodePage, NodesQuery, Owner, PlacePage,
+  PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharedContentQuery, SharedPage,
+  SharedQuery, SharesQuery, Storage, WireError, WriteQuery,
 };
 
 // Everything but the unreserved characters is written percent-encoded in a path segment, a `/` and a `:`
@@ -350,6 +351,57 @@ impl DriveClient {
     range: Option<ByteRange>,
   ) -> Result<Content, ClientFailure> {
     let request = self.request(Method::GET, &format!("/shares/{}/content", segment(token)));
+
+    Self::content_of(request, range).await
+  }
+
+  /// `GET /member-shares`.
+  pub async fn member_shares(&self, query: &MemberSharesQuery) -> Result<MemberSharePage, ClientFailure> {
+    Self::read(Self::with_query(self.request(Method::GET, "/member-shares"), query)).await
+  }
+
+  /// `POST /member-shares`: the member shares of the users asked, made now or already standing.
+  pub async fn create_member_shares(
+    &self,
+    shares: &MemberShareRequest,
+  ) -> Result<MemberSharePage, ClientFailure> {
+    Self::read(self.request(Method::POST, "/member-shares").json(shares)).await
+  }
+
+  /// `PATCH /member-shares/{id}`.
+  pub async fn update_member_share(
+    &self,
+    id: i64,
+    change: &MemberShareChange,
+  ) -> Result<MemberShare, ClientFailure> {
+    Self::read(self.request(Method::PATCH, &format!("/member-shares/{id}")).json(change)).await
+  }
+
+  /// `DELETE /member-shares/{id}`.
+  pub async fn delete_member_share(&self, id: i64) -> Result<(), ClientFailure> {
+    Self::sent(self.request(Method::DELETE, &format!("/member-shares/{id}")))
+      .await
+      .map(|_| ())
+  }
+
+  /// `GET /shared`.
+  pub async fn shared(&self, query: &SharedQuery) -> Result<SharedPage, ClientFailure> {
+    Self::read(Self::with_query(self.request(Method::GET, "/shared"), query)).await
+  }
+
+  /// `GET /shared/{id}/entries`.
+  pub async fn shared_entries(&self, id: i64, query: &EntriesQuery) -> Result<EntryPage, ClientFailure> {
+    Self::read(Self::with_query(self.request(Method::GET, &format!("/shared/{id}/entries")), query)).await
+  }
+
+  /// `GET /shared/{id}/content`, the bytes `range` names where it is given.
+  pub async fn shared_content(
+    &self,
+    id: i64,
+    query: &SharedContentQuery,
+    range: Option<ByteRange>,
+  ) -> Result<Content, ClientFailure> {
+    let request = Self::with_query(self.request(Method::GET, &format!("/shared/{id}/content")), query);
 
     Self::content_of(request, range).await
   }

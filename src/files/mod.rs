@@ -6,6 +6,7 @@ mod change;
 mod drives;
 mod garage;
 mod guard;
+pub mod members;
 mod node;
 mod order;
 pub mod shares;
@@ -778,10 +779,6 @@ impl Route for EntriesList {
     let id = path_place(&mut call).await?;
     let query: EntriesQuery = call.query()?;
     let within = Within::read(query.path.as_deref().unwrap_or_default())?;
-    let by = query.sort.unwrap_or_default();
-    let descending = query.order.unwrap_or_default() == SortOrder::Desc;
-    let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
-    let folders_only = query.folders == Some(true);
     let path = within.joined();
     let kept_as = kept_name(&id, &owner);
 
@@ -800,22 +797,28 @@ impl Route for EntriesList {
       }
     };
 
-    let shown: Vec<Entry> = if folders_only {
-      entries.iter().filter(|entry| entry.kind == Kind::Folder).cloned().collect()
-    } else {
-      entries.to_vec()
-    };
-    let total = shown.len() as u64;
-    let (page, more) = page_of(sorted(&shown, by, descending), query.after, limit);
+    Ok(answer(StatusCode::OK, listed_page(&entries, &query, &id, &within)))
+  }
+}
 
-    Ok(answer(
-      StatusCode::OK,
-      EntryPage {
-        items: page.iter().map(|entry| entry.wire(&id, &within)).collect(),
-        more,
-        total_count: total,
-      },
-    ))
+/// One page of a folder's entries as a listing asks for it, cut from one order over the whole folder, each
+/// entry standing in the folder at `within` of the place `place_name`.
+fn listed_page(entries: &[Entry], query: &EntriesQuery, place_name: &str, within: &Within) -> EntryPage {
+  let by = query.sort.unwrap_or_default();
+  let descending = query.order.unwrap_or_default() == SortOrder::Desc;
+  let limit = query.limit.unwrap_or(PAGE).clamp(1, PAGE_MOST);
+  let shown: Vec<Entry> = if query.folders == Some(true) {
+    entries.iter().filter(|entry| entry.kind == Kind::Folder).cloned().collect()
+  } else {
+    entries.to_vec()
+  };
+  let total = shown.len() as u64;
+  let (page, more) = page_of(sorted(&shown, by, descending), query.after, limit);
+
+  EntryPage {
+    items: page.iter().map(|entry| entry.wire(place_name, within)).collect(),
+    more,
+    total_count: total,
   }
 }
 

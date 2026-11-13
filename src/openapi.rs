@@ -11,9 +11,10 @@ use crate::events::KINDS;
 use crate::mcp::tools;
 use crate::wire::{
   ArchiveRequest, ContentQuery, CopyRequest, EntriesQuery, Entry, EntryMove, EntryPage, EventPage,
-  EventsQuery, FolderRequest, Health, Machine, MachineQuery, NodePage, NodesQuery, Owner, PlacePage,
-  PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharesQuery, Storage, WireError,
-  WriteQuery,
+  EventsQuery, FolderRequest, Health, Machine, MachineQuery, MemberShare, MemberShareChange,
+  MemberSharePage, MemberShareRequest, MemberSharesQuery, NodePage, NodesQuery, Owner, PlacePage,
+  PlacesQuery, Quota, QuotaRequest, Share, SharePage, ShareRequest, SharedContentQuery, SharedPage,
+  SharedQuery, SharesQuery, Storage, WireError, WriteQuery,
 };
 
 /// Where the schemas the routes refer to stand in the document.
@@ -21,8 +22,8 @@ const SCHEMAS: &str = "/components/schemas";
 
 const DESCRIPTION: &str = "Files across places: a machine's drives, an S3-compatible store and the volumes \
   of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, \
-  moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it \
-  under its own.";
+  moved, shared by link and shared with members to read. The paths carry no prefix; whatever serves the \
+  service to a browser mounts it under its own.";
 
 /// What a route takes as its body.
 enum Body {
@@ -143,6 +144,10 @@ fn token() -> Value {
   segment("token", "The share link's token.")
 }
 
+fn member_share_id() -> Value {
+  segment("id", "The member share's number.")
+}
+
 /// The owner a route acts for (`docs/api.md`, 「Owners」).
 fn owner_key() -> Value {
   json!({
@@ -174,17 +179,19 @@ fn header(name: &str, description: &str) -> Value {
   json!({ "name": name, "in": "header", "required": false, "description": description, "schema": { "type": "string" } })
 }
 
-/// The query parameters of a query type, each property one parameter.
+/// The query parameters of a query type, each property one parameter, required where the type requires it.
 fn query<Query: JsonSchema>(generator: &mut SchemaGenerator) -> Vec<Value> {
   let schema = Query::json_schema(generator).to_value();
   let Some(properties) = schema["properties"].as_object() else {
     return Vec::new();
   };
+  let required = schema["required"].as_array().cloned().unwrap_or_default();
 
   properties
     .iter()
     .map(|(name, property)| {
-      let mut parameter = json!({ "name": name, "in": "query", "required": false, "schema": property });
+      let needed = required.iter().any(|one| one.as_str() == Some(name));
+      let mut parameter = json!({ "name": name, "in": "query", "required": needed, "schema": property });
 
       if let Some(description) = property.get("description") {
         parameter["description"] = description.clone();
@@ -627,13 +634,139 @@ fn operations(generator: &mut SchemaGenerator) -> Vec<Operation> {
       owned: false,
       tag: "shares",
       summary: "The shared bytes: a file as a download, a folder as its zip.",
-      parameters: vec![token(), range],
+      parameters: vec![token(), range.clone()],
       body: None,
       answers: vec![
         (200, bytes_answer("application/octet-stream")),
         (206, bytes_answer("application/octet-stream")),
       ],
       codes: &["unauthorized", "not-found", "gone", "upstream-failed", "failed"],
+    },
+    Operation {
+      method: "get",
+      path: "/member-shares",
+      id: "listMemberShares",
+      owned: true,
+      tag: "member-shares",
+      summary: "The members an entry is shared with.",
+      parameters: query::<MemberSharesQuery>(generator),
+      body: None,
+      answers: vec![(200, json_answer::<MemberSharePage>(generator))],
+      codes: &["unauthorized", "bad-request", "outside-place", "failed"],
+    },
+    Operation {
+      method: "post",
+      path: "/member-shares",
+      id: "createMemberShares",
+      owned: true,
+      tag: "member-shares",
+      summary: "Share an entry with members, to read.",
+      parameters: Vec::new(),
+      body: json_body::<MemberShareRequest>(generator),
+      answers: vec![(200, json_answer::<MemberSharePage>(generator))],
+      codes: &[
+        "unauthorized",
+        "bad-request",
+        "not-found",
+        "outside-place",
+        "not-shareable",
+        "read-only",
+        "own-share",
+        "no-permission",
+        "garage-closed",
+        "storage-unready",
+        "upstream-failed",
+        "failed",
+      ],
+    },
+    Operation {
+      method: "patch",
+      path: "/member-shares/{id}",
+      id: "updateMemberShare",
+      owned: true,
+      tag: "member-shares",
+      summary: "Set a member share's permission.",
+      parameters: vec![member_share_id()],
+      body: json_body::<MemberShareChange>(generator),
+      answers: vec![(200, json_answer::<MemberShare>(generator))],
+      codes: &["unauthorized", "bad-request", "not-found", "read-only", "failed"],
+    },
+    Operation {
+      method: "delete",
+      path: "/member-shares/{id}",
+      id: "deleteMemberShare",
+      owned: true,
+      tag: "member-shares",
+      summary: "Take a member off an entry.",
+      parameters: vec![member_share_id()],
+      body: None,
+      answers: vec![(204, None)],
+      codes: &["unauthorized", "bad-request", "not-found", "failed"],
+    },
+    Operation {
+      method: "get",
+      path: "/shared",
+      id: "listShared",
+      owned: true,
+      tag: "member-shares",
+      summary: "What is shared with the asking owner, the newest first.",
+      parameters: query::<SharedQuery>(generator),
+      body: None,
+      answers: vec![(200, json_answer::<SharedPage>(generator))],
+      codes: &["unauthorized", "bad-request", "failed"],
+    },
+    Operation {
+      method: "get",
+      path: "/shared/{id}/entries",
+      id: "listSharedEntries",
+      owned: true,
+      tag: "member-shares",
+      summary: "The entries under a path of a shared folder.",
+      parameters: [vec![member_share_id()], query::<EntriesQuery>(generator)].concat(),
+      body: None,
+      answers: vec![(200, json_answer::<EntryPage>(generator))],
+      codes: &[
+        "unauthorized",
+        "bad-request",
+        "not-found",
+        "outside-place",
+        "link-loop",
+        "not-folder",
+        "no-permission",
+        "failed-io",
+        "garage-closed",
+        "storage-unready",
+        "upstream-failed",
+        "failed",
+      ],
+    },
+    Operation {
+      method: "get",
+      path: "/shared/{id}/content",
+      id: "readSharedContent",
+      owned: true,
+      tag: "member-shares",
+      summary: "A shared file's bytes, or a file's under a shared folder, with Range.",
+      parameters: [vec![member_share_id()], query::<SharedContentQuery>(generator), vec![range]].concat(),
+      body: None,
+      answers: vec![
+        (200, bytes_answer("application/octet-stream")),
+        (206, bytes_answer("application/octet-stream")),
+      ],
+      codes: &[
+        "unauthorized",
+        "bad-request",
+        "not-found",
+        "outside-place",
+        "link-loop",
+        "is-folder",
+        "no-permission",
+        "bucket-not-file",
+        "garage-closed",
+        "storage-unready",
+        "upstream-failed",
+        "failed",
+      ],
     },
   ]
 }

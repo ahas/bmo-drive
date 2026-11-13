@@ -428,6 +428,94 @@
         ],
         "type": "object"
       },
+      "MemberShare": {
+        "description": "One member an entry is shared with, as its owner is told of it.",
+        "properties": {
+          "id": {
+            "description": "Its number.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/SharePermission"
+          },
+          "sharedAt": {
+            "description": "When it was made, in epoch milliseconds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "user": {
+            "description": "The member's owner key.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user",
+          "permission",
+          "sharedAt"
+        ],
+        "type": "object"
+      },
+      "MemberShareChange": {
+        "description": "A member share's permission asked to change.",
+        "properties": {
+          "permission": {
+            "$ref": "#/components/schemas/SharePermission"
+          }
+        },
+        "required": [
+          "permission"
+        ],
+        "type": "object"
+      },
+      "MemberSharePage": {
+        "description": "A page of member shares.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemberShare"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
+      "MemberShareRequest": {
+        "description": "An entry asked to be shared with members.",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/SharePermission"
+          },
+          "placeName": {
+            "type": "string"
+          },
+          "users": {
+            "description": "The members' owner keys.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "placeName",
+          "path",
+          "users",
+          "permission"
+        ],
+        "type": "object"
+      },
       "NodePage": {
         "description": "A page of the node list.",
         "properties": {
@@ -778,6 +866,14 @@
         ],
         "type": "object"
       },
+      "SharePermission": {
+        "description": "What a member share lets its member do (`docs/files.md`, 「What a member share is」): the service keeps and\nserves `read` alone, and refuses `edit`.",
+        "enum": [
+          "read",
+          "edit"
+        ],
+        "type": "string"
+      },
       "ShareRequest": {
         "description": "A share link asked for.",
         "properties": {
@@ -806,6 +902,63 @@
         "required": [
           "placeName",
           "path"
+        ],
+        "type": "object"
+      },
+      "Shared": {
+        "description": "One entry shared with the asking owner, as its member is told of it.",
+        "properties": {
+          "id": {
+            "description": "The member share's number, which its readings name.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ShareKind"
+          },
+          "name": {
+            "description": "The name its entry is handed out under.",
+            "type": "string"
+          },
+          "ownerKey": {
+            "description": "The owner key it is shared by.",
+            "type": "string"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/SharePermission"
+          },
+          "sharedAt": {
+            "description": "When it was shared, in epoch milliseconds.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "ownerKey",
+          "name",
+          "kind",
+          "permission",
+          "sharedAt"
+        ],
+        "type": "object"
+      },
+      "SharedPage": {
+        "description": "A page of what is shared with the asking owner.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Shared"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
         ],
         "type": "object"
       },
@@ -923,9 +1076,9 @@
     }
   },
   "info": {
-    "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved and shared by link. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
+    "description": "Files across places: a machine's drives, an S3-compatible store and the volumes of other machines, the administrator's alone, and each owner's own drive with its quota, read, written, moved, shared by link and shared with members to read. The paths carry no prefix; whatever serves the service to a browser mounts it under its own.",
     "title": "bmo-drive",
-    "version": "0.1.0-rev.7"
+    "version": "0.1.0-rev.8"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1134,6 +1287,313 @@
           "bad-request",
           "not-found",
           "upstream-failed",
+          "failed"
+        ]
+      }
+    },
+    "/member-shares": {
+      "get": {
+        "operationId": "listMemberShares",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "An `id`: the member shares after it.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "description": "An `id`: the member shares after it.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "placeName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSharePage"
+                }
+              }
+            },
+            "description": "The members an entry is shared with."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The members an entry is shared with.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "outside-place",
+          "failed"
+        ]
+      },
+      "post": {
+        "operationId": "createMemberShares",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSharePage"
+                }
+              }
+            },
+            "description": "Share an entry with members, to read."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Share an entry with members, to read.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found",
+          "outside-place",
+          "not-shareable",
+          "read-only",
+          "own-share",
+          "no-permission",
+          "garage-closed",
+          "storage-unready",
+          "upstream-failed",
+          "failed"
+        ]
+      }
+    },
+    "/member-shares/{id}": {
+      "delete": {
+        "operationId": "deleteMemberShare",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member share's number.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Take a member off an entry."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Take a member off an entry.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found",
+          "failed"
+        ]
+      },
+      "patch": {
+        "operationId": "updateMemberShare",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member share's number.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberShareChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberShare"
+                }
+              }
+            },
+            "description": "Set a member share's permission."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Set a member share's permission.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found",
+          "read-only",
           "failed"
         ]
       }
@@ -2465,6 +2925,396 @@
         ]
       }
     },
+    "/shared": {
+      "get": {
+        "operationId": "listShared",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "An `id`: the shares made before it.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "description": "An `id`: the shares made before it.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedPage"
+                }
+              }
+            },
+            "description": "What is shared with the asking owner, the newest first."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "What is shared with the asking owner, the newest first.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "failed"
+        ]
+      }
+    },
+    "/shared/{id}/content": {
+      "get": {
+        "operationId": "readSharedContent",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member share's number.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Handed over to be saved rather than shown.",
+            "in": "query",
+            "name": "download",
+            "required": false,
+            "schema": {
+              "description": "Handed over to be saved rather than shown.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The first so many bytes alone.",
+            "in": "query",
+            "name": "head",
+            "required": false,
+            "schema": {
+              "description": "The first so many bytes alone.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The file from the shared entry, the entry itself where none is named.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "description": "The file from the shared entry, the entry itself where none is named.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "One byte range of the file.",
+            "in": "header",
+            "name": "Range",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentEncoding": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A shared file's bytes, or a file's under a shared folder, with Range."
+          },
+          "206": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentEncoding": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A shared file's bytes, or a file's under a shared folder, with Range."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "A shared file's bytes, or a file's under a shared folder, with Range.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found",
+          "outside-place",
+          "link-loop",
+          "is-folder",
+          "no-permission",
+          "bucket-not-file",
+          "garage-closed",
+          "storage-unready",
+          "upstream-failed",
+          "failed"
+        ]
+      }
+    },
+    "/shared/{id}/entries": {
+      "get": {
+        "operationId": "listSharedEntries",
+        "parameters": [
+          {
+            "description": "The opaque key of the owner the caller acts for, 1 to 200 characters.",
+            "in": "header",
+            "name": "Owner-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The role the reader holds; either allows the console bundle's role, member.",
+            "in": "header",
+            "name": "Owner-Role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "administrator",
+                "member"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member share's number.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "How many entries of the order were already read.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "description": "How many entries of the order were already read.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The folders alone.",
+            "in": "query",
+            "name": "folders",
+            "required": false,
+            "schema": {
+              "description": "The folders alone.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The folder read again rather than from what was kept.",
+            "in": "query",
+            "name": "fresh",
+            "required": false,
+            "schema": {
+              "description": "The folder read again rather than from what was kept.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SortOrder"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "The folder, the place's top where none is named.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "description": "The folder, the place's top where none is named.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EntrySort"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryPage"
+                }
+              }
+            },
+            "description": "The entries under a path of a shared folder."
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The entries under a path of a shared folder.",
+        "tags": [
+          "member-shares"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "bad-request",
+          "not-found",
+          "outside-place",
+          "link-loop",
+          "not-folder",
+          "no-permission",
+          "failed-io",
+          "garage-closed",
+          "storage-unready",
+          "upstream-failed",
+          "failed"
+        ]
+      }
+    },
     "/shares": {
       "get": {
         "operationId": "listShares",
@@ -2881,6 +3731,9 @@
     },
     {
       "name": "shares"
+    },
+    {
+      "name": "member-shares"
     }
   ],
   "x-calls": [

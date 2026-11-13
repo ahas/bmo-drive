@@ -2,7 +2,7 @@ import { relayAddress } from "bmo-ui/app/domain/relay";
 import { joinPath, lastName, parentPath } from "./files";
 
 import type { components } from "../../shared/openapi";
-import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FilePlaces, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
+import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FileMemberView, FilePlaces, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
 import type { FolderAt } from "./files";
 
 // The Files screen's calls to the drive service, each through the console's relay at the path the
@@ -288,6 +288,32 @@ export async function makeShare(place: string, path: string, seconds: number | n
 /** One link taken away. */
 export async function endShare(token: string): Promise<void> {
   await $fetch(drivePath(`/shares/${segment(token)}`), { method: "DELETE" });
+}
+
+function memberOf(share: Wire["MemberShare"]): FileMemberView {
+  return { id: share.id, user: share.user, permission: share.permission };
+}
+
+/** The members one entry is shared with, in the order they were shared with. */
+export async function readMembers(place: string, path: string): Promise<FileMemberView[]> {
+  return (await $fetch<Wire["MemberSharePage"]>(drivePath("/member-shares"), { query: { placeName: place, path, limit: "1000" } })).items.map(memberOf);
+}
+
+/** One entry shared with members at a permission: the member shares of those members as they now stand. */
+export async function shareMembers(place: string, path: string, users: string[], permission: Wire["SharePermission"]): Promise<FileMemberView[]> {
+  const body: Wire["MemberShareRequest"] = { placeName: place, path, users, permission };
+
+  return (await $fetch<Wire["MemberSharePage"]>(drivePath("/member-shares"), { method: "POST", body })).items.map(memberOf);
+}
+
+/** One member share's permission set. */
+export async function changeMember(id: number, permission: Wire["SharePermission"]): Promise<void> {
+  await $fetch(drivePath(`/member-shares/${id}`), { method: "PATCH", body: { permission } });
+}
+
+/** One member taken off an entry. */
+export async function endMember(id: number): Promise<void> {
+  await $fetch(drivePath(`/member-shares/${id}`), { method: "DELETE" });
 }
 
 /** What a link's holder is shown of it. */

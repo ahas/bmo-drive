@@ -55,6 +55,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/member-shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The members an entry is shared with. */
+        get: operations["listMemberShares"];
+        put?: never;
+        /** Share an entry with members, to read. */
+        post: operations["createMemberShares"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/member-shares/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take a member off an entry. */
+        delete: operations["deleteMemberShare"];
+        options?: never;
+        head?: never;
+        /** Set a member share's permission. */
+        patch: operations["updateMemberShare"];
+        trace?: never;
+    };
     "/nodes": {
         parameters: {
             query?: never;
@@ -222,6 +258,57 @@ export interface paths {
         get: operations["readQuota"];
         /** Set one owner's quota, or return it to the default. */
         put: operations["setQuota"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is shared with the asking owner, the newest first. */
+        get: operations["listShared"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shared/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A shared file's bytes, or a file's under a shared folder, with Range. */
+        get: operations["readSharedContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shared/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entries under a path of a shared folder. */
+        get: operations["listSharedEntries"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -435,6 +522,39 @@ export interface components {
             /** @description The node, null for this machine. */
             nodeName: string | null;
         };
+        /** @description One member an entry is shared with, as its owner is told of it. */
+        MemberShare: {
+            /**
+             * Format: int64
+             * @description Its number.
+             */
+            id: number;
+            permission: components["schemas"]["SharePermission"];
+            /**
+             * Format: int64
+             * @description When it was made, in epoch milliseconds.
+             */
+            sharedAt: number;
+            /** @description The member's owner key. */
+            user: string;
+        };
+        /** @description A member share's permission asked to change. */
+        MemberShareChange: {
+            permission: components["schemas"]["SharePermission"];
+        };
+        /** @description A page of member shares. */
+        MemberSharePage: {
+            items: components["schemas"]["MemberShare"][];
+            more: boolean;
+        };
+        /** @description An entry asked to be shared with members. */
+        MemberShareRequest: {
+            path: string;
+            permission: components["schemas"]["SharePermission"];
+            placeName: string;
+            /** @description The members' owner keys. */
+            users: string[];
+        };
         /** @description A page of the node list. */
         NodePage: {
             items: components["schemas"]["ListedNode"][];
@@ -565,6 +685,12 @@ export interface components {
             items: components["schemas"]["Share"][];
             more: boolean;
         };
+        /**
+         * @description What a member share lets its member do (`docs/files.md`, 「What a member share is」): the service keeps and
+         *     serves `read` alone, and refuses `edit`.
+         * @enum {string}
+         */
+        SharePermission: "read" | "edit";
         /** @description A share link asked for. */
         ShareRequest: {
             /** @description Who makes it. */
@@ -576,6 +702,30 @@ export interface components {
             expiresAt?: number | null;
             path: string;
             placeName: string;
+        };
+        /** @description One entry shared with the asking owner, as its member is told of it. */
+        Shared: {
+            /**
+             * Format: int64
+             * @description The member share's number, which its readings name.
+             */
+            id: number;
+            kind: components["schemas"]["ShareKind"];
+            /** @description The name its entry is handed out under. */
+            name: string;
+            /** @description The owner key it is shared by. */
+            ownerKey: string;
+            permission: components["schemas"]["SharePermission"];
+            /**
+             * Format: int64
+             * @description When it was shared, in epoch milliseconds.
+             */
+            sharedAt: number;
+        };
+        /** @description A page of what is shared with the asking owner. */
+        SharedPage: {
+            items: components["schemas"]["Shared"][];
+            more: boolean;
         };
         /**
          * @description Which way an order runs.
@@ -709,6 +859,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Machine"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listMemberShares: {
+        parameters: {
+            query: {
+                /** @description An `id`: the member shares after it. */
+                after?: number | null;
+                limit?: number | null;
+                path: string;
+                placeName: string;
+            };
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The members an entry is shared with. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberSharePage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createMemberShares: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Share an entry with members, to read. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberSharePage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteMemberShare: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path: {
+                /** @description The member share's number. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Take a member off an entry. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateMemberShare: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path: {
+                /** @description The member share's number. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberShareChange"];
+            };
+        };
+        responses: {
+            /** @description Set a member share's permission. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberShare"];
                 };
             };
             default: components["responses"]["Error"];
@@ -1197,6 +1469,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Quota"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listShared: {
+        parameters: {
+            query?: {
+                /** @description An `id`: the shares made before it. */
+                after?: number | null;
+                limit?: number | null;
+            };
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What is shared with the asking owner, the newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedPage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    readSharedContent: {
+        parameters: {
+            query?: {
+                /** @description Handed over to be saved rather than shown. */
+                download?: boolean | null;
+                /** @description The first so many bytes alone. */
+                head?: number | null;
+                /** @description The file from the shared entry, the entry itself where none is named. */
+                path?: string | null;
+            };
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+                /** @description One byte range of the file. */
+                Range?: string;
+            };
+            path: {
+                /** @description The member share's number. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A shared file's bytes, or a file's under a shared folder, with Range. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description A shared file's bytes, or a file's under a shared folder, with Range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listSharedEntries: {
+        parameters: {
+            query?: {
+                /** @description How many entries of the order were already read. */
+                after?: number | null;
+                /** @description The folders alone. */
+                folders?: boolean | null;
+                /** @description The folder read again rather than from what was kept. */
+                fresh?: boolean | null;
+                limit?: number | null;
+                order?: components["schemas"]["SortOrder"] | null;
+                /** @description The folder, the place's top where none is named. */
+                path?: string | null;
+                sort?: components["schemas"]["EntrySort"] | null;
+            };
+            header: {
+                /** @description The opaque key of the owner the caller acts for, 1 to 200 characters. */
+                "Owner-Key": string;
+                /** @description The role the reader holds; either allows the console bundle's role, member. */
+                "Owner-Role": "administrator" | "member";
+            };
+            path: {
+                /** @description The member share's number. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entries under a path of a shared folder. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryPage"];
                 };
             };
             default: components["responses"]["Error"];

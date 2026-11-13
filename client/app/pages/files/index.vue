@@ -137,7 +137,7 @@
 
       <FilesConflictDialog v-model:open="conflictOpen" :names="conflictNames" @answer="onConflictAnswer" />
 
-      <ShareDialog v-model:open="shareOpen" :road="shareRoad" :spans="shareSpans" span="7d" :subject="shareTarget?.name" />
+      <ShareDialog v-model:open="shareOpen" :road="shareRoad" :members="memberRoad" :spans="shareSpans" span="7d" :subject="shareTarget?.name" :explain="shareFailure" />
       <DriveShareList v-model:open="shareListOpen" :places="places" />
 
       <UModal v-model:open="propertiesOpen" :title="propertiesEntry?.name ?? ''">
@@ -167,7 +167,8 @@
 import { useI18n } from "vue-i18n";
 import { refusalText } from "../../domain/refusals";
 import { countText } from "bmo-ui/app/domain/numbers";
-import { carryEntries, contentUrl, deleteEntries, endShare, makeFolder, makeShare, readListing, readNode, readPlaces, readShares, readSpace, renameEntry as renameAt, sendFile } from "../../domain/drive";
+import { carryEntries, changeMember, contentUrl, deleteEntries, endMember, endShare, makeFolder, makeShare, readListing, readMembers, readNode, readPlaces, readShares, readSpace, renameEntry as renameAt, sendFile, shareMembers } from "../../domain/drive";
+import { CONSOLE_PEOPLE, personOf } from "../../domain/people";
 import {
   DEFAULT_SORT,
   DEFAULT_VIEW,
@@ -207,8 +208,10 @@ import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
 import { SHARE_SPANS, spanSeconds } from "../../../shared/config";
 import { browserStore, forgetPlace, rememberPlace, rememberedPlace, startingPlace } from "../../domain/place-memory";
 
-import type { FileConflict, FileEntry, FileMachine, FilePlaces, FileShareView, FileSortKey } from "../../../shared/types";
+import type { FileConflict, FileEntry, FileMachine, FileMemberView, FilePlaces, FileShareView, FileSortKey } from "../../../shared/types";
+import type { ConsolePeople } from "../../domain/people";
 import type { ShareRoad, ShareSpan } from "bmo-ui/app/domain/share-links";
+import type { ShareMemberRoad } from "bmo-ui/app/domain/share-members";
 import type { Dropped, FilesClip, FilesSort, FilesView, FolderAt, FolderChildren, FilesTreeItem } from "../../domain/files";
 import type { FilesPress } from "../../components/DriveList.vue";
 import type { FilesUploading } from "bmo-ui/app/components/FilesProgress.vue";
@@ -615,6 +618,56 @@ const shareRoad = computed<ShareRoad>(() => {
     remove: async (link) => endShare(link.token)
   };
 });
+
+// The people of the reader's company, where the console offers them (docs/files.md, "The Files screen").
+const people = inject<ConsolePeople | null>(CONSOLE_PEOPLE, null);
+
+// The road the share dialog's member part goes by: people found and named through the console's directory,
+// who the entry is shared with kept by the service. Each member's share number is held as it is read or
+// made, since a change and a removal name the share rather than the person. With no directory there is
+// none, and the dialog shares by link alone.
+const memberRoad = computed<ShareMemberRoad | undefined>(() => {
+  const target = shareTarget.value;
+  const directory = people;
+
+  if (directory === null || target === null) return undefined;
+
+  const ids = new Map<string, number>();
+  const held = (members: FileMemberView[]): FileMemberView[] => {
+    for (const member of members) ids.set(member.user, member.id);
+
+    return members;
+  };
+  const idOf = (user: string): number => {
+    const id = ids.get(user);
+
+    if (id === undefined) throw new Error(`no member share is held for ${user}`);
+
+    return id;
+  };
+
+  return {
+    search: (words) => directory.search(words),
+    read: async () => {
+      const members = held(await readMembers(target.place, target.path));
+
+      return Promise.all(members.map(async (member) => ({ person: await personOf(directory, member.user), permission: member.permission })));
+    },
+    share: async (users, permission) => {
+      held(await shareMembers(target.place, target.path, users, permission));
+    },
+    change: (user, permission) => changeMember(idOf(user), permission),
+    remove: async (user) => {
+      await endMember(idOf(user));
+      ids.delete(user);
+    }
+  };
+});
+
+// A refused share, link or member, said in the screen's own words for the service's code.
+function shareFailure(error: unknown, fallback: string): string {
+  return refusalText(t, error, fallback);
+}
 
 /** The one chosen entry a link can be made for: a file or a folder, never anything else. */
 function shareable(): FileEntry | null {

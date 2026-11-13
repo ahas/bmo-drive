@@ -55,8 +55,9 @@ in the same commit and follows the version rule (「Versions」).
   place, `GET /machine`, a node, `GET /storage` and `GET`/`PUT /quotas/{ownerKey}` are answered 404
   `not-found`, as if they did not stand. An empty setting makes no key the administrator.
 - **Every other route acts for the key it is given:** the place `drive` is that owner's own space
-  (`docs/files.md`, 「The BMO drive」), the share links listed and taken away are that owner's, and the
-  events read are that owner's.
+  (`docs/files.md`, 「The BMO drive」), the share links listed and taken away are that owner's, the member
+  shares granted and taken off are that owner's, the member shares read are those naming that key as their
+  member (「Member shares」), and the events read are that owner's.
 
 | Method and path | Sends | Answers |
 |---|---|---|
@@ -260,6 +261,47 @@ starts; an entry that fails once the zip has started ends the answer as broken.
   with 404 `not-found`. They read nothing of the request but the token and the range, and take no owner
   key: the entry is read in the places of the link's own owner.
 
+## Member shares
+
+| Method and path | Sends | Answers |
+|---|---|---|
+| `GET /member-shares` | query `placeName`, `path`, `after?`, `limit?` | 200, a page of the members the asking owner shares that entry with |
+| `POST /member-shares` | `placeName`, `path`, `users`, `permission` | 200, a page of the member shares of those users, made now or already standing |
+| `PATCH /member-shares/{id}` | `permission` | 200, the member share |
+| `DELETE /member-shares/{id}` | | 204 |
+| `GET /shared` | query `after?`, `limit?` | 200, a page of what is shared with the asking owner, the newest first |
+| `GET /shared/{id}/entries` | query `path?`, `sort?`, `order?`, `folders?`, `after?`, `limit?` | 200, a page of a folder's entries under a shared folder |
+| `GET /shared/{id}/content` | query `path?`, `download?`, `head?`; the `Range` header | the file's bytes, answered as a file's content is (「A file's answer」) |
+
+- **A member share** is `id` (its number), `user` (the member's owner key), `permission` (`read`) and
+  `sharedAt`. The owner's routes act on the asking owner's member shares alone: another owner's `id` is
+  answered 404 `not-found`.
+- **`GET /member-shares`** lists the members of the entry at `placeName` and `path` in the asking owner's
+  places, in the order they were shared with. Its cursor `after` is an `id`: the page holds the member shares
+  after it. `limit` is 1 to 1000, 1000 where none is asked. The entry is not read, so an entry gone still
+  lists the members it had.
+- **`POST /member-shares`** shares the entry with every owner key in `users`, 1 to 1000 keys each of 1 to 200
+  characters. The entry is read first and judged a file or a folder there; anything else is refused 422
+  `not-shareable`, nothing there 404 `not-found`. A key already a member keeps its row. `permission` is
+  `read` or `edit`, and `edit` is refused 422 `read-only` before anything is stored (`docs/files.md`, 「What a
+  member share is」); a key that is the asking owner's own is refused 422 `own-share`.
+- **`PATCH /member-shares/{id}`** sets the permission: `read` keeps the share as it stands, `edit` is refused
+  422 `read-only`.
+- **`DELETE /member-shares/{id}`** takes the member off; their reading stops at once.
+- **What is shared with an owner** is `id`, `ownerKey` (the owner key it is shared by, which a screen names
+  through the console's people directory), `name` (its entry's name, at a place's top the place's last name),
+  `kind` (`file` or `folder`), `permission` and `sharedAt`. `GET /shared` cursor `after` is an `id`: the page
+  holds the shares made before it. `limit` is 1 to 1000, 100 where none is asked.
+- **`GET /shared/{id}/…`** reads the share whose member is the asking owner key; any other key is answered
+  404 `not-found`, as is a share whose entry no longer stands as that kind at its path. The entry is read in
+  the places of the owner who shared it, cut down to it (`docs/files.md`, 「Who shares and who reads」):
+  - `path` is read from the shared entry, the empty path being the entry itself;
+  - `entries` lists a folder under a shared folder as `GET /places/{placeName}/entries` lists one, read now
+    every time, so `fresh` is passed over; each entry's `placeName` is `shared:<id>` and its `path` is read
+    from the shared folder; a shared file is refused 422 `not-folder`;
+  - `content` reads a shared file at the empty path, or a file under a shared folder; a folder asked to be
+    read as a file is refused 422 `is-folder`, and a path under a shared file 404 `not-found`.
+
 ## The console face
 
 The service serves its Files screen and its file share page as a console face of bmo-ui's console plugin
@@ -290,6 +332,10 @@ them as the contract names. This section names only what the drive hands the cra
   | `pushKinds`, `calls`, `relays` | none: the screens call the routes of this document alone, the node list among them (「Places」), and read no event stream |
   | `shareReads` | `/shares/{token}` and `/shares/{token}/content`, the two reads a link's holder makes (「Share links」) |
 
+- **Its Files screen** uses the contract's people directory and its sharing with members: the share dialog's
+  member road searches and names people through the directory the console provides, and reads, grants,
+  changes and takes back members through 「Member shares」. These are the bundle's own service, so `calls`
+  stays empty.
 - **Its share page** is the contract's share page: a link's page under `/files/share/` and the token, reading
   the link and its content through the two share reads. Since the manifest names share reads, the module and
   the stylesheet are answered with no role and no owner key.
@@ -332,7 +378,9 @@ that document states them (`bad-request`, `unauthorized`, `forbidden`, `no-route
 | `no-bucket` | a change at Garage that names no bucket |
 | `garage-closed` | Garage was asked for while it cannot be opened; the sentence gives its place's reason |
 | `bad-expiry` | an `expiresAt` already passed |
-| `not-shareable` | a share link asked for what is neither a file nor a folder |
+| `not-shareable` | a share link or a member share asked for what is neither a file nor a folder |
+| `read-only` | a member share asked at a permission other than `read` |
+| `own-share` | a member share naming the asking owner's own key |
 | `quota-exceeded` | a write into the drive that would take its usage past its quota; answered 413 with `usedBytes` and `quotaBytes` |
 | `no-quota` | a quota set for the administrator's own key |
 | `storage-unready` | the drive asked for while its storage cannot be opened: a kind whose adapter has not landed, or no root set |
@@ -345,7 +393,8 @@ that document states them (`bad-request`, `unauthorized`, `forbidden`, `no-route
   an `Owner-Role` that allows `member` (「Owners」).
 - **`not-found`** covers nothing at a path, a place the current reading does not list, a node the node list
   does not hold, the machine branch, the node list, the storage and the quotas asked for by any key but the
-  administrator's, and a share link as above.
+  administrator's, a share link as above, and a member share asked by any key but its owner's or, for a
+  reading, its member's.
 - **`conflict`** covers a name already taken (with `names`) and a bucket asked to be deleted that still
   holds objects.
 - **`upstream-failed`** covers the node service not answering, a node that could not be reached or whose

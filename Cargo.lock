@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-drive"
-version = "0.1.0-rev.7"
+version = "0.1.0-rev.8"
 dependencies = [
  "async_zip",
  "aws-runtime",

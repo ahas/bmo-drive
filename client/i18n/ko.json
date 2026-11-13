@@ -136,6 +136,8 @@
       "garage-closed": "Garage를 열 수 없습니다.",
       "bad-expiry": "이미 지난 시각으로는 링크를 만들 수 없습니다.",
       "not-shareable": "파일이나 폴더만 공유할 수 있습니다.",
+      "read-only": "같은 조직의 사람에게는 읽기 권한만 줄 수 있습니다.",
+      "own-share": "자신과는 공유할 수 없습니다.",
       "garage-config-unreadable": "Garage 설정 파일을 읽지 못했습니다.",
       "aws-config-unreadable": "AWS 설정을 읽지 못했습니다.",
       "garage-profile-missing": "AWS 프로필이 없습니다.",
