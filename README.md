@@ -17,8 +17,9 @@ face in `tests/console.rs`: the manifest the service serves read through bmo-ui'
 `client/vendor/` holds, run with Bun by bmo-console-face, the face wired to the console's credential, and
 the drive's own guard of every other route; links on a volume in
 `tests/links.rs`: a path walking back into itself refused, a link to a folder beside walked once, each link's
-target listed and a folder's zip ending over links; and where the Files screen opens in `tests/screen.rs`, the
-screen's place memory run with Bun the same way. `cargo test` runs them all, and the bundle's check,
+target listed and a folder's zip ending over links; and the Files screen in `tests/screen.rs`, its modules run
+with Bun the same way: where it opens, from the place memory, and the branch of what is shared with the owner,
+each share a read-only place read through the member's own roads. `cargo test` runs them all, and the bundle's check,
 `bun install --frozen-lockfile && bun run typecheck` inside `client/`, stands beside them.
 `docs/inventory.md` lists the tests the old behaviour was held to.
 

@@ -82,6 +82,7 @@ import { TEXT_HEAD_BYTES, entryIcon, entryProperties, isJson, laidOutJson, listS
 
 import type { FileEntry } from "../../shared/types";
 import type { FolderAt } from "../domain/files";
+import type { PlaceRoad } from "../domain/drive";
 import type { BarAction, BarProperty } from "bmo-ui/app/domain/tabs";
 
 interface Props {
@@ -90,6 +91,10 @@ interface Props {
   // The name of the place the folder is of, and the entry's path as it is copied out.
   placeName: string;
   shownPath: string;
+  // The road the chosen file's place is read by; null where no folder is open.
+  road: PlaceRoad | null;
+  // Who shared the place the entry stands in, where it stands in a share.
+  sharer: string | null;
 }
 
 const { t } = useI18n();
@@ -105,8 +110,8 @@ const video = ref<VideoState>({ state: "loading" });
 
 const at = computed(() => (props.chosen === null ? null : { place: props.chosen.place, path: props.chosen.path, name: props.chosen.entry.name }));
 const kind = computed(() => (props.chosen === null ? "none" : previewKind(props.chosen.entry.name)));
-const shownUrl = computed(() => (at.value === null ? "" : contentUrl(at.value)));
-const downloadUrl = computed(() => (at.value === null ? "" : contentUrl(at.value, { download: true })));
+const shownUrl = computed(() => (at.value === null || props.road === null ? "" : contentUrl(props.road, at.value)));
+const downloadUrl = computed(() => (at.value === null || props.road === null ? "" : contentUrl(props.road, at.value, { download: true })));
 
 const actions = computed<BarAction[]>(() =>
   props.chosen?.entry.kind !== "file"
@@ -119,7 +124,7 @@ const actions = computed<BarAction[]>(() =>
 
 const typeLabel = computed(() => (props.chosen === null ? "" : typeOf(t, props.chosen.entry)));
 
-const properties = computed<BarProperty[]>(() => (props.chosen === null ? [] : entryProperties(t, props.placeName, props.shownPath, props.chosen.entry)));
+const properties = computed<BarProperty[]>(() => (props.chosen === null ? [] : entryProperties(t, props.placeName, props.shownPath, props.chosen.entry, props.sharer)));
 
 let asked = 0;
 
@@ -127,16 +132,17 @@ let asked = 0;
 // preview.
 async function readText(): Promise<void> {
   const chosen = props.chosen;
+  const road = props.road;
   const mine = ++asked;
 
-  if (!import.meta.client || chosen === null || at.value === null || chosen.entry.kind !== "file" || kind.value !== "text") {
+  if (!import.meta.client || chosen === null || road === null || at.value === null || chosen.entry.kind !== "file" || kind.value !== "text") {
     return;
   }
 
   text.value = { state: "loading" };
 
   try {
-    const response = await fetch(contentUrl(at.value, { head: TEXT_HEAD_BYTES }));
+    const response = await fetch(contentUrl(road, at.value, { head: TEXT_HEAD_BYTES }));
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { code?: unknown } | null;
@@ -167,8 +173,9 @@ function videoRead(event: Event): void {
 async function videoFailed(event: Event): Promise<void> {
   const failure = (event.target as HTMLVideoElement).error;
   const mine = asked;
+  const road = props.road;
 
-  if (failure === null || failure.code === MediaError.MEDIA_ERR_ABORTED || at.value === null) return;
+  if (failure === null || failure.code === MediaError.MEDIA_ERR_ABORTED || at.value === null || road === null) return;
 
   if (failure.code === MediaError.MEDIA_ERR_NETWORK) {
     video.value = { state: "failed", reason: t("drive.error.preview_failed") };
@@ -182,7 +189,7 @@ async function videoFailed(event: Event): Promise<void> {
     return;
   }
 
-  const response = await fetch(contentUrl(at.value, { head: 1 })).catch(() => null);
+  const response = await fetch(contentUrl(road, at.value, { head: 1 })).catch(() => null);
   const body = response === null || response.ok ? null : ((await response.json().catch(() => null)) as { code?: unknown } | null);
 
   if (mine !== asked) return;

@@ -64,6 +64,8 @@ export interface FilePlaces {
   viewer: string;
   space: FileSpace | null;
   machines: FileMachine[];
+  // What other owners share with the signed-in owner, the newest first.
+  shared: FileSharedItem[];
 }
 
 // How a name already taken in the folder a change lands in is settled (docs/files.md, "Changing
@@ -127,6 +129,17 @@ export interface FileMemberView {
   id: number;
   user: string;
   permission: "read" | "edit";
+}
+
+// One entry another owner shares with the signed-in owner (docs/files.md, "The Files screen"): the share's
+// number its readings name, the place the screen walks it as, the owner key it is shared by, and the entry's
+// name and kind.
+export interface FileSharedItem {
+  id: number;
+  place: string;
+  owner: string;
+  name: string;
+  kind: FileShareKind;
 }
 
 // What the holder of a link is shown: the entry's name and kind, and when the link ends.

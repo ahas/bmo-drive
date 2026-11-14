@@ -26,8 +26,8 @@
 
     <span class="relative flex shrink-0 items-center justify-center" :style="{ width: `${mark}px`, height: `${mark}px` }">
       <img
-        v-if="!props.parent && props.at !== null && showsThumbnail(props.entry, mark)"
-        :src="contentUrl({ ...props.at, name: props.entry.name })"
+        v-if="!props.parent && props.at !== null && props.road !== null && showsThumbnail(props.entry, mark)"
+        :src="contentUrl(props.road, { ...props.at, name: props.entry.name })"
         :alt="props.entry.name"
         loading="lazy"
         draggable="false"
@@ -68,10 +68,13 @@ import { formatDateClock } from "bmo-ui/app/domain/time";
 
 import type { FileEntry } from "../../shared/types";
 import type { FilesView, FolderAt } from "../domain/files";
+import type { PlaceRoad } from "../domain/drive";
 
 interface Props {
   entry: FileEntry;
   at: FolderAt | null;
+  // The road the folder's place is read by, which a picture's own small version is read through.
+  road: PlaceRoad | null;
   view: Exclude<FilesView, "details">;
   // Whether this is the `..` heading the list, which goes to the folder above.
   parent?: boolean;

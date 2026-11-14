@@ -438,7 +438,7 @@ flowchart TD
   - Every listing of a shared folder is read now; nothing a member is answered is kept for the pages after
     it.
 - **A member changes nothing.** No route writes through a member share, and every route that changes files
-  acts for the asking owner's own places, exactly as before.
+  acts for the asking owner's own places alone.
 - **Everything else answers as it does without member shares:** every route over `places` reads the asking
   owner's own places, and the share links are untouched.
 
@@ -452,6 +452,24 @@ flowchart TD
 - **The machines stand below it only where the service answers that they are the owner's:** this machine
   with its drives and Garage, then each node of the node list. The screen reads no name and no node list to
   decide it; for any other owner it reads neither the machines nor the node list.
+- **What is shared with the signed-in owner stands as a branch of its own,** after the owner's drive and
+  before the machines, for every owner alike (「Sharing with members」). The branch itself opens nothing: it
+  holds one row for each entry shared with the owner, the newest first, and a row saying none is shared
+  where the service answers none.
+  - **Each share is a read-only place,** named as the service names its entries, `shared:` and the share's
+    number. A shared folder is walked as any place is, its tree, its list, its preview and its downloads
+    all read through the member's own roads (`docs/api.md`, 「Member shares」); a shared file opens as a
+    place holding that one file, previewed and downloaded the same way.
+  - **The sharer is named** beside the share's row, in the read-only mark and among an entry's properties,
+    by the name the console's people directory answers for the share's owner key. A key it answers no
+    person for, or a console that offers no directory, leaves the key standing as the name.
+  - **A read-only place offers nothing that writes:** no create button, no new folder, upload, paste,
+    cut, copy, rename, delete or share in its toolbar, its menus or its keys, and nothing dragged into it,
+    out of it or dropped on it. Its toolbar carries the read-only mark, which names the sharer as its hint.
+  - **A share the owner ends is gone from the branch** at the next reading of the places. A reading under
+    a share refused as not found reads the places again at once: where the share no longer stands among
+    them, the screen forgets it and opens where it would with nothing remembered; where it still stands,
+    only the folder was taken away, and the refusal is said as any other.
 - **The share dialog offers the members of the reader's company under the link** (「Sharing with members」),
   found through the console's people directory and drawn by the name it answers for each key, a key it
   answers no person for standing as the key. Who an entry is shared with, and each share and removal, are
@@ -470,7 +488,8 @@ flowchart TD
   the folders walked and a reload opens the same folder.
 - **The last folder each viewer opened is remembered in the browser,** under the viewer's owner key as the
   service answers it, as a convenience: the screen opened with an address that names no place opens at
-  that folder, where the place is still one the viewer reaches. A remembered folder that can no longer be
+  that folder, where the place is still one the viewer reaches, a share among them while it stands in the
+  branch. A remembered folder that can no longer be
   listed is forgotten and the screen opens where it would with nothing remembered. Storage the browser
   refuses or clears leaves nothing remembered and changes nothing else.
 - **A link is marked as one** in the open folder's list, with the target it names, and a link refused for

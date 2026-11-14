@@ -1,14 +1,29 @@
 import { relayAddress } from "bmo-ui/app/domain/relay";
-import { joinPath, lastName, parentPath } from "./files";
+import { joinPath, lastName, parentPath, sharedItemOf, sharedPlace } from "./files";
 
 import type { components } from "../../shared/openapi";
-import type { FileConflict, FileDrive, FileDriveKind, FileEntry, FileGarage, FileListing, FileMachine, FileMemberView, FilePlaces, FileShareView, FileSortKey, FileSpace, SharedFileView } from "../../shared/types";
+import type {
+  FileConflict,
+  FileDrive,
+  FileDriveKind,
+  FileEntry,
+  FileGarage,
+  FileListing,
+  FileMachine,
+  FileMemberView,
+  FilePlaces,
+  FileSharedItem,
+  FileShareView,
+  FileSortKey,
+  FileSpace,
+  SharedFileView
+} from "../../shared/types";
 import type { FolderAt } from "./files";
 
 // The Files screen's calls to the drive service, each through the console's relay at the path the
 // service's own API writes it (docs/api.md), and what each answer becomes in the screen's own view of the
-// owner's drive, machines, folders and links. The node list is read from the drive service too, and only
-// where it answers that the machines are the signed-in owner's.
+// owner's drive, machines, folders, links and what is shared with the owner. The node list is read from the
+// drive service too, and only where it answers that the machines are the signed-in owner's.
 
 type Wire = components["schemas"];
 
@@ -62,15 +77,26 @@ function spaceOf(owner: Wire["Owner"], places: readonly Wire["Place"][]): FileSp
     : { place: drive.name, usedBytes: owner.usedBytes ?? null, quotaBytes: owner.quotaBytes ?? null, error: drive.reason ?? null, errorCode: drive.reasonCode ?? null };
 }
 
+function sharedOf(share: Wire["Shared"]): FileSharedItem {
+  return { id: share.id, place: sharedPlace(share.id), owner: share.ownerKey, name: share.name, kind: share.kind };
+}
+
 /**
- * The signed-in owner's drive, then, where the service answers that the machines are the owner's, this
- * machine read now with its drives and Garage and each node of the node list with its drives unread.
+ * The signed-in owner's drive and what is shared with the owner, then, where the service answers that the
+ * machines are the owner's, this machine read now with its drives and Garage and each node of the node list
+ * with its drives unread.
  */
 export async function readPlaces(): Promise<FilePlaces> {
-  const [owner, places] = await Promise.all([$fetch<Wire["Owner"]>(drivePath("/owner")), $fetch<Wire["PlacePage"]>(drivePath("/places"))]);
+  const [owner, places, received] = await Promise.all([
+    $fetch<Wire["Owner"]>(drivePath("/owner")),
+    $fetch<Wire["PlacePage"]>(drivePath("/places")),
+    // What is shared with the owner, which cannot be read, leaves its branch empty and the owner's own places standing.
+    $fetch<Wire["SharedPage"]>(drivePath("/shared"), { query: { limit: "1000" } }).catch((): Wire["SharedPage"] => ({ items: [], more: false }))
+  ]);
   const space = spaceOf(owner, places.items);
+  const shared = received.items.map(sharedOf);
 
-  if (!owner.administrator) return { administrator: false, viewer: owner.ownerKey, space, machines: [] };
+  if (!owner.administrator) return { administrator: false, viewer: owner.ownerKey, space, machines: [], shared };
 
   const [machine, nodes] = await Promise.all([
     $fetch<Wire["Machine"]>(drivePath("/machine")),
@@ -80,7 +106,7 @@ export async function readPlaces(): Promise<FilePlaces> {
   const local: FileMachine = { key: "local", name: machine.name, local: true, disks: drivesOf(machine), garage: garageOf(places.items), error: null, errorCode: null };
   const others = nodes.items.map((node): FileMachine => ({ key: nodeMachineKey(node.name), name: node.label, local: false, disks: null, garage: null, error: null, errorCode: null }));
 
-  return { administrator: true, viewer: owner.ownerKey, space, machines: [local, ...others] };
+  return { administrator: true, viewer: owner.ownerKey, space, machines: [local, ...others], shared };
 }
 
 /** The owner's drive with its usage and quota read again, after a change in it. */
@@ -98,11 +124,88 @@ export async function readNode(machine: FileMachine): Promise<FileMachine> {
   return { ...machine, name: read.name, disks: drivesOf(read), error: null, errorCode: null };
 }
 
-// ---- Folders ------------------------------------------------------------------------------------
+// ---- Roads ---------------------------------------------------------------------------------------
 
 function entryOf(entry: Wire["Entry"]): FileEntry {
   return { name: entry.name, kind: entry.kind, size: entry.byteCount ?? null, modified: entry.changedAt ?? null, link: entry.linkTarget ?? null };
 }
+
+/** One page of a folder as a road answers it: how many entries the whole folder holds, and the page's own. */
+interface RoadPage {
+  total: number;
+  entries: FileEntry[];
+}
+
+/**
+ * How the screen reaches one place: a page of a folder under it, the address a file in it is read at, and
+ * whether anything may be written to it. Each kind of place answers these its own way.
+ */
+export interface PlaceRoad {
+  writable: boolean;
+  page: (path: string, query: Record<string, string>) => Promise<RoadPage>;
+  content: (path: string, query: URLSearchParams) => string;
+}
+
+function addressWith(route: string, query: URLSearchParams): string {
+  const asked = query.toString();
+
+  return drivePath(asked === "" ? route : `${route}?${asked}`);
+}
+
+async function pageAt(route: string, path: string, query: Record<string, string>): Promise<RoadPage> {
+  const page = await $fetch<Wire["EntryPage"]>(drivePath(route), { query: { ...query, path } });
+
+  return { total: page.totalCount, entries: page.items.map(entryOf) };
+}
+
+/** One of the owner's own places, read and changed through the routes over places. */
+function ownRoad(place: string): PlaceRoad {
+  return {
+    writable: true,
+    page: (path, query) => pageAt(`/places/${segment(place)}/entries`, path, query),
+    content: (path, query) => addressWith(`${entryRoute(place, path)}/content`, query)
+  };
+}
+
+/** A folder shared with the owner, read through the member's own routes and never changed. */
+function sharedFolderRoad(share: FileSharedItem): PlaceRoad {
+  return {
+    writable: false,
+    page: (path, query) => pageAt(`/shared/${share.id}/entries`, path, query),
+    content: (path, query) => {
+      const asked = new URLSearchParams(query);
+
+      asked.set("path", path);
+
+      return addressWith(`/shared/${share.id}/content`, asked);
+    }
+  };
+}
+
+/**
+ * A file shared with the owner, walked as a place holding that one file: its only entry is the share's own,
+ * read at the share's own content, and it holds no folder.
+ */
+function sharedFileRoad(share: FileSharedItem): PlaceRoad {
+  const only: FileEntry = { name: share.name, kind: "file", size: null, modified: null, link: null };
+
+  return {
+    writable: false,
+    page: async (_path, query) => (query.folders === "true" ? { total: 0, entries: [] } : { total: 1, entries: Number(query.after ?? 0) > 0 ? [] : [only] }),
+    content: (_path, query) => addressWith(`/shared/${share.id}/content`, query)
+  };
+}
+
+/** The road a place is reached by: a share's where the place is one shared with the owner, else the owner's own. */
+export function roadOf(places: FilePlaces | null, place: string): PlaceRoad {
+  const share = sharedItemOf(places, place);
+
+  if (share === null) return ownRoad(place);
+
+  return share.kind === "folder" ? sharedFolderRoad(share) : sharedFileRoad(share);
+}
+
+// ---- Folders ------------------------------------------------------------------------------------
 
 export interface ListingAsked {
   sort?: FileSortKey;
@@ -113,18 +216,18 @@ export interface ListingAsked {
   fresh?: boolean;
 }
 
-/** One page of a folder, cut from one order over the whole of it. */
-export async function readListing(at: FolderAt, asked: ListingAsked): Promise<FileListing> {
-  const query: Record<string, string> = { path: at.path, after: String(asked.after ?? 0), limit: String(asked.limit) };
+/** One page of a folder, cut from one order over the whole of it, read by the road of its place. */
+export async function readListing(road: PlaceRoad, at: FolderAt, asked: ListingAsked): Promise<FileListing> {
+  const query: Record<string, string> = { after: String(asked.after ?? 0), limit: String(asked.limit) };
 
   if (asked.sort !== undefined) query.sort = SORT_FIELDS[asked.sort];
   if (asked.order !== undefined) query.order = asked.order;
   if (asked.folders === true) query.folders = "true";
   if (asked.fresh === true) query.fresh = "true";
 
-  const page = await $fetch<Wire["EntryPage"]>(drivePath(`/places/${segment(at.place)}/entries`), { query });
+  const page = await road.page(at.path, query);
 
-  return { place: at.place, path: at.path, total: page.totalCount, offset: asked.after ?? 0, entries: page.items.map(entryOf) };
+  return { place: at.place, path: at.path, total: page.total, offset: asked.after ?? 0, entries: page.entries };
 }
 
 /** Every name standing in a folder, read page by page. */
@@ -133,7 +236,7 @@ async function namesIn(at: FolderAt): Promise<Set<string>> {
   const limit = 1000;
 
   for (let after = 0; ; after += limit) {
-    const page = await readListing(at, { after, limit, fresh: true });
+    const page = await readListing(ownRoad(at.place), at, { after, limit, fresh: true });
 
     page.entries.forEach((entry) => names.add(entry.name));
 
@@ -141,16 +244,14 @@ async function namesIn(at: FolderAt): Promise<Set<string>> {
   }
 }
 
-/** The address a file is read at: shown in the browser, saved, or only its head. */
-export function contentUrl(at: FolderAt & { name: string }, how: { download?: boolean; head?: number } = {}): string {
+/** The address a file is read at, by the road of its place: shown in the browser, saved, or only its head. */
+export function contentUrl(road: PlaceRoad, at: FolderAt & { name: string }, how: { download?: boolean; head?: number } = {}): string {
   const query = new URLSearchParams();
 
   if (how.download === true) query.set("download", "true");
   if (how.head !== undefined) query.set("head", String(how.head));
 
-  const asked = query.toString();
-
-  return drivePath(`${entryRoute(at.place, joinPath(at.path, at.name))}/content${asked === "" ? "" : `?${asked}`}`);
+  return road.content(joinPath(at.path, at.name), query);
 }
 
 // ---- Changes ------------------------------------------------------------------------------------

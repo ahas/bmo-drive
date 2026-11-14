@@ -1,9 +1,9 @@
 <template>
-  <!-- The Files screen's folder tree (docs/files.md): each machine, opening onto its
-       drives and Garage, each folder opening onto its own folders as it is unfolded. A name is never
-       cut: the tree is as wide as its widest row and scrolls sideways inside its panel. A folder is
-       offered its actions on a right press or a held finger, and takes entries and files dropped on
-       it. It reaches its panel's edges and scrolls on its own. -->
+  <!-- The Files screen's folder tree (docs/files.md): the owner's drive, what is shared with the owner and
+       each machine, opening onto its drives and Garage, each folder opening onto its own folders as it is
+       unfolded. A name is never cut: the tree is as wide as its widest row and scrolls sideways inside its
+       panel. A folder is offered its actions on a right press or a held finger, and one that may be written
+       to takes entries and files dropped on it. It reaches its panel's edges and scrolls on its own. -->
   <div class="flex min-h-0 flex-col">
     <ContentSkeleton v-if="props.items === null && props.loading" :rows="4" list-class="flex flex-col px-1 py-2" :label="$t('drive.status.tree_loading')">
       <template #default="{ index }">
@@ -50,7 +50,7 @@
               :class="dropOn === (item as FilesTreeItem).value ? 'rounded-sm outline-2 outline-primary' : ''"
               :data-row="(item as FilesTreeItem).value"
             >
-              <span :class="(item as FilesTreeItem).failed && !(item as FilesTreeItem).note ? 'text-error' : ''">{{ (item as FilesTreeItem).label }}</span>
+              <span :class="labelClass(item as FilesTreeItem)">{{ (item as FilesTreeItem).label }}</span>
               <span v-if="(item as FilesTreeItem).note" :class="(item as FilesTreeItem).failed ? 'text-error' : 'text-muted'">{{ (item as FilesTreeItem).note }}</span>
             </span>
           </template>
@@ -108,6 +108,12 @@ const byKey = computed(() => {
 // The row of the open folder, found among the rows standing so the tree marks the same object.
 const chosen = computed(() => (props.open === null ? undefined : byKey.value.get(folderKey(props.open))));
 
+function labelClass(item: FilesTreeItem): string {
+  if (item.failed && !item.note) return "text-error";
+
+  return item.muted ? "text-muted" : "";
+}
+
 // A folder below a place's top wears the file explorer's folder mark, open or shut as its row is.
 function leadingIcon(item: FilesTreeItem, open: boolean): string {
   return item.icon === "" ? folderIcon(item.label, open) : item.icon;
@@ -154,7 +160,7 @@ function onDragOver(event: DragEvent): void {
   const transfer = event.dataTransfer;
   const row = rowUnder(event.target);
 
-  if (transfer === null || (!carriesFiles(transfer) && ![...transfer.types].includes(ENTRIES_DRAG)) || row?.folder === undefined) {
+  if (transfer === null || (!carriesFiles(transfer) && ![...transfer.types].includes(ENTRIES_DRAG)) || row?.folder === undefined || row.readOnly === true) {
     dropOn.value = null;
 
     return;
@@ -174,7 +180,7 @@ function onDrop(event: DragEvent): void {
 
   dropOn.value = null;
 
-  if (row?.folder === undefined || event.dataTransfer === null) return;
+  if (row?.folder === undefined || row.readOnly === true || event.dataTransfer === null) return;
 
   event.preventDefault();
   emit("drop", row.folder, event.dataTransfer, event.ctrlKey || event.metaKey);

@@ -3,7 +3,8 @@
        view the entries laid out as that view lays them, with `..` at the head of the list below a
        place's top. Entries are chosen, opened, dragged onto a folder, renamed in place and offered
        their actions on a right press or a held finger; files dropped from the desktop land in the
-       folder they are dropped on, or in the open one. A line at the foot says how many entries the
+       folder they are dropped on, or in the open one. A folder of a read-only place is neither dragged
+       from nor dropped on. A line at the foot says how many entries the
        folder holds and how many are chosen, and a page more is asked for as the list nears its end. -->
   <UContextMenu :items="props.menu" :disabled="choosing" @update:open="onMenuOpen">
     <div
@@ -33,7 +34,7 @@
         @dragstart="onDragStart"
         @pointerdown="onMarqueeStart"
       >
-        <DataTable :data="rows" :columns="columns" layout="dense" class="flex-1" :class="END_ROOM" selectable :row-class="rowClass" @select="(row) => onRowPress(row)">
+        <DataTable :data="rows" :columns="columns" layout="dense" class="flex-1" :class="endRoom" selectable :row-class="rowClass" @select="(row) => onRowPress(row)">
           <template v-for="column in SORTED" :key="column" #[`${column}-header`]>
             <button
               type="button"
@@ -62,7 +63,7 @@
               :data-entry="isParent(row.original) ? undefined : row.original.name"
               :data-parent="isParent(row.original) ? '' : undefined"
               :data-folder="row.original.kind === 'folder' ? '' : undefined"
-              :draggable="!isParent(row.original) && props.renaming !== row.original.name"
+              :draggable="!props.readOnly && !isParent(row.original) && props.renaming !== row.original.name"
             >
               <!-- The box stands on the line of the toolbar's choice of all, which its cell's own room puts a step further out. -->
               <UCheckbox v-if="choosing && !isParent(row.original)" :model-value="selected.has(row.original.name)" tabindex="-1" class="pointer-events-none -ms-1 shrink-0" :aria-label="row.original.name" />
@@ -115,7 +116,7 @@
         @dragstart="onDragStart"
         @pointerdown="onMarqueeStart"
       >
-        <div :class="[GRIDS[props.view], END_ROOM]">
+        <div :class="[GRIDS[props.view], endRoom]">
           <template v-for="(entry, at) in rows" :key="isPending(entry) ? `pending-${at}` : isParent(entry) ? '..' : entry.name">
             <SkeletonStatus v-if="isPending(entry)" as="div" :class="SKELETONS[props.view].box" :label="$t('drive.status.list_loading')">
               <SkeletonBar class="shrink-0 rounded-md" :style="{ width: `${skeletonMark}px`, height: `${skeletonMark}px` }" />
@@ -125,6 +126,7 @@
               v-else
               :entry="entry"
               :at="props.at"
+              :road="props.road"
               :view="props.view"
               :parent="isParent(entry)"
               :selected="!isParent(entry) && selected.has(entry.name)"
@@ -179,11 +181,15 @@ import { formatDateClock } from "bmo-ui/app/domain/time";
 
 import type { FileEntry, FileSortKey } from "../../shared/types";
 import type { FilesClip, FilesSort, FilesView, FolderAt } from "../domain/files";
+import type { PlaceRoad } from "../domain/drive";
 import type { ContextMenuItem, TableColumn } from "@nuxt/ui";
 
 interface Props {
   // The folder the entries are of.
   at: FolderAt | null;
+  // The road the folder's place is read by, and whether anything may be written to it.
+  road: PlaceRoad | null;
+  readOnly: boolean;
   // The entries read so far; null before the first page.
   entries: FileEntry[] | null;
   total: number;
@@ -257,8 +263,9 @@ const SKELETONS: Record<Exclude<FilesView, "details">, { box: string }> = {
 const skeletonMark = computed(() => VIEW_MARK[props.view]);
 
 // The room the screen's create button takes from the list's scrolling end where it floats over the list on a
-// phone, so the last entry scrolls clear of it; the layer's token is nought on a wide screen.
-const END_ROOM = "pb-(--bmo-create-room)";
+// phone, so the last entry scrolls clear of it; the layer's token is nought on a wide screen. A read-only
+// place stands no create button, and keeps none.
+const endRoom = computed(() => (props.readOnly ? "" : "pb-(--bmo-create-room)"));
 
 // A row standing for an entry still being read.
 interface Pending {
@@ -549,7 +556,7 @@ let dragDepth = 0;
 function onDragStart(event: DragEvent): void {
   const entry = entryAt(event.target);
 
-  if (entry === null || isParent(entry) || event.dataTransfer === null) {
+  if (props.readOnly || entry === null || isParent(entry) || event.dataTransfer === null) {
     event.preventDefault();
 
     return;
@@ -569,7 +576,7 @@ function folderUnder(event: DragEvent): string | null {
 }
 
 function onDragEnter(event: DragEvent): void {
-  if (!carriesFiles(event.dataTransfer) && !carriesEntries(event.dataTransfer)) return;
+  if (props.readOnly || (!carriesFiles(event.dataTransfer) && !carriesEntries(event.dataTransfer))) return;
 
   dragDepth += 1;
   dropFiles.value = carriesFiles(event.dataTransfer);
@@ -578,7 +585,7 @@ function onDragEnter(event: DragEvent): void {
 function onDragOver(event: DragEvent): void {
   const files = carriesFiles(event.dataTransfer);
 
-  if (!files && !carriesEntries(event.dataTransfer)) return;
+  if (props.readOnly || (!files && !carriesEntries(event.dataTransfer))) return;
 
   event.preventDefault();
 
@@ -609,7 +616,7 @@ function onDrop(event: DragEvent): void {
   dropOn.value = null;
   dropFiles.value = false;
 
-  if (event.dataTransfer === null || (!files && into === null)) return;
+  if (props.readOnly || event.dataTransfer === null || (!files && into === null)) return;
 
   event.preventDefault();
   emit("drop", into === null ? null : (props.entries?.find((one) => one.name === into) ?? null), event.dataTransfer, event.ctrlKey || event.metaKey);
