@@ -78,6 +78,7 @@
 import { useI18n } from "vue-i18n";
 import { refusalText } from "../domain/refusals";
 import { contentUrl } from "../domain/drive";
+import { saveFrom } from "../domain/save";
 import { TEXT_HEAD_BYTES, entryIcon, entryProperties, isJson, laidOutJson, listSize, previewKind, textOf, typeLabel as typeOf } from "../domain/files";
 
 import type { FileEntry } from "../../shared/types";
@@ -117,7 +118,7 @@ const actions = computed<BarAction[]>(() =>
   props.chosen?.entry.kind !== "file"
     ? []
     : [
-        { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(downloadUrl.value, "_self") },
+        { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => saveFrom(downloadUrl.value) },
         { id: "open", label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(shownUrl.value, "_blank", "noopener") }
       ]
 );

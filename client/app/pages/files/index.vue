@@ -178,6 +178,7 @@ import {
   shareMembers
 } from "../../domain/drive";
 import { CONSOLE_PEOPLE, personOf } from "../../domain/people";
+import { saveFrom } from "../../domain/save";
 import {
   DEFAULT_SORT,
   DEFAULT_VIEW,
@@ -433,9 +434,12 @@ async function go(parts: Record<string, string | null>): Promise<void> {
   await router.replace({ query });
 }
 
-// Opening a folder is a step of the browser's history, as choosing a file is.
+// Opening a folder is a step of the browser's history, as choosing a file is. A shared file's place holds
+// that file alone, so it opens with the file chosen.
 function openFolder(at: FolderAt): void {
-  void router.push({ query: addressOf(at) });
+  const share = sharedItemOf(places.value, at.place);
+
+  void router.push({ query: addressOf(at, share?.kind === "file" ? share.name : null) });
 }
 
 function openFromTree(at: FolderAt): void {
@@ -596,7 +600,7 @@ const pictureActions = computed<BarAction[]>(() => {
   if (at === null || name === null) return [];
 
   return [
-    { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(fileUrl(at, name, { download: true }), "_self") },
+    { id: "download", label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => saveFrom(fileUrl(at, name, { download: true })) },
     { id: "open", label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(fileUrl(at, name), "_blank", "noopener") }
   ];
 });
@@ -757,7 +761,9 @@ async function loadPlaces(): Promise<void> {
     places.value = merged(await readPlaces());
     void nameSharers();
 
-    if (open.value === null) {
+    if (open.value !== null) {
+      leaveEndedShare();
+    } else {
       const remembered = rememberedPlace(browserStore(), places.value.viewer);
       const start = startingPlace(null, remembered, places.value, firstPlace(places.value));
 
@@ -783,31 +789,21 @@ async function nameSharers(): Promise<void> {
   if (named.length > 0) sharers.value = new Map([...sharers.value, ...named]);
 }
 
-// Whether a share a reading under it was refused as not found still stands, read again from the service: the
-// owner may have ended it, or only taken away a folder inside it. The places read stand in for the ones held.
-async function shareStands(at: FolderAt): Promise<boolean> {
-  try {
-    places.value = merged(await readPlaces());
-  } catch {
-    return true;
-  }
-
-  void nameSharers();
-
-  return sharedItemOf(places.value, at.place) !== null;
-}
-
-// A share the owner ended leaves the memory, and the screen opens where it would with nothing remembered.
-function leaveEndedShare(at: FolderAt): void {
+// The open share, where the places as last read no longer list it, is one its owner ended: it leaves the memory,
+// and the screen opens where it would with nothing remembered. Whether it did so is the answer.
+function leaveEndedShare(): boolean {
+  const at = open.value;
   const standing = places.value;
 
-  if (standing === null) return;
+  if (at === null || standing === null || !isSharedPlace(at.place) || sharedItemOf(standing, at.place) !== null) return false;
 
   if (rememberedPlace(browserStore(), standing.viewer)?.place === at.place) forgetPlace(browserStore(), standing.viewer);
 
   const first = firstPlace(standing);
 
   if (first !== null) void router.replace({ query: addressOf({ place: first, path: "" }) });
+
+  return true;
 }
 
 function refusedAsNotFound(error: unknown): boolean {
@@ -893,13 +889,13 @@ async function loadListing(fresh = false): Promise<void> {
   } catch (error) {
     if (mine !== listAsked) return;
 
-    if (isSharedPlace(at.place) && refusedAsNotFound(error) && !(await shareStands(at))) {
-      if (mine === listAsked) leaveEndedShare(at);
+    // A share refused as not found is asked about again: its owner may have ended it, or only taken away a
+    // folder inside it, whose refusal is then said as any other.
+    if (isSharedPlace(at.place) && refusedAsNotFound(error)) {
+      await loadPlaces();
 
-      return;
+      if (mine !== listAsked || sharedItemOf(places.value, at.place) === null) return;
     }
-
-    if (mine !== listAsked) return;
 
     entries.value = null;
     listFailure.value = refusalText(t, error, t("drive.error.list_failed"));
@@ -1433,7 +1429,7 @@ const listMenu = computed<ContextMenuItem[][]>(() => {
       ...(file && !many
         ? [
             { label: t("drive.action.open_tab"), icon: "i-material-symbols-open-in-new", onSelect: () => window.open(fileUrl(at, entry.name), "_blank", "noopener") },
-            { label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => window.open(fileUrl(at, entry.name, { download: true }), "_self") }
+            { label: t("drive.action.download"), icon: "i-material-symbols-download", onSelect: () => saveFrom(fileUrl(at, entry.name, { download: true })) }
           ]
         : []),
       ...((file || folder) && !many && write ? [{ label: t("drive.action.share"), icon: "i-material-symbols-share-outline", onSelect: () => shareEntry(entry) }] : [])

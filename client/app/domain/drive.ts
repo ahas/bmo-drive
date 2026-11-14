@@ -90,8 +90,9 @@ export async function readPlaces(): Promise<FilePlaces> {
   const [owner, places, received] = await Promise.all([
     $fetch<Wire["Owner"]>(drivePath("/owner")),
     $fetch<Wire["PlacePage"]>(drivePath("/places")),
-    // What is shared with the owner, which cannot be read, leaves its branch empty and the owner's own places standing.
-    $fetch<Wire["SharedPage"]>(drivePath("/shared"), { query: { limit: "1000" } }).catch((): Wire["SharedPage"] => ({ items: [], more: false }))
+    // What is shared with the owner is read with the places, and fails them where it fails: read as empty, it would
+    // take every open share for one its owner ended.
+    $fetch<Wire["SharedPage"]>(drivePath("/shared"), { query: { limit: "1000" } })
   ]);
   const space = spaceOf(owner, places.items);
   const shared = received.items.map(sharedOf);

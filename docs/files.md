@@ -459,17 +459,19 @@ flowchart TD
   - **Each share is a read-only place,** named as the service names its entries, `shared:` and the share's
     number. A shared folder is walked as any place is, its tree, its list, its preview and its downloads
     all read through the member's own roads (`docs/api.md`, 「Member shares」); a shared file opens as a
-    place holding that one file, previewed and downloaded the same way.
+    place holding that one file, chosen in the preview at once, and downloaded the same way.
   - **The sharer is named** beside the share's row, in the read-only mark and among an entry's properties,
     by the name the console's people directory answers for the share's owner key. A key it answers no
     person for, or a console that offers no directory, leaves the key standing as the name.
   - **A read-only place offers nothing that writes:** no create button, no new folder, upload, paste,
     cut, copy, rename, delete or share in its toolbar, its menus or its keys, and nothing dragged into it,
     out of it or dropped on it. Its toolbar carries the read-only mark, which names the sharer as its hint.
-  - **A share the owner ends is gone from the branch** at the next reading of the places. A reading under
-    a share refused as not found reads the places again at once: where the share no longer stands among
-    them, the screen forgets it and opens where it would with nothing remembered; where it still stands,
-    only the folder was taken away, and the refusal is said as any other.
+  - **A share the owner ends is gone from the branch** at the next reading of the places, which a refresh
+    makes, and which a reading under a share refused as not found makes at once. Where the share open is no
+    longer among them, the screen forgets it and opens where it would with nothing remembered; where it still
+    stands, only a folder inside it was taken away, and the refusal is said as any other. What is shared is
+    read with the places and fails them where it fails, so a reading that did not answer never stands for
+    every share ended.
 - **The share dialog offers the members of the reader's company under the link** (「Sharing with members」),
   found through the console's people directory and drawn by the name it answers for each key, a key it
   answers no person for standing as the key. Who an entry is shared with, and each share and removal, are
