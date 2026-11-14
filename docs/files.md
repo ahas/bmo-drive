@@ -474,9 +474,11 @@ flowchart TD
     every share ended.
 - **The share dialog offers the members of the reader's company under the link** (「Sharing with members」),
   found through the console's people directory and drawn by the name it answers for each key, a key it
-  answers no person for standing as the key. Who an entry is shared with, and each share and removal, are
-  calls to this service. A permission the service refuses, or a member share it cannot store, is said inside
-  the dialog in the screen's own words. Under a console that offers no people directory, the dialog shares
+  answers no person for standing as the key. The screen grants read alone, the one permission the service
+  keeps (「What a member share is」), so the dialog offers no other: each member's row says read in words and
+  nothing on it changes the permission. Who an entry is shared with, and each share and removal, are calls to
+  this service. A permission the service refuses, or a member share it cannot store, is said inside the
+  dialog in the screen's own words. Under a console that offers no people directory, the dialog shares
   by link alone.
 - **A new folder and an upload start from the screen's one create button,** bmo-ui's `CreateButton`
   (bmo-ui's `docs/components.md`, 「Creating」), named for a new folder or an upload. It opens a menu of a new

@@ -664,8 +664,9 @@ const people = inject<ConsolePeople | null>(CONSOLE_PEOPLE, null);
 
 // The road the share dialog's member part goes by: people found and named through the console's directory,
 // who the entry is shared with kept by the service. Each member's share number is held as it is read or
-// made, since a change and a removal name the share rather than the person. With no directory there is
-// none, and the dialog shares by link alone.
+// made, since a change and a removal name the share rather than the person. It grants read alone, the one
+// permission the service keeps for a member. With no directory there is none, and the dialog shares by link
+// alone.
 const memberRoad = computed<ShareMemberRoad | undefined>(() => {
   const target = shareTarget.value;
   const directory = people;
@@ -700,7 +701,8 @@ const memberRoad = computed<ShareMemberRoad | undefined>(() => {
     remove: async (user) => {
       await endMember(idOf(user));
       ids.delete(user);
-    }
+    },
+    permissions: ["read"]
   };
 });
 
