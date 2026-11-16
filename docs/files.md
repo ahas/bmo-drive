@@ -486,6 +486,30 @@ flowchart TD
   cell of the toolbar; on a phone it floats at the screen's bottom right, and the open folder's list keeps
   room at its scrolling end so its last entry stands clear of it. The context menu over the open folder
   offers the same new folder and uploads, and the one over a folder in the tree offers a new folder inside it.
+- **Files come in three ways, and all three go the same road:** picked through the create button's uploads,
+  dropped on the open folder's list or on a folder of the list or the tree, or pasted. Each file is written
+  through the service's content route with its length, one after another, under one progress of files and
+  bytes, a dropped or picked folder made first and merged where it stands; the first name already taken asks
+  how to settle it, replaced, kept both or skipped (「Changing files」), and that answer settles every later
+  collision of the same upload. Nothing comes into a read-only place.
+- **A paste uploads what the clipboard carries into the open folder.** Files copied in the system's file
+  manager, and a picture copied as a picture, such as a screenshot, are uploaded as a drop of them would be.
+  - **A picture the browser hands without a name of its own is named for the moment it was pasted,** the date
+    and time to the second as the screen shows times, with dots for colons, followed by the ending the browser
+    gave it, `2026-11-16 18.31.05.png`, and a second one in the same paste takes the number after it,
+    `2026-11-16 18.31.05 (2).png`. The browser makes such a file at the paste, under its own stock name or
+    none, and so it bears the paste's own moment, where a file copied from a folder bears the time it was last
+    changed; that moment is what tells the two apart.
+  - **A paste with no file in it carries the entries cut or copied on the screen** into the open folder, as the
+    paste action does; with nothing held it does nothing.
+  - **Cutting or copying entries on the screen puts their paths on the system clipboard as text,** so the newer
+    of the two copies is what a paste carries: files copied in the file manager after it are uploaded, and
+    entries copied after those are pasted.
+  - **A paste into a field stays the field's text,** a search or a rename among them, and so does one while a
+    dialog or a menu is open over the screen.
+  - **A paste is the browser's to give.** A phone's browser offers one inside a field alone, so a phone pastes
+    no file into the screen, and a browser that hands copied files on as their paths alone uploads nothing
+    from them.
 - **The usage is read again after every change** the screen makes, and a write refused over the quota is
   said in the screen's own words.
 - **The address names the place, the folder and the chosen file,** so the browser's history steps through

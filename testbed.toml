@@ -10,7 +10,8 @@ name = "bmo-drive"
 languages = ["cargo", "bun"]
 
 # The console plugin bundle under client/ is a project of its own: its manifest and lockfile stand in its own
-# folder, outside any package workspace, and its check script installs its locked packages and typechecks it.
+# folder, outside any package workspace, and its check script installs its locked packages, typechecks it and runs
+# its browser tests, one file after another, since the testbed gathers no test file inside a project.
 [projects]
 paths = ["client"]
 

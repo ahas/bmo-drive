@@ -202,6 +202,7 @@ import {
   keysTo,
   machineKeyOf,
   machineRowKey,
+  namedPasted,
   nextSort,
   parentPath,
   pastesBeside,
@@ -1156,7 +1157,12 @@ function toClip(mode: FilesClip["mode"]): void {
   const at = open.value;
   const names = targets();
 
-  if (at !== null && writableAt(at) && names.length > 0) clip.value = { mode, place: at.place, paths: names.map((name) => joinPath(at.path, name)) };
+  if (at === null || !writableAt(at) || names.length === 0) return;
+
+  clip.value = { mode, place: at.place, paths: names.map((name) => joinPath(at.path, name)) };
+  // Their paths go on the system clipboard too, so files copied in the file manager before this are no longer
+  // what a paste carries; a browser that refuses the write leaves the system clipboard as it was.
+  void navigator.clipboard?.writeText(names.map((name) => pathOf(at, name)).join("\n")).catch(() => undefined);
 }
 
 /** Entries of one place carried into a folder, copied or moved, with any collision asked about. */
@@ -1298,6 +1304,33 @@ function onPicked(event: Event): void {
     ...picked.map((file): Dropped => ({ kind: "file", path: file.webkitRelativePath || file.name, file }))
   ]);
 }
+
+// ---- Pasting ------------------------------------------------------------------------------------------------
+
+// A paste on the screen: what the clipboard carries uploaded into the open folder, the pictures the browser made
+// at the paste named for its moment, or, with no file in it, the entries cut or copied on the screen pasted there.
+// The clipboard's files are read before the handler returns, while the browser still lets them be read.
+function onPaste(event: ClipboardEvent): void {
+  const at = open.value;
+  const transfer = event.clipboardData;
+
+  if (screenKeeps(event.target) || at === null || !writableAt(at)) return;
+
+  event.preventDefault();
+
+  if (transfer === null || !carriesFiles(transfer)) {
+    paste(at);
+
+    return;
+  }
+
+  const pastedAt = Date.now();
+
+  void droppedItems(transfer).then((items) => upload(at, namedPasted(items, pastedAt)));
+}
+
+onMounted(() => document.addEventListener("paste", onPaste));
+onBeforeUnmount(() => document.removeEventListener("paste", onPaste));
 
 // ---- Dragging and dropping ---------------------------------------------------------------------------------
 
@@ -1500,14 +1533,19 @@ const treeMenu = computed<ContextMenuItem[][]>(() => {
 
 // ---- The keyboard -------------------------------------------------------------------------------------------
 
+// Whether a key or a paste aimed at an element is a field's or a layer's open over the screen rather than the
+// screen's own.
+function screenKeeps(target: EventTarget | null): boolean {
+  const element = target instanceof Element ? target : null;
+
+  return element?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], [role='menu']") != null || renaming.value !== null || pictureOpen.value;
+}
+
 // A file explorer's keys, wherever on the screen the keyboard is but a field or something open over it. The
-// Esc the back gesture sends to close a layer is the layer's alone, so it never also leaves choosing.
+// Esc the back gesture sends to close a layer is the layer's alone, so it never also leaves choosing. The paste
+// key is left to the browser, whose paste the screen reads (「Pasting」 above).
 function onKey(event: KeyboardEvent): void {
-  if (isBackEscape()) return;
-
-  const target = event.target instanceof Element ? event.target : null;
-
-  if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], [role='menu']") || renaming.value !== null || pictureOpen.value) return;
+  if (isBackEscape() || screenKeeps(event.target)) return;
 
   const command = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
@@ -1515,7 +1553,6 @@ function onKey(event: KeyboardEvent): void {
   if (command && key === "a") chooseAll(true);
   else if (command && key === "c") toClip("copy");
   else if (command && key === "x") toClip("cut");
-  else if (command && key === "v") paste();
   else if (event.key === "F2") startRename();
   else if (event.key === "Delete") deleteChosen();
   else if (event.key === "Escape" && (selected.value.size > 0 || choosing.value)) leaveChoosing();

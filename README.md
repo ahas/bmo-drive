@@ -19,8 +19,12 @@ the drive's own guard of every other route; links on a volume in
 `tests/links.rs`: a path walking back into itself refused, a link to a folder beside walked once, each link's
 target listed and a folder's zip ending over links; and the Files screen in `tests/screen.rs`, its modules run
 with Bun the same way: where it opens, from the place memory, and the branch of what is shared with the owner,
-each share a read-only place read through the member's own roads. `cargo test` runs them all, and the bundle's check,
-`bun install --frozen-lockfile && bun run typecheck` inside `client/`, stands beside them.
+each share a read-only place read through the member's own roads. `cargo test` runs them all. The bundle carries
+its browser tests in `client/tests/`: the Files screen stands on its own in a small Nuxt host there, served by its
+dev server with the bundle's own words and driven in Chromium against a stand-in of the service, and
+`tests/browser/files-upload.test.ts` drops and pastes files into the open folder, pastes a picture the browser
+names at the paste, pastes into the rename field and pastes entries copied on the screen. The bundle's check,
+`bun run check` inside `client/` (its frozen install, its typecheck and its browser tests), stands beside them.
 `docs/inventory.md` lists the tests the old behaviour was held to.
 
 ## Layout

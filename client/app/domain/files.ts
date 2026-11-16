@@ -687,6 +687,42 @@ export async function droppedItems(transfer: DataTransfer): Promise<Dropped[]> {
   return dropped;
 }
 
+// ---- Pasted files ---------------------------------------------------------------------------------
+
+// How near the paste a file's time stands where the browser made the file at the paste.
+const MADE_AT_PASTE_MS = 2_000;
+
+/** Whether the browser made a pasted file at the paste, as it does a picture copied as a picture: under its
+ * stock name or none, bearing the paste's own moment, where a file copied from a folder bears the time it was
+ * last changed. */
+export function madeAtPaste(file: File, pastedAt: number): boolean {
+  return file.name === "" || Math.abs(file.lastModified - pastedAt) < MADE_AT_PASTE_MS;
+}
+
+/** The name a picture the browser made at the paste takes: the moment of the paste, as the screen shows a time
+ * but with dots for colons, which not every file system takes in a name, then the number of its place among such pictures of
+ * the same paste after the first, then the ending the browser gave it. */
+export function pastedName(file: File, pastedAt: number, nth: number): string {
+  const stamp = formatStamp(Math.floor(pastedAt / 1000)).replaceAll(":", ".");
+  const numbered = nth > 1 ? `${stamp} (${nth})` : stamp;
+  const dot = file.name.lastIndexOf(".");
+
+  return dot > 0 ? `${numbered}${file.name.slice(dot)}` : numbered;
+}
+
+/** What a paste carries, each picture the browser made at the paste named for the paste's moment. */
+export function namedPasted(items: Dropped[], pastedAt: number): Dropped[] {
+  let nth = 0;
+
+  return items.map((item) => {
+    if (item.kind !== "file" || item.path.includes("/") || !madeAtPaste(item.file, pastedAt)) return item;
+
+    nth += 1;
+
+    return { ...item, path: pastedName(item.file, pastedAt, nth) };
+  });
+}
+
 /** Whether a drag carries files from outside the page rather than entries of the list. */
 export function carriesFiles(transfer: DataTransfer | null): boolean {
   return transfer !== null && [...transfer.types].includes("Files");
