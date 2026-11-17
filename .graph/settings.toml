@@ -1,9 +1,0 @@
-repository = "bmo-drive"
-base = false
-
-[coverage]
-# The package's src/ and the console bundle under client/, but these: a declaration file that only types
-# the host's translator, the type-only view of the service's answers, and the types generated from
-# docs/openapi.json.
-layout = "bmo-next"
-unindexed = ["client/app/i18n.d.ts", "client/shared/openapi.ts", "client/shared/types.ts"]
