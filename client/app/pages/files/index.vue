@@ -46,10 +46,38 @@
         <ActionGroup :actions="editActions" />
 
         <div>
-          <UDropdownMenu :items="viewItems" :content="{ align: 'end' }">
-            <IconButton v-if="narrow" :icon="VIEW_ICONS[view]" :label="$t('drive.action.view')" trailing-icon="i-material-symbols-arrow-drop-down" />
-            <UButton v-else color="neutral" variant="ghost" :icon="VIEW_ICONS[view]" :label="$t(VIEW_LABELS[view])" trailing-icon="i-material-symbols-arrow-drop-down" :aria-label="$t('drive.action.view')" />
-          </UDropdownMenu>
+          <!-- The view is a value chosen from a list, so it is the layer's one select, naming the standing
+               view by its icon and its word; on a phone the icon alone, at the small size of the keys
+               beside it, named by its tooltip. Each width is a select of its own, since the select takes
+               the parts it is handed as it is first drawn. -->
+          <UTooltip v-if="narrow" :text="$t('drive.action.view')">
+            <ChoiceSelect
+              :model-value="view"
+              :items="viewChoices"
+              value-key="value"
+              variant="ghost"
+              size="sm"
+              trailing-icon="i-material-symbols-arrow-drop-down"
+              :ui="{ base: 'ps-1.5 pe-6' }"
+              :aria-label="$t('drive.action.view')"
+              @update:model-value="setView"
+            >
+              <template #default>
+                <UIcon :name="VIEW_ICONS[view]" class="size-4 shrink-0" />
+              </template>
+            </ChoiceSelect>
+          </UTooltip>
+          <ChoiceSelect
+            v-else
+            :model-value="view"
+            :items="viewChoices"
+            value-key="value"
+            variant="ghost"
+            :icon="VIEW_ICONS[view]"
+            trailing-icon="i-material-symbols-arrow-drop-down"
+            :aria-label="$t('drive.action.view')"
+            @update:model-value="setView"
+          />
         </div>
 
         <div>
@@ -1397,6 +1425,9 @@ const editActions = computed<BarAction[]>(() => {
   ];
 });
 
+const viewChoices = computed(() => FILES_VIEWS.map((one) => ({ label: t(VIEW_LABELS[one]), icon: VIEW_ICONS[one], value: one })));
+
+// The same views as the checks of the list's context menu, whose view entry opens them.
 const viewItems = computed<DropdownMenuItem[]>(() =>
   FILES_VIEWS.map((one) => ({ label: t(VIEW_LABELS[one]), icon: VIEW_ICONS[one], type: "checkbox" as const, checked: one === view.value, onSelect: () => setView(one) }))
 );

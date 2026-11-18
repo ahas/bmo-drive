@@ -486,6 +486,9 @@ flowchart TD
   cell of the toolbar; on a phone it floats at the screen's bottom right, and the open folder's list keeps
   room at its scrolling end so its last entry stands clear of it. The context menu over the open folder
   offers the same new folder and uploads, and the one over a folder in the tree offers a new folder inside it.
+- **The view is chosen in the toolbar from bmo-ui's one select** (bmo-ui's `docs/components.md`, 「Choosing a
+  value」), which names the standing view by its icon and, where the bar has room, its word, and by the icon
+  alone on a phone. The context menu over the open folder offers the same views.
 - **Files come in three ways, and all three go the same road:** picked through the create button's uploads,
   dropped on the open folder's list or on a folder of the list or the tree, or pasted. Each file is written
   through the service's content route with its length, one after another, under one progress of files and
