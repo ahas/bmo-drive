@@ -74,10 +74,6 @@ tokio-util = { version = "0.7.19", features = ["io"] }
 # Garage's own configuration file.
 toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 
-[dev-dependencies]
-# The personal data a tracked file may not hold (PERSONAL-DATA.md).
-regex = "1.13.1"
-
 [[test]]
 name = "main"
 path = "tests/main.rs"

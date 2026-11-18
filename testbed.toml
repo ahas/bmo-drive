@@ -1,12 +1,12 @@
 # How the testbed checks, builds and deploys this repository, in the testbed's declaration format. The suite
-# runs the repository-wide personal-data check (PERSONAL-DATA.md) and the behaviour tests standing so far
-# (README.md).
+# runs the behaviour tests standing so far (README.md); the quick checks hold the personal-data rule
+# (PERSONAL-DATA.md).
 
 testbed = 0
 name = "bmo-drive"
 
 [test]
-# Cargo runs the personal-data check; Bun runs the console plugin bundle's check script.
+# Cargo runs the behaviour tests; Bun runs the console plugin bundle's check script.
 languages = ["cargo", "bun"]
 
 # The console plugin bundle under client/ is a project of its own: its manifest and lockfile stand in its own
@@ -19,7 +19,9 @@ paths = ["client"]
 # The sweeps that read the tree before anything runs: Korean in the code, the README's folder table and the
 # dependencies the manifests name. The ledger is the debt of Korean left in a code file, a file it does not
 # name being allowed none; no code file of this repository holds any.
-quick = ["korean", "layout", "dependencies", "cargo-profile", "shared-versions"]
+quick = ["korean", "layout", "dependencies", "cargo-profile", "shared-versions", "personal-data"]
+# The one address PERSONAL-DATA.md allows.
+personal_data_allowed = ["dev@ahas.io"]
 korean_ledger = "korean-ledger.json"
 base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-console-face", "bmo-ui"]
 

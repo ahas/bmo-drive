@@ -9,8 +9,8 @@ unit is reached through its API, as `docs/api.md` lists.
 
 ## Tests
 
-The repository carries the repository-wide personal-data check in `tests/personal_data.rs`
-(`PERSONAL-DATA.md`), the import of the old archive's share links in `tests/import.rs`, and the owners and
+The testbed's `personal-data` check holds the personal-data rule (`PERSONAL-DATA.md`). The repository
+carries the import of the old archive's share links in `tests/import.rs`, and the owners and
 their two branches in `tests/owners.rs`: each owner's drive its own alone, the quota judged before bytes
 arrive, the machines the administrator's alone, and share links opening in both branches; the console
 face in `tests/console.rs`: the manifest the service serves read through bmo-ui's own reading on the release
@@ -37,7 +37,7 @@ names at the paste, pastes into the rename field and pastes entries copied on th
 | `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own, with its build in `client/console/` |
 | `deploy/` | The service's user unit |
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |
-| `tests/` | The repository-wide personal-data check, `personal_data.rs`, and the behaviour tests standing so far |
+| `tests/` | The behaviour tests standing so far |
 
 At the root stand the Cargo manifest, `VERSION`, `testbed.toml`, `rustfmt.toml`, `CLAUDE.md`,
 `PERSONAL-DATA.md`, `korean-ledger.json`, `settings.toml`, `settings.local.toml.example` (the example of

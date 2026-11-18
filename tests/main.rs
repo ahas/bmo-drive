@@ -6,5 +6,4 @@ mod import;
 mod links;
 mod members;
 mod owners;
-mod personal_data;
 mod screen;

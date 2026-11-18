@@ -61,7 +61,7 @@ These hold every bmo repository, and every change here (archive document #301, i
 - The console plugin bundle stands in `client/`, a project of its own.
 - Tests live in `tests/`, one test target, `tests/main.rs`, each file of tests a module of it (bmo-chat's
   `docs/conventions.md`, 「Rust builds」); no test module stands in `src/`. The repository carries the
-  personal-data check, `tests/personal_data.rs`, beside the behaviour tests standing so far (README.md).
+  behaviour tests standing so far (README.md); the testbed's `personal-data` check holds the personal-data rule.
   The bundle's browser tests are the bundle project's own and stand in `client/tests/`, run by its check
   script.
 
