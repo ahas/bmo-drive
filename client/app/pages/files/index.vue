@@ -46,38 +46,27 @@
         <ActionGroup :actions="editActions" />
 
         <div>
-          <!-- The view is a value chosen from a list, so it is the layer's one select, naming the standing
-               view by its icon and its word; on a phone the icon alone, at the small size of the keys
-               beside it, named by its tooltip. Each width is a select of its own, since the select takes
-               the parts it is handed as it is first drawn. -->
-          <UTooltip v-if="narrow" :text="$t('drive.action.view')">
+          <!-- The view is a value chosen from a list, so it is the layer's one select at the small size of
+               the keys beside it, naming the standing view by its icon and its word; on a phone the icon
+               alone, named by its tooltip. -->
+          <HintTip class="inline-flex" :text="$t('drive.action.view')" :disabled="!narrow" press>
             <ChoiceSelect
               :model-value="view"
               :items="viewChoices"
               value-key="value"
               variant="ghost"
               size="sm"
+              :icon="narrow ? undefined : VIEW_ICONS[view]"
               trailing-icon="i-material-symbols-arrow-drop-down"
-              :ui="{ base: 'ps-1.5 pe-6' }"
+              :ui="narrow ? { base: 'ps-1.5 pe-6' } : undefined"
               :aria-label="$t('drive.action.view')"
               @update:model-value="setView"
             >
-              <template #default>
+              <template v-if="narrow" #default>
                 <UIcon :name="VIEW_ICONS[view]" class="size-4 shrink-0" />
               </template>
             </ChoiceSelect>
-          </UTooltip>
-          <ChoiceSelect
-            v-else
-            :model-value="view"
-            :items="viewChoices"
-            value-key="value"
-            variant="ghost"
-            :icon="VIEW_ICONS[view]"
-            trailing-icon="i-material-symbols-arrow-drop-down"
-            :aria-label="$t('drive.action.view')"
-            @update:model-value="setView"
-          />
+          </HintTip>
         </div>
 
         <div>

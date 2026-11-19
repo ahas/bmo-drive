@@ -1,7 +1,8 @@
 // The Files screen's view chosen from the toolbar (docs/files.md, 「The Files screen」), driven in Chromium against a
-// stand-in of the service at a wide window and at a phone's width: the view is bmo-ui's one select, whose eight
-// views open on a search, and the view found and chosen there is the one the screen's address then names.
-// Whether a list searches is the layer's own rule and its own tests; this holds the screen's list to it.
+// stand-in of the service at a wide window and at a phone's width: the view is bmo-ui's one select, naming the
+// standing view by its word where the bar has room and by its icon alone on a phone, whose eight views open on a
+// search, and the view found and chosen there is the one the screen's address then names. Whether a list searches
+// is the layer's own rule and its own tests; this holds the screen's list to it.
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 
@@ -25,11 +26,13 @@ afterAll(async () => {
   await screen?.close();
 });
 
+// The words the select shows for the standing view: its word on a wide window, and none on a phone, where the icon
+// the screen hands the select once the phone's width is read stands alone.
 for (const width of [
-  { name: "a wide window", viewport: { width: 1280, height: 900 } },
-  { name: "a phone", viewport: { width: 360, height: 780 } },
+  { name: "a wide window", viewport: { width: 1280, height: 900 }, shown: words.drive.label.view_details },
+  { name: "a phone", viewport: { width: 360, height: 780 }, shown: "" },
 ]) {
-  test(`at ${width.name}, the view select opens its eight views on a search and the view found there is the screen's`, async () => {
+  test(`at ${width.name}, the view select names the standing view as the width asks, opens its eight views on a search and the view found there is the screen's`, async () => {
     const state = standIn();
     const context = await screen.browser.newContext({ viewport: width.viewport });
 
@@ -41,7 +44,13 @@ for (const width of [
       await page.goto(`${screen.origin}/files?place=drive&path=docs`);
       await page.locator('[data-entry="readme.txt"]').first().waitFor();
 
-      await page.locator(`button[aria-label="${words.drive.action.view}"]`).first().click();
+      const select = `button[aria-label="${words.drive.action.view}"]`;
+
+      await page.waitForFunction(
+        ([found, shown]) => document.querySelector(found)?.textContent?.trim() === shown,
+        [select, width.shown] as const,
+      );
+      await page.locator(select).click();
 
       const list = page.locator('[data-slot="content"][data-side]:has([role="listbox"])');
 
