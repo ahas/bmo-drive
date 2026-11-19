@@ -59,6 +59,9 @@ under `drive.*`, with `drive.error.<code>` for each refusal code of `docs/api.md
   release, and the service answers its files with its manifest.
 - **The layer.** `client/vendor/` holds bmo-ui's release file as bmo-ui's release verb wrote it, the one
   bmo-chat's `shared-versions.toml` pins; the bundle is installed, built and typechecked against it. The
+  component library stands at the exact version that release names, and the install applies the layer's own
+  patches for it, its primitives and its icons, kept in `client/patches/`: a patch applies to the exact version
+  it names alone. The
   Nuxt configuration in `client/` serves the typecheck alone.
 - **The types.** The screen's types of the service's answers are generated from `docs/openapi.json` into
   `client/shared/openapi.ts` by `bun run api`.
