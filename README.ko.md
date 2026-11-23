@@ -26,7 +26,8 @@
 그곳의 작은 Nuxt 호스트 안에서 단독으로 서고, 번들 자체의 문구와 함께 개발 서버로 제공되며, 서비스의 대역을 상대로
 Chromium에서 구동됩니다. `tests/browser/files-upload.test.ts`는 열린 폴더에 파일을 끌어다 놓거나 붙여 넣고,
 붙여 넣는 순간 브라우저가 이름을 붙이는 그림을 붙여 넣고, 이름 바꾸기 입력란에 붙여 넣고, 화면에서 복사한 항목을
-붙여 넣습니다. `tests/browser/files-view.test.ts`는 넓은 창과 휴대폰 너비에서 도구 모음으로 보기를 고릅니다. 번들의
+붙여 넣습니다. `tests/browser/files-view.test.ts`는 넓은 창과 휴대폰 너비에서 도구 모음으로 보기를 고르고,
+`tests/words/packs.test.ts`는 언어 팩의 네 로케일이 같은 키와 자리 표시자를 갖는지 확인합니다. 번들의
 검사인 `client/` 안의 `bun run check`(고정된 설치, 타입 검사, 브라우저 테스트)가 이들과 나란히 있습니다.
 `docs/inventory.md`는 이전 동작을 지키던 테스트를 나열합니다.
 

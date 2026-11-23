@@ -28,7 +28,8 @@ its browser tests in `client/tests/`: the Files screen stands on its own in a sm
 dev server with the bundle's own words and driven in Chromium against a stand-in of the service, and
 `tests/browser/files-upload.test.ts` drops and pastes files into the open folder, pastes a picture the browser
 names at the paste, pastes into the rename field and pastes entries copied on the screen, and
-`tests/browser/files-view.test.ts` chooses the view from the toolbar at a wide window and at a phone's width. The bundle's check,
+`tests/browser/files-view.test.ts` chooses the view from the toolbar at a wide window and at a phone's width, and
+`tests/words/packs.test.ts` holds the language pack's four locales to the same keys and placeholders. The bundle's check,
 `bun run check` inside `client/` (its frozen install, its typecheck and its browser tests), stands beside them.
 `docs/inventory.md` lists the tests the old behaviour was held to.
 

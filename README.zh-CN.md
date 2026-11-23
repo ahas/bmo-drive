@@ -22,7 +22,7 @@
 `client/tests/` 中：Files 页面在那里的一个小型 Nuxt 宿主中独立运行，由开发服务器连同前端包自己的文案一起提供，并在
 Chromium 中针对服务的替身进行驱动。`tests/browser/files-upload.test.ts` 向打开的文件夹拖放和粘贴文件，粘贴一张由
 浏览器在粘贴时命名的图片，向重命名输入框粘贴，并粘贴在页面上复制的条目；`tests/browser/files-view.test.ts` 在宽
-窗口和手机宽度下通过工具栏选择视图。前端包的检查，即 `client/` 中的 `bun run check`（锁定版本的安装、类型检查和
+窗口和手机宽度下通过工具栏选择视图；`tests/words/packs.test.ts` 确认语言包的四种语言区域拥有相同的键和占位符。前端包的检查，即 `client/` 中的 `bun run check`（锁定版本的安装、类型检查和
 浏览器测试），与上述测试并列。`docs/inventory.md` 列出了旧行为所依据的测试。
 
 ## 目录结构

@@ -1,6 +1,6 @@
 {
-  // The browser tests and what supports them, typechecked on their own: the host they stand the screen in is a
-  // Nuxt project, typed by its own preparation, and stands outside.
+  // The browser tests, the language pack's test and what supports them, typechecked on their own: the host they
+  // stand the screen in is a Nuxt project, typed by its own preparation, and stands outside.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -13,5 +13,5 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": ["browser/**/*.ts", "support/**/*.ts"]
+  "include": ["browser/**/*.ts", "support/**/*.ts", "words/**/*.ts"]
 }

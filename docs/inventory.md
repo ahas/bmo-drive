@@ -164,9 +164,12 @@ bundle's pages is the console's.
 
 ### The screen's words
 
-The screen reads its words from the bundle's own pack, `client/i18n/`, under `drive`, beside the layer's
+The screen reads its words from the bundle's own pack, `client/i18n/`, under `drive`, in English, Korean, Japanese
+and Simplified Chinese (`en`, `ko`, `ja`, `zh-CN`, the locale codes the console speaks), beside the layer's
 own `common` and `files` keys the console answers. The old pack's whole `files` part is carried there, with
-a key for each refusal code (`drive.error.<code>`, `docs/api.md`).
+a key for each refusal code (`drive.error.<code>`, `docs/api.md`). Every locale's file holds the English
+file's keys in its order, each word naming the same placeholders, and `client/tests/words/packs.test.ts` holds
+them to it.
 
 ## The old tests
 
