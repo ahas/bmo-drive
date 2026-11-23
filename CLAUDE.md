@@ -45,7 +45,8 @@ These hold every bmo repository, and every change here (archive document #301, i
 
 - Everything in this repository is English: code, comments, strings, tests, documents, commit messages
   and branch names. No Korean in code or tests, written plainly or as escapes; `korean-ledger.json`
-  names none.
+  names none. The README's Korean, Japanese and Chinese translations at the root (`README.ko.md`, `README.ja.md`,
+  `README.zh-CN.md`) are the one exception.
 - What the service answers is an English sentence for a log and a kebab-case code a screen shows in its
   own language's words (`docs/api.md`, 「Refusals」). The screen's words stand in the console plugin
   bundle's own language pack, `client/i18n/`, one file to a locale; its Korean file is data a screen
