@@ -332,6 +332,10 @@ them as the contract names. This section names only what the drive hands the cra
   | `pushKinds`, `calls`, `relays` | none: the screens call the routes of this document alone, the node list among them (「Places」), and read no event stream |
   | `shareReads` | `/shares/{token}` and `/shares/{token}/content`, the two reads a link's holder makes (「Share links」) |
 
+- **The Files app.** The service name `drive` is the key of the app the screen is, which a person's settings
+  switch on and off on the account service's delegation chain. The service ships no tool, so its deployment
+  publishes the app from `deploy/app.toml`, the `[app]` table alone, offered and on by default, with `bmo pocket
+  app` once the service answers ready (bmo-pocket's `docs/api.md`, 「An app on the delegation chain」).
 - **Its Files screen** uses the contract's people directory and its sharing with members: the share dialog's
   member road searches and names people through the directory the console provides, and reads, grants,
   changes and takes back members through 「Member shares」; its branch of what is shared with the signed-in

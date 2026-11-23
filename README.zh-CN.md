@@ -33,7 +33,7 @@ Chromium 中针对服务的替身进行驱动。`tests/browser/files-upload.test
 | `migrations/` | 存储：按顺序创建各张表的语句 |
 | `skills/` | `bmo-drive` 技能，与 MCP 服务器并列的 harness 插件的另一半 |
 | `client/` | 控制台插件包：Files 页面和文件共享页面，是一个独立项目，构建配置位于 `client/console/` |
-| `deploy/` | 服务的用户单元 |
+| `deploy/` | 服务的用户单元，以及部署发布的应用声明 |
 | `docs/` | 服务行为的规范说明以及 OpenAPI 文档 |
 | `tests/` | 目前已有的行为测试 |
 

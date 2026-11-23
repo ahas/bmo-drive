@@ -38,7 +38,7 @@ Chromium에서 구동됩니다. `tests/browser/files-upload.test.ts`는 열린 �
 | `migrations/` | 저장소. 테이블을 순서대로 만드는 구문 |
 | `skills/` | `bmo-drive` 스킬. MCP 서버와 함께 하니스 플러그인의 나머지 절반 |
 | `client/` | 콘솔 플러그인 번들: Files 화면과 파일 공유 페이지. 독립된 프로젝트이며 빌드는 `client/console/`에 있음 |
-| `deploy/` | 서비스의 사용자 유닛 |
+| `deploy/` | 서비스의 사용자 유닛과 배포가 게시하는 앱 선언 |
 | `docs/` | 서비스가 하는 일에 대한 정식 기술과 OpenAPI 문서 |
 | `tests/` | 지금까지 갖춰진 동작 테스트 |
 

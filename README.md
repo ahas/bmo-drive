@@ -40,7 +40,7 @@ names at the paste, pastes into the rename field and pastes entries copied on th
 | `migrations/` | The store, its tables made by these statements in order |
 | `skills/` | The `bmo-drive` skill, the harness plugin's half beside the MCP server |
 | `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own, with its build in `client/console/` |
-| `deploy/` | The service's user unit |
+| `deploy/` | The service's user unit, and the app declaration its deployment publishes |
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |
 | `tests/` | The behaviour tests standing so far |
 
