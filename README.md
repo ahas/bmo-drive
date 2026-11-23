@@ -1,3 +1,5 @@
+**English** | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+
 # bmo-drive
 
 The file viewer as one service with its own API: this machine's drives, its Garage and the nodes'
@@ -12,7 +14,9 @@ unit is reached through its API, as `docs/api.md` lists.
 The testbed's `personal-data` check holds the personal-data rule (`PERSONAL-DATA.md`). The repository
 carries the import of the old archive's share links in `tests/import.rs`, and the owners and
 their two branches in `tests/owners.rs`: each owner's drive its own alone, the quota judged before bytes
-arrive, the machines the administrator's alone, and share links opening in both branches; the console
+arrive, the machines the administrator's alone, and share links opening in both branches; member shares in
+`tests/members.rs`: a file or folder shared with a member read by that member alone, the share ended and the
+reading refused again; the console
 face in `tests/console.rs`: the manifest the service serves read through bmo-ui's own reading on the release
 `client/vendor/` holds, run with Bun by bmo-console-face, the face wired to the console's credential, and
 the drive's own guard of every other route; links on a volume in
@@ -23,7 +27,8 @@ each share a read-only place read through the member's own roads. `cargo test` r
 its browser tests in `client/tests/`: the Files screen stands on its own in a small Nuxt host there, served by its
 dev server with the bundle's own words and driven in Chromium against a stand-in of the service, and
 `tests/browser/files-upload.test.ts` drops and pastes files into the open folder, pastes a picture the browser
-names at the paste, pastes into the rename field and pastes entries copied on the screen. The bundle's check,
+names at the paste, pastes into the rename field and pastes entries copied on the screen, and
+`tests/browser/files-view.test.ts` chooses the view from the toolbar at a wide window and at a phone's width. The bundle's check,
 `bun run check` inside `client/` (its frozen install, its typecheck and its browser tests), stands beside them.
 `docs/inventory.md` lists the tests the old behaviour was held to.
 
