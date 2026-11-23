@@ -44,7 +44,7 @@ names at the paste, pastes into the rename field and pastes entries copied on th
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |
 | `tests/` | The behaviour tests standing so far |
 
-At the root stand the Cargo manifest, `VERSION`, `testbed.toml`, `rustfmt.toml`, `CLAUDE.md`,
+At the root stand the Cargo manifest, `VERSION`, `testbed.toml`, `install.toml`, `rustfmt.toml`, `CLAUDE.md`,
 `PERSONAL-DATA.md`, `korean-ledger.json`, `settings.toml`, `settings.local.toml.example` (the example of
 the local settings a deployment gives) and `LICENSE`.
 

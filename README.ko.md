@@ -42,7 +42,7 @@ Chromium에서 구동됩니다. `tests/browser/files-upload.test.ts`는 열린 �
 | `docs/` | 서비스가 하는 일에 대한 정식 기술과 OpenAPI 문서 |
 | `tests/` | 지금까지 갖춰진 동작 테스트 |
 
-루트에는 Cargo 매니페스트, `VERSION`, `testbed.toml`, `rustfmt.toml`, `CLAUDE.md`, `PERSONAL-DATA.md`,
+루트에는 Cargo 매니페스트, `VERSION`, `testbed.toml`, `install.toml`, `rustfmt.toml`, `CLAUDE.md`, `PERSONAL-DATA.md`,
 `korean-ledger.json`, `settings.toml`, `settings.local.toml.example`(배포가 제공하는 로컬 설정의 예시),
 `LICENSE`가 있습니다.
 

@@ -43,7 +43,7 @@
 | `docs/` | サービスが何をするかの正規の記述と OpenAPI ドキュメント |
 | `tests/` | 現時点で揃っている挙動テスト |
 
-ルートには Cargo マニフェスト、`VERSION`、`testbed.toml`、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
+ルートには Cargo マニフェスト、`VERSION`、`testbed.toml`、`install.toml`、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
 `korean-ledger.json`、`settings.toml`、`settings.local.toml.example`（デプロイが用意するローカル設定の例）、
 `LICENSE` があります。
 
