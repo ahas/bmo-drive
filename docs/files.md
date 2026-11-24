@@ -395,6 +395,17 @@ flowchart TD
   before any row is written, and whether it is a file or a folder is judged there, never taken from the
   caller.
 
+## The store
+
+- **The store is one SQLite file whose schema starts at the 1.0.0 baseline,** one migration that makes the
+  links', member shares', quotas' and events' tables. Every later change to the schema is a migration after
+  it, run as the service or the command opens the store.
+- **An install from before 1.0.0 is taken as it stands.** A store whose record of migrations names every
+  migration of the last release before 1.0.0, and nothing else, already holds the baseline's schema: the
+  record is rewritten to name the baseline alone, in one transaction, and no table and no row is touched. A
+  store whose record names only part of them is refused, with the version it stopped at; it is brought to the
+  last release before 1.0.0 by that release first.
+
 ## Sharing with members
 
 - **An owner shares one file or folder with members of the reader's company,** each named by their owner
