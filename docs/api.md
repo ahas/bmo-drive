@@ -543,6 +543,7 @@ token lets no caller in with it.
 
 ## Versions
 
-The repository's version is the crate's, `0.1.0` followed by `-rev.<n>` until the first release: each
-change to this document's routes, fields, codes, command, plugin or settings raises the revision alone.
-The OpenAPI document and the console plugin bundle carry the same version.
+The version is the set's (bmo-chat's `docs/conventions.md`, 「Versions」), read off the git tag when a build
+is made and handed to the build as `BMO_VERSION`; the health, the MCP server and `--version` answer it. The
+crate's version, the OpenAPI document's and the console plugin bundle's are a placeholder that never moves,
+and a change to this document's routes, fields, codes, command, plugin or settings moves no version.

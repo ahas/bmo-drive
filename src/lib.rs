@@ -26,6 +26,14 @@ use crate::http::Standing;
 use crate::settings::Settings;
 use crate::store::Store;
 
+/// The version the drive's health, its MCP server and its command name: the set's version the build was
+/// made at, which the testbed hands the build as `BMO_VERSION`, else the manifest's placeholder (bmo-chat's
+/// `docs/conventions.md`, 「Versions」).
+pub const VERSION: &str = match option_env!("BMO_VERSION") {
+  Some(version) => version,
+  None => env!("CARGO_PKG_VERSION"),
+};
+
 /// Opens the store, then answers the routes on the settings' address until the process is told to stop, and
 /// then until every request still in hand has ended, the live event streams ended at once.
 pub async fn serve(settings: Settings) -> Result<(), String> {

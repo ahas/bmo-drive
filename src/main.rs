@@ -13,7 +13,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
   name = "bmo-drive",
-  version,
+  version = bmo_drive::VERSION,
   about = "The file viewer, its share links and its harness plugin"
 )]
 struct Command {

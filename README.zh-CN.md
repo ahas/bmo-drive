@@ -37,7 +37,7 @@ Chromium 中针对服务的替身进行驱动。`tests/browser/files-upload.test
 | `docs/` | 服务行为的规范说明以及 OpenAPI 文档 |
 | `tests/` | 目前已有的行为测试 |
 
-根目录下有 Cargo 清单、`VERSION`、`testbed.toml`、`install.toml`、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
+根目录下有 Cargo 清单、`testbed.toml`、`install.toml`、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
 `korean-ledger.json`、`settings.toml`、`settings.local.toml.example`（部署时提供的本地设置示例）以及 `LICENSE`。
 
 ## 控制台插件包
@@ -70,7 +70,7 @@ Chromium 中针对服务的替身进行驱动。`tests/browser/files-upload.test
 
 ## 版本
 
-`VERSION` 保存仓库的版本，也就是 crate 自身的版本；版本如何变动见 `docs/api.md` 的「Versions」。
+版本属于整个套件，在构建时从 git 标签读取；crate 的版本只是永不变动的占位值（见 `docs/api.md` 的「Versions」）。
 
 ## 许可证
 
