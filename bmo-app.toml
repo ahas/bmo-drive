@@ -1,0 +1,67 @@
+# The one declaration this application answers to: bmo-app-sdk's docs/manifest.md states every
+# field, and testbed.toml, install.toml, the unit and the removal script are generated from this
+# file by bmo-app-declare. What is bmo-drive's own — its routes, its stores, its bundle and words —
+# stands in src/, client/ and docs/.
+
+app = 1
+name = "bmo-drive"
+description = "the file viewer and its share links"
+env_prefix = "BMO_DRIVE"
+deploy_root = "~/.local/share/bmo-drive"
+data_root = "~/.local/share/bmo/data"
+data_folder = "drive"
+service_port = 13110
+port_name = "drive.server"
+checkout = "~/repos/ahas/bmo/services/drive"
+base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-console-face", "bmo-ui"]
+shared_versions = "bmo-chat"
+korean_ledger = "korean-ledger.json"
+personal_data_allowed = ["dev@ahas.io"]
+
+[console]
+project = "client"
+install = "bun install --frozen-lockfile"
+reach = true
+publish = true
+
+[[token]]
+name = "drive.service"
+file = "env/drive-service.token"
+
+[[token]]
+name = "drive.console"
+file = "env/drive-console.token"
+
+[[settings]]
+file = "env/drive.toml"
+text = """
+[server]
+listen = "127.0.0.1:{{port.drive.server}}"
+token = "{{token.drive.service}}"
+
+[store]
+path = "{{data_root}}/drive/drive.db"
+
+[share]
+address = "{{input.web.public-address}}files/share"
+
+[owners]
+administrator = "{{value.web.owner-account}}"
+
+[console]
+token = "{{token.drive.console}}"
+
+[storage]
+kind = "local"
+root = "{{data_root}}/drive/spaces"
+"""
+
+[[line]]
+file = "env/web-console.env"
+key = "DRIVE_ADDRESS"
+value = "http://127.0.0.1:{{port.drive.server}}"
+
+[[line]]
+file = "env/web-console.env"
+key = "DRIVE_TOKEN"
+value = "{{token.drive.console}}"

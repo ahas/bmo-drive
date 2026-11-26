@@ -31,6 +31,8 @@ axum = { version = "0.8.9", features = ["macros", "multipart", "ws"] }
 bmo-console-face = { path = "../../base/chat/console-face" }
 # A jake hub's output chunks, a name handed to a Windows node's script, and a file's bytes in a tool answer.
 base64 = "0.22.1"
+# The shared service skeleton: the serving loop and its graceful stop, and the coded answer shape.
+bmo-app-service = { path = "../../../bmo-app-sdk/crates/service" }
 # A zip entry's time, as this machine's clock writes it.
 chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }

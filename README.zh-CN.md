@@ -35,9 +35,10 @@ Chromium 中针对服务的替身进行驱动。`tests/browser/files-upload.test
 | `client/` | 控制台插件包：Files 页面和文件共享页面，是一个独立项目，构建配置位于 `client/console/` |
 | `deploy/` | 服务的用户单元，以及部署发布的应用声明 |
 | `docs/` | 服务行为的规范说明以及 OpenAPI 文档 |
+| `scripts/` | 与声明一并生成的、把本应用从机器上移除的脚本 |
 | `tests/` | 目前已有的行为测试 |
 
-根目录下有 Cargo 清单、`testbed.toml`、`install.toml`、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
+根目录下有 Cargo 清单、`bmo-app.toml`(唯一声明;`testbed.toml`、`install.toml`、`deploy/` 单元与 `scripts/remove.sh` 由它生成)、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
 `korean-ledger.json`、`settings.toml`、`settings.local.toml.example`（部署时提供的本地设置示例）以及 `LICENSE`。
 
 ## 控制台插件包

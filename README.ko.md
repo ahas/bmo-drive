@@ -41,9 +41,10 @@ Chromium에서 구동됩니다. `tests/browser/files-upload.test.ts`는 열린 �
 | `client/` | 콘솔 플러그인 번들: Files 화면과 파일 공유 페이지. 독립된 프로젝트이며 빌드는 `client/console/`에 있음 |
 | `deploy/` | 서비스의 사용자 유닛과 배포가 게시하는 앱 선언 |
 | `docs/` | 서비스가 하는 일에 대한 정식 기술과 OpenAPI 문서 |
+| `scripts/` | 선언물과 함께 생성되는, 이 앱을 컴퓨터에서 제거하는 절차 |
 | `tests/` | 지금까지 갖춰진 동작 테스트 |
 
-루트에는 Cargo 매니페스트, `testbed.toml`, `install.toml`, `rustfmt.toml`, `CLAUDE.md`, `PERSONAL-DATA.md`,
+루트에는 Cargo 매니페스트, `bmo-app.toml`(단 하나의 선언; `testbed.toml`, `install.toml`, `deploy/`의 유닛과 `scripts/remove.sh`는 여기서 생성된다), `rustfmt.toml`, `CLAUDE.md`, `PERSONAL-DATA.md`,
 `korean-ledger.json`, `settings.toml`, `settings.local.toml.example`(배포가 제공하는 로컬 설정의 예시),
 `LICENSE`가 있습니다.
 

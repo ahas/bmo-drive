@@ -42,9 +42,10 @@
 | `client/` | コンソールプラグインバンドル：Files 画面とファイル共有ページ。独立したプロジェクトで、ビルドは `client/console/` にある |
 | `deploy/` | サービスのユーザーユニットと、デプロイが公開するアプリ宣言 |
 | `docs/` | サービスが何をするかの正規の記述と OpenAPI ドキュメント |
+| `scripts/` | 宣言物とともに生成される、このアプリをマシンから除く手順 |
 | `tests/` | 現時点で揃っている挙動テスト |
 
-ルートには Cargo マニフェスト、`testbed.toml`、`install.toml`、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
+ルートには Cargo マニフェスト、`bmo-app.toml`(単一のマニフェスト。`testbed.toml`、`install.toml`、`deploy/` のユニットと `scripts/remove.sh` はここから生成される)、`rustfmt.toml`、`CLAUDE.md`、`PERSONAL-DATA.md`、
 `korean-ledger.json`、`settings.toml`、`settings.local.toml.example`（デプロイが用意するローカル設定の例）、
 `LICENSE` があります。
 

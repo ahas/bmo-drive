@@ -43,9 +43,11 @@ names at the paste, pastes into the rename field and pastes entries copied on th
 | `client/` | The console plugin bundle: the Files screen and the file share page, a project of its own, with its build in `client/console/` |
 | `deploy/` | The service's user unit, and the app declaration its deployment publishes |
 | `docs/` | The canonical statements of what the service does, and the OpenAPI document |
+| `scripts/` | The application's removal from a machine, generated like the declarations |
 | `tests/` | The behaviour tests standing so far |
 
-At the root stand the Cargo manifest, `testbed.toml`, `install.toml`, `rustfmt.toml`, `CLAUDE.md`,
+At the root stand the Cargo manifest, `bmo-app.toml` (the one manifest, whose generated readings are
+`testbed.toml`, `install.toml`, the unit under `deploy/` and `scripts/remove.sh`), `rustfmt.toml`, `CLAUDE.md`,
 `PERSONAL-DATA.md`, `korean-ledger.json`, `settings.toml`, `settings.local.toml.example` (the example of
 the local settings a deployment gives) and `LICENSE`.
 

@@ -1,6 +1,7 @@
-# What installing the file viewer on a fresh machine needs, read by the testbed's install verb (bmo-testbed's
-# docs/install.md, 「The install declaration」). The settings are docs/api.md's 「Settings」.
+# Generated from bmo-app.toml by bmo-app-sdk's bmo-app-declare.
+# Change the manifest and run `bmo-app-declare bmo-app.toml` again; do not hand-edit this file.
 
+# What installing this application needs on a machine, read by the testbed's install verb.
 install = 1
 
 restart = "systemctl --user restart bmo-drive.service"
@@ -15,7 +16,7 @@ what = "Builds the console bundle at every release; the Bun runtime from https:/
 
 [[port]]
 name = "drive.server"
-number = 3300
+number = 13110
 
 [[token]]
 name = "drive.service"
@@ -25,9 +26,7 @@ file = "env/drive-service.token"
 name = "drive.console"
 file = "env/drive-console.token"
 
-# The release's settings.local.toml. The BMO drive is a local folder under the data root; a share link stands
-# under the console's public address, at the bundle's share page; the administrator is the owner's account on
-# the account service. The node service is left at its default, so the nodes are listed only where one answers.
+# The deployed settings the release links beside its own.
 [[settings]]
 file = "env/drive.toml"
 text = """
