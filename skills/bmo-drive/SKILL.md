@@ -1,6 +1,6 @@
 ---
 name: bmo-drive
-description: Walk, read, write and share files with the bmo-drive MCP server. Use when a task needs the files of a machine's volumes, its S3-compatible store or another machine's volumes through the drive service rather than a local shell, when a file has to be handed to someone as a download link, or when building or checking a caller of the drive service.
+description: How the bmo-drive MCP tools walk, read, write, copy, move and share the files of a place: the owner's drive, a machine's volumes, its S3-compatible store or another machine's volumes, with the arguments each takes.
 ---
 
 # bmo-drive
@@ -25,7 +25,7 @@ other owner reaches its own drive alone.
 
 ## Places first
 
-Every tool but `drive_places` and `drive_share` names a place by its `placeName`, so start with
+Every tool but `drive_places` names a place by its `placeName`, so start with
 `drive_places`. It lists the owner's BMO drive (`drive`), then, for the administrator, this machine's
 volumes (`volume:<mount>`) and its store (`garage`); with `nodeName`
 it lists that node's volumes (`node:<nodeName>:<mount>`) instead, reading the node over the network. A place
@@ -36,7 +36,9 @@ whose `reason` is set cannot be opened now; its `reasonCode` says why.
 - `drive_entries` lists the folder at `path` (the place's top where none is given) a page at a time:
   `after` is how many entries were already read, `limit` how many to read, and `totalCount` how many the
   folder holds. `sort` (`name`, `byteCount`, `changedAt`), `order` and `folders` shape the listing.
-- A path is names joined by `/` from the place's top, never with `.` or `..`.
+- A path is names joined by `/` from the place's top, never with `.` or `..`. `drive_read`, `drive_write`,
+  `drive_move` and `drive_delete` take the entry's path as `entryPath`; `drive_entries` and `drive_share` take it as
+  `path`.
 - `drive_read` answers a file's bytes in base64, at most 4 MiB from `start`. Read a longer file a part at
   a time, moving `start` on by `byteCount` until it reaches `fileByteCount`.
 
@@ -55,7 +57,7 @@ whose `reason` is set cannot be opened now; its `reasonCode` says why.
 
 ## Sharing
 
-`drive_share` makes a link to one file or folder, until `expiresAt` (epoch milliseconds) or with no end
+`drive_share` with `placeName` and `path` makes a link to one file or folder, until `expiresAt` (epoch milliseconds) or with no end
 where none is given; asking again for the same entry hands back the link that stands. Hand the person the
 link's `url`: it opens a page with a download, a folder downloading as its zip.
 
